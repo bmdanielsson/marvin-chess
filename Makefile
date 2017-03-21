@@ -21,17 +21,17 @@ endif
 .PHONY : variant
 ifeq ($(variant), release)
     CPPFLAGS += -DNDEBUG
-    CFLAGS = -O3 -funroll-loops -fomit-frame-pointer
-    LDFLAGS = $(ARCH)
+    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer
+    LDFLAGS += $(ARCH)
 else
 ifeq ($(variant), debug)
-    CFLAGS = -g
-    LDFLAGS = $(ARCH)
+    CFLAGS += -g
+    LDFLAGS += $(ARCH)
 else
 ifeq ($(variant), profile)
     CPPFLAGS += -DNDEBUG
-    CFLAGS = -g -pg -O2 -funroll-loops
-    LDFLAGS = $(ARCH) -pg
+    CFLAGS += -g -pg -O2 -funroll-loops
+    LDFLAGS += $(ARCH) -pg
 endif
 endif
 endif
