@@ -17,6 +17,7 @@
  */
 #include <assert.h>
 #include <stdio.h>
+#include <inttypes.h>
 
 #include "test.h"
 #include "config.h"
@@ -153,7 +154,7 @@ void test_run_benchmark(void)
     total = get_current_time() - start;
 
     printf("Total time: %.2fs\n", total/1000.0);
-    printf("Total number of nodes: %llu\n", (unsigned long long)nodes);
+    printf("Total number of nodes: %"PRIu64"\n", nodes);
     printf("Speed: %.2fkN/s\n", ((double)nodes)/(total/1000.0)/1000);
 
     destroy_game_state(pos);
