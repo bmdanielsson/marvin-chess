@@ -38,7 +38,7 @@ endif
 
 # Set special flags needed for Windows
 ifeq ($(OS), Windows_NT)
-CFLAGS += -DWIN32
+CFLAGS += -DWINDOWS
 endif
 
 # Configure warnings

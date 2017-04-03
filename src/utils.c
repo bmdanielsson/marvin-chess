@@ -18,7 +18,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
-#if defined(WIN32)
+#if defined(WINDOWS)
 #include <windows.h>
 #include <sys/timeb.h>
 #include <process.h>
@@ -100,7 +100,7 @@ int pop_bit(uint64_t *v)
 
 time_t get_current_time(void)
 {
-#ifdef WIN32
+#ifdef WINDOWS
     struct timeb tb;
 
     ftime(&tb);
@@ -119,7 +119,7 @@ time_t get_current_time(void)
 
 int get_current_pid(void)
 {
-#ifdef WIN32
+#ifdef WINDOWS
     return _getpid();
 #else
     return getpid();
@@ -128,7 +128,7 @@ int get_current_pid(void)
 
 bool poll_input(void)
 {
-#ifdef WIN32
+#ifdef WINDOWS
     HANDLE handle;
     DWORD  temp;
 
@@ -162,7 +162,7 @@ bool poll_input(void)
 
 void sleep_ms(int ms)
 {
-#ifdef WIN32
+#ifdef WINDOWS
     Sleep(ms);
 #else
     struct timespec ts;
