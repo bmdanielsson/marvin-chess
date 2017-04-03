@@ -36,8 +36,7 @@ endif
 endif
 endif
 
-# Enable C99
-CFLAGS += -std=c99 -D_GNU_SOURCE
+# Set special flags needed for Windows
 ifeq ($(OS), Windows_NT)
 CFLAGS += -DWIN32
 endif
