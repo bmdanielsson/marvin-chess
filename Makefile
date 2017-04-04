@@ -7,6 +7,8 @@ variant = release
 ifeq ($(popcnt), yes)
     CPPFLAGS += -DHAS_POPCNT
     CFLAGS += -msse3 -mpopcnt
+else
+    CPPFLAGS += -DTB_NO_HW_POP_COUNT
 endif
 .PHONY : arch
 ifeq ($(arch), x86)
@@ -42,7 +44,10 @@ CFLAGS += -DWINDOWS
 endif
 
 # Configure warnings
-CFLAGS += -W -Wall -Werror
+CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
+
+# Extra include directories
+CFLAGS += -Iimport/fathom -Isrc
 
 # Common linker options
 LDFLAGS += -lm
@@ -75,7 +80,8 @@ SOURCES = src/bitboard.c \
           src/uci.c \
           src/utils.c \
           src/validation.c \
-          src/xboard.c
+          src/xboard.c \
+          import/fathom/tbprobe.c
 TUNER_SOURCES = src/bitboard.c \
                 src/board.c \
                 src/chess.c \
@@ -98,11 +104,16 @@ TUNER_SOURCES = src/bitboard.c \
                 src/uci.c \
                 src/utils.c \
                 src/validation.c \
-                src/xboard.c
+                src/xboard.c \
+                import/fathom/tbprobe.c
 
-# Objects
+# Intermediate files
 OBJECTS = $(SOURCES:%.c=%.o)
+DEPS = $(SOURCES:%.c=%.d)
 TUNER_OBJECTS = $(TUNER_SOURCES:%.c=%.o)
+TUNER_DEPS = $(TUNER_SOURCES:%.c=%.d)
+INTERMEDIATES = $(OBJECTS) $(DEPS)
+TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
 
 # Include depencies
 -include $(SOURCES:.c=.d)
@@ -118,7 +129,7 @@ TUNER_OBJECTS = $(TUNER_SOURCES:%.c=%.o)
                 -e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $*.d; \
 
 clean :
-	rm -f marvin marvin.exe tuner src/*.o src/*.d
+	rm -f marvin marvin.exe tuner $(INTERMEDIATES) $(TUNER_INTERMEDIATES)
 .PHONY : clean
 
 help :
