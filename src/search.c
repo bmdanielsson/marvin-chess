@@ -629,12 +629,19 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
     int       bwindex = 0;
     struct pv pv;
 	bool      ponderhit;
+	bool      analysis;
 
     assert(valid_board(pos));
     assert(ponder_move != NULL);
 
 	/* Initialize ponder move */
 	*ponder_move = NOMOVE;
+	
+	/*
+	 * Try to guess if the search is part of a
+	 * game or if it is for analysis.
+	 */
+	analysis = (pos->tc_type == TC_INFINITE) || (pos->root_moves.nmoves > 0);
 	
     /* Try to find a move in the opening book */
     if (pos->use_own_book && pos->in_book) {
@@ -676,7 +683,7 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
          * If there is only one legal move then there is no
          * need to do a search. Instead save the time for later.
          */
-        if (pos->root_moves.nmoves == 1 && !pos->pondering) {
+        if (pos->root_moves.nmoves == 1 && !pos->pondering && !analysis) {
             return pos->root_moves.moves[0];
         }
 
