@@ -53,9 +53,9 @@ static bool check_tt_cutoff(struct gamestate *pos, struct tt_item *item,
 
     /* Adjust mate scores */
     adj_score = item->score;
-    if (adj_score > FORCED_MATE) {
+    if (adj_score > KNOWN_WIN) {
         adj_score -= pos->sply;
-    } else if (adj_score < -FORCED_MATE) {
+    } else if (adj_score < -KNOWN_WIN) {
         adj_score += pos->sply;
     }
     *score = adj_score;
@@ -155,19 +155,21 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
      * as boundaries. The reason is that the score have taken on a
      * different meaning in these cases since the mate was actually
      * found in a different part of the tree.
+     *
+     * The same reasoning also applies to tablebase wins/losses so
+     * they are treated the same way.
      */
-    if (score > FORCED_MATE) {
+    if (score > KNOWN_WIN) {
         if (type != TT_EXACT) {
             return;
         }
         score += pos->sply;
-    } else if (score < -FORCED_MATE) {
+    } else if (score < -KNOWN_WIN) {
         if (type != TT_EXACT) {
             return;
         }
         score -= pos->sply;
     }
-    assert((score <= CHECKMATE) && (score >= (-CHECKMATE)));
 
     /* Find the correct bucket */
     idx = (uint32_t)(pos->key%pos->tt_size);

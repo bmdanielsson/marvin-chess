@@ -35,6 +35,7 @@
 #include "timectl.h"
 #include "polybook.h"
 #include "debug.h"
+#include "tbprobe.h"
 
 /* Possible game results */
 enum game_result {
@@ -346,6 +347,29 @@ static void xboard_cmd_exit(void)
     analyze_mode = false;
 }
 
+static void xboard_cmd_egtpath(char *cmd, struct gamestate *pos)
+{
+    char *iter;
+
+    if (pos->use_tablebases) {
+        return;
+    }
+
+    iter = strstr(cmd, "syzygy");
+    if (iter == NULL) {
+        engine_write_command("Error (malformed command): %s", cmd);
+        return;
+    }
+    iter += strlen("syzygy");
+    iter = skip_whitespace(iter);
+
+    strncpy(syzygy_path, iter, sizeof(syzygy_path));
+    if (tb_init(syzygy_path) && (TB_LARGEST > 0)) {
+        pos->tb_men = TB_LARGEST;
+        pos->use_tablebases = pos->tb_men > 0;
+    }
+}
+
 static void xboard_cmd_force(void)
 {
     force_mode = true;
@@ -538,6 +562,7 @@ static void xboard_cmd_protover(void)
 	engine_write_command("feature colors=0");
 	engine_write_command("feature name=0");
 	engine_write_command("feature nps=0");
+	engine_write_command("feature egt=\"syzygy\"");
     engine_write_command("feature done=1");
 }
 
@@ -696,6 +721,8 @@ bool xboard_handle_command(struct gamestate *pos, char *cmd, bool *stop)
         xboard_cmd_easy(pos);
     } else if (!strncmp(cmd, "exit", 4)) {
         xboard_cmd_exit();
+    } else if (!strncmp(cmd, "egtpath", 7)) {
+        xboard_cmd_egtpath(cmd, pos);
     } else if (!strncmp(cmd, "force", 5)) {
         xboard_cmd_force();
     } else if (!strncmp(cmd, "go", 2)) {
@@ -854,6 +881,12 @@ void xboard_send_pv_info(struct gamestate *pos, int score)
 	/* Only display thinking in post mode */
 	if (!post_mode) {
 		return;
+    }
+
+    /* Adjust score in case the root position was found in tablebases */
+    if (pos->root_in_tb) {
+        score = ((score > FORCED_MATE) || (score < (-FORCED_MATE)))?
+                                                    score:pos->root_tb_score;
     }
 
 	/* Display thinking according to the current output mode */

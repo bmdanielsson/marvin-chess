@@ -36,6 +36,8 @@
 #include "utils.h"
 #include "polybook.h"
 #include "debug.h"
+#include "bitboard.h"
+#include "tbprobe.h"
 
 /* The number of plies to reduce the depth with when doing a null move */
 #define NULLMOVE_REDUCTION 2
@@ -100,6 +102,109 @@ static void add_killer_move(struct gamestate *pos, uint32_t move, int see_score)
 
     pos->killer_table[pos->sply][1] = pos->killer_table[pos->sply][0];
     pos->killer_table[pos->sply][0] = move;
+}
+
+static bool probe_wdl_tables(struct gamestate *pos, int *score)
+{
+    unsigned int res;
+
+    res = tb_probe_wdl(pos->bb_sides[WHITE], pos->bb_sides[BLACK],
+                    pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING],
+                    pos->bb_pieces[WHITE_QUEEN]|pos->bb_pieces[BLACK_QUEEN],
+                    pos->bb_pieces[WHITE_ROOK]|pos->bb_pieces[BLACK_ROOK],
+                    pos->bb_pieces[WHITE_BISHOP]|pos->bb_pieces[BLACK_BISHOP],
+                    pos->bb_pieces[WHITE_KNIGHT]|pos->bb_pieces[BLACK_KNIGHT],
+                    pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN],
+                    pos->fifty, pos->castle,
+                    pos->ep_sq != NO_SQUARE?pos->ep_sq:0,
+                    pos->stm == WHITE);
+    if (res == TB_RESULT_FAILED) {
+        *score = 0;
+        return false;
+    }
+
+    *score = (res == TB_WIN)?TABLEBASE_WIN-pos->sply:
+             (res == TB_LOSS)?-TABLEBASE_WIN+pos->sply:0;
+
+    return true;
+}
+
+static bool probe_dtz_tables(struct gamestate *pos, int *score)
+{
+    unsigned int res;
+    int          wdl;
+    int          promotion;
+    int          flags;
+    int          from;
+    int          to;
+
+    res = tb_probe_root(pos->bb_sides[WHITE], pos->bb_sides[BLACK],
+                    pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING],
+                    pos->bb_pieces[WHITE_QUEEN]|pos->bb_pieces[BLACK_QUEEN],
+                    pos->bb_pieces[WHITE_ROOK]|pos->bb_pieces[BLACK_ROOK],
+                    pos->bb_pieces[WHITE_BISHOP]|pos->bb_pieces[BLACK_BISHOP],
+                    pos->bb_pieces[WHITE_KNIGHT]|pos->bb_pieces[BLACK_KNIGHT],
+                    pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN],
+                    pos->fifty, pos->castle,
+                    pos->ep_sq != NO_SQUARE?pos->ep_sq:0,
+                    pos->stm == WHITE, NULL);
+    if (res == TB_RESULT_FAILED) {
+        return false;
+    }
+    wdl = TB_GET_WDL(res);
+    switch (wdl) {
+    case TB_LOSS:
+        *score = -TABLEBASE_WIN;
+        break;
+    case TB_WIN:
+        *score = TABLEBASE_WIN;
+        break;
+    case TB_BLESSED_LOSS:
+    case TB_CURSED_WIN:
+    case TB_DRAW:
+    default:
+        *score = 0;
+        break;
+    }
+
+    from = TB_GET_FROM(res);
+    to = TB_GET_TO(res);
+    flags = NORMAL;
+    promotion = NO_PIECE;
+    if (TB_GET_EP(res) != 0) {
+        flags = EN_PASSANT;
+    } else {
+        if (pos->pieces[to] != NO_PIECE) {
+            flags |= CAPTURE;
+        }
+        switch (TB_GET_PROMOTES(res)) {
+        case TB_PROMOTES_QUEEN:
+            flags |= PROMOTION;
+            promotion = QUEEN + pos->stm;
+            break;
+        case TB_PROMOTES_ROOK:
+            flags |= PROMOTION;
+            promotion = ROOK + pos->stm;
+            break;
+        case TB_PROMOTES_BISHOP:
+            flags |= PROMOTION;
+            promotion = BISHOP + pos->stm;
+            break;
+        case TB_PROMOTES_KNIGHT:
+            flags |= PROMOTION;
+            promotion = KNIGHT + pos->stm;
+            break;
+        case TB_PROMOTES_NONE:
+        default:
+            break;
+        }
+    }
+    pos->root_moves.moves[0] = MOVE(from, to, promotion, flags);
+    pos->root_moves.nmoves++;
+
+    assert(board_is_move_pseudo_legal(pos, pos->root_moves.moves[0]));
+
+    return true;
 }
 
 static void update_pv(struct gamestate *pos, uint32_t move)
@@ -248,6 +353,7 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
                   bool try_null)
 {
     int      score;
+    int      tb_score;
     int      see_score;
     int      best_score;
     uint32_t move;
@@ -316,6 +422,13 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
         return score;
     }
     select_set_tt_move(pos, move);
+
+    /* Probe tablebases */
+    if (pos->probe_wdl && (BITCOUNT(pos->bb_all) <= pos->tb_men)) {
+        if (probe_wdl_tables(pos, &tb_score)) {
+            return tb_score;
+        }
+    }
 
     /*
      * Null move pruning. If the opponent can't beat beta even when given
@@ -636,13 +749,13 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
 
 	/* Initialize ponder move */
 	*ponder_move = NOMOVE;
-	
+
 	/*
 	 * Try to guess if the search is part of a
 	 * game or if it is for analysis.
 	 */
 	analysis = (pos->tc_type == TC_INFINITE) || (pos->root_moves.nmoves > 0);
-	
+
     /* Try to find a move in the opening book */
     if (pos->use_own_book && pos->in_book) {
         best_move = polybook_probe(pos);
@@ -663,12 +776,21 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
 	}
 
     /* Prepare for search */
-	pos->pondering = pondering;
+    pos->probe_wdl = pos->use_tablebases;
+    pos->root_in_tb = false;
+    pos->root_tb_score = 0;
+    pos->pondering = pondering;
     pos->ponder_move = NOMOVE;
     pos->sply = 0;
     pos->abort = false;
     pos->resolving_root_fail = false;
     hash_tt_age_table(pos);
+
+    /* Probe tablebases for the root position */
+    if (pos->use_tablebases && (BITCOUNT(pos->bb_all) <= pos->tb_men)) {
+        pos->root_in_tb = probe_dtz_tables(pos, &pos->root_tb_score);
+        pos->probe_wdl = !pos->root_in_tb;
+    }
 
     /* If no root moves are specified then search all moves */
     if (pos->root_moves.nmoves == 0) {
@@ -683,7 +805,8 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
          * If there is only one legal move then there is no
          * need to do a search. Instead save the time for later.
          */
-        if (pos->root_moves.nmoves == 1 && !pos->pondering && !analysis) {
+        if (pos->root_moves.nmoves == 1 && !pos->pondering && !analysis &&
+            !pos->root_in_tb) {
             return pos->root_moves.moves[0];
         }
 
@@ -722,12 +845,12 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
 		*ponder_move = pos->ponder_move;
 
         /*
-         * Check if the score indicates a forced mate in
+         * Check if the score indicates a known win in
          * which case there is no point in searching any
          * further.
          */
         if (pos->exit_on_mate && !pos->pondering) {
-            if ((score > FORCED_MATE) || (score < (-FORCED_MATE))) {
+            if ((score > KNOWN_WIN) || (score < (-KNOWN_WIN))) {
                 break;
             }
         }

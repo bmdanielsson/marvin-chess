@@ -33,6 +33,7 @@
 #include "hash.h"
 #include "engine.h"
 #include "validation.h"
+#include "tbprobe.h"
 
 static void uci_cmd_go(char *cmd, struct gamestate *pos)
 {
@@ -318,6 +319,16 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *pos)
             } else if (!strncmp(iter, "true", 4)) {
                 pos->ponder = true;
             }
+        } else if (!strncmp(iter, "SyzygyPath", 10) && !pos->use_tablebases) {
+            iter = strstr(iter, "value");
+            iter += strlen("value");
+            iter = skip_whitespace(iter);
+
+            strncpy(syzygy_path, iter, sizeof(syzygy_path));
+            if (tb_init(syzygy_path) && (TB_LARGEST > 0)) {
+                pos->tb_men = TB_LARGEST;
+                pos->use_tablebases = pos->tb_men > 0;
+            }
         }
 
         iter = strstr(iter, "name");
@@ -339,6 +350,8 @@ static void uci_cmd_uci(struct gamestate *pos)
                          MAX_MAIN_HASH_SIZE);
     engine_write_command("option name OwnBook type check default true");
     engine_write_command("option name Ponder type check default false");
+    engine_write_command("option name SyzygyPath type string default %s",
+                         syzygy_path[0] != '\0'?syzygy_path:"<empty>");
     engine_write_command("uciok");
 }
 
@@ -437,6 +450,12 @@ void uci_send_pv_info(struct gamestate *pos, int score)
     now = get_current_time();
     msec = (int)(now - pos->search_start);
     nps = (msec > 0)?(pos->nodes/msec)*1000:0;
+
+    /* Adjust score in case the root position was found in tablebases */
+    if (pos->root_in_tb) {
+        score = ((score > FORCED_MATE) || (score < (-FORCED_MATE)))?
+                                                    score:pos->root_tb_score;
+    }
 
     /* Build command */
     sprintf(buffer, "info depth %d seldepth %d nodes %d time %d nps %d "

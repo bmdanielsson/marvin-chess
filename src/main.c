@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
+#include <limits.h>
 
 #include "utils.h"
 #include "chess.h"
@@ -31,6 +32,7 @@
 #include "config.h"
 #include "test.h"
 #include "eval.h"
+#include "tbprobe.h"
 
 /* The maximum length of a line in the configuration file */
 #define CFG_MAX_LINE_LENGTH 1024
@@ -38,6 +40,7 @@
 /* Configration values */
 static int cfg_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
 static int cfg_log_level = 0;
+static int cfg_syzygy_nmen = 0;
 
 static void cleanup(void)
 {
@@ -46,10 +49,10 @@ static void cleanup(void)
 
 static void read_config_file(void)
 {
-	FILE *fp;
-	char buffer[CFG_MAX_LINE_LENGTH];
-	char *line;
-	int  int_val;
+    FILE *fp;
+    char buffer[CFG_MAX_LINE_LENGTH];
+    char *line;
+    int  int_val;
 
 	/* Initialise */
     fp = fopen(CONFIGFILE_NAME, "r");
@@ -68,8 +71,12 @@ static void read_config_file(void)
             } else {
 			    cfg_default_hash_size = int_val;
             }
-	    } else if (sscanf(line, "LOG_LEVEL=%d", &int_val) == 1) {
-			cfg_log_level = int_val;
+        } else if (sscanf(line, "LOG_LEVEL=%d", &int_val) == 1) {
+            cfg_log_level = int_val;
+        } else if (sscanf(line, "SYZYGY_PATH=%s", syzygy_path) == 1) {
+            if (tb_init(syzygy_path) && (TB_LARGEST > 0)) {
+                cfg_syzygy_nmen = TB_LARGEST;
+            }
         }
 
         /* Next line */
@@ -116,6 +123,8 @@ int main(int argc, char *argv[])
         return 1;
     }
     pos->default_hash_size = cfg_default_hash_size;
+    pos->use_tablebases = cfg_syzygy_nmen > 0;
+    pos->tb_men = cfg_syzygy_nmen;
 
     /* Enter the main engine loop */
     engine_loop(pos);

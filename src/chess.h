@@ -441,6 +441,17 @@ struct gamestate {
     /* The number of entries in the pawn transposition table */
     int pawntt_size;
 
+    /* Flag indicating if Syzygy tablebases should be used */
+    bool use_tablebases;
+    /* Value indicating which tablebases are available */
+    int tb_men;
+    /* Flag indicating if the root position was found in the tablebases */
+    bool root_in_tb;
+    /* Score for the root position based on tablebases */
+    int  root_tb_score;
+    /* Flag indicating if the WDL tables should be probed during search */
+    bool probe_wdl;
+
     /* Flag indicating if it's time to abort the search */
     bool abort;
     /*
@@ -552,6 +563,9 @@ extern int mirror_table[NSQUARES];
 
 /* Table containing the square color for all squares on the chess table */
 extern int sq_color[NSQUARES];
+
+/* Path to Syzygy tablebases */
+extern char syzygy_path[1024];
 
 /* Initialize chess data */
 void chess_data_init(void);

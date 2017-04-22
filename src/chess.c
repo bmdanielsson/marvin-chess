@@ -82,6 +82,8 @@ int sq_color[NSQUARES] = {
     WHITE, BLACK, WHITE, BLACK, WHITE, BLACK, WHITE, BLACK
 };
 
+char syzygy_path[1024] = {'\0'};
+
 void chess_data_init(void)
 {
     int k;
