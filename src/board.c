@@ -476,6 +476,16 @@ bool board_is_move_pseudo_legal(struct gamestate *pos, uint32_t move)
         return false;
     }
 
+    /*
+     * If the moving piece is a pawn and the destination square is on
+     * the first or eigth rank then the move must be a promotion.
+     */
+    if ((VALUE(piece) == PAWN) &&
+        (sq_mask[to]&(rank_mask[RANK_1]|rank_mask[RANK_8])) &&
+        (!ISPROMOTION(move))) {
+        return false;
+    }
+
     /* Handle special moves */
     if (ISENPASSANT(move)) {
         const int offset[2] = {-8, 8};
