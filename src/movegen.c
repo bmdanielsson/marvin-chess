@@ -869,46 +869,46 @@ void gen_normal_moves(struct gamestate *pos, struct movelist *list)
 
         moves = 0ULL;
         switch (piece) {
-            case WHITE_PAWN:
-            case BLACK_PAWN:
-                moves |= bb_pawn_moves(pos->bb_all, sq, pos->stm);
-                add_pawn_moves(pos, list, sq, moves, PROMOTE_NONE);
-                break;
-            case WHITE_KNIGHT:
-            case BLACK_KNIGHT:
-                moves |= bb_knight_moves(sq);
-                moves &= (~pos->bb_all);
-                add_moves(pos, list, sq, moves);
-                break;
-            case WHITE_BISHOP:
-            case BLACK_BISHOP:
-                moves |= bb_bishop_moves(pos->bb_all, sq);
-                moves &= (~pos->bb_all);
-                add_moves(pos, list, sq, moves);
-                break;
-            case WHITE_ROOK:
-            case BLACK_ROOK:
-                moves |= bb_rook_moves(pos->bb_all, sq);
-                moves &= (~pos->bb_all);
-                add_moves(pos, list, sq, moves);
-                break;
-            case WHITE_QUEEN:
-            case BLACK_QUEEN:
-                moves |= bb_queen_moves(pos->bb_all, sq);
-                moves &= (~pos->bb_all);
-                add_moves(pos, list, sq, moves);
-                break;
-            case WHITE_KING:
-            case BLACK_KING:
-                moves |= bb_king_moves(sq);
-                moves &= (~pos->bb_all);
-                add_moves(pos, list, sq, moves);
-                break;
-            case NO_PIECE:
-                break;
-            default:
-                assert(false);
-                break;
+        case WHITE_PAWN:
+        case BLACK_PAWN:
+            moves |= bb_pawn_moves(pos->bb_all, sq, pos->stm);
+            add_pawn_moves(pos, list, sq, moves, PROMOTE_NONE);
+            break;
+        case WHITE_KNIGHT:
+        case BLACK_KNIGHT:
+            moves |= bb_knight_moves(sq);
+            moves &= (~pos->bb_all);
+            add_moves(pos, list, sq, moves);
+            break;
+        case WHITE_BISHOP:
+        case BLACK_BISHOP:
+            moves |= bb_bishop_moves(pos->bb_all, sq);
+            moves &= (~pos->bb_all);
+            add_moves(pos, list, sq, moves);
+            break;
+        case WHITE_ROOK:
+        case BLACK_ROOK:
+            moves |= bb_rook_moves(pos->bb_all, sq);
+            moves &= (~pos->bb_all);
+            add_moves(pos, list, sq, moves);
+            break;
+        case WHITE_QUEEN:
+        case BLACK_QUEEN:
+            moves |= bb_queen_moves(pos->bb_all, sq);
+            moves &= (~pos->bb_all);
+            add_moves(pos, list, sq, moves);
+            break;
+        case WHITE_KING:
+        case BLACK_KING:
+            moves |= bb_king_moves(sq);
+            moves &= (~pos->bb_all);
+            add_moves(pos, list, sq, moves);
+            break;
+        case NO_PIECE:
+            break;
+        default:
+            assert(false);
+            break;
         }
     }
 
