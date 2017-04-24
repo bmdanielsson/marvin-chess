@@ -374,6 +374,7 @@ void board_make_null_move(struct gamestate *pos)
     /* Update the state structure */
     pos->ep_sq = NO_SQUARE;
     pos->key = key_update_ep_square(pos->key, elem->ep_sq, pos->ep_sq);
+    pos->fifty++;
     if (pos->stm == BLACK) {
         pos->fullmove++;
     }
