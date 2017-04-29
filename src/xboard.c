@@ -508,6 +508,22 @@ static void xboard_cmd_level(char *cmd)
     time_control_type = tc_type;
 }
 
+static void xboard_cmd_memory(char *cmd, struct gamestate *pos)
+{
+    int size;
+
+    if (sscanf(cmd, "memory %d", &size) == 1) {
+        if (size > MAX_MAIN_HASH_SIZE) {
+            size = MAX_MAIN_HASH_SIZE;
+        } else if (size < MIN_MAIN_HASH_SIZE) {
+            size = MIN_MAIN_HASH_SIZE;
+        }
+        hash_tt_create_table(pos, size);
+    } else {
+        engine_write_command("Error (malformed command): %s", cmd);
+    }
+}
+
 static void xboard_cmd_new(struct gamestate *pos)
 {
     reset_game_state(pos);
@@ -562,6 +578,7 @@ static void xboard_cmd_protover(void)
 	engine_write_command("feature colors=0");
 	engine_write_command("feature name=0");
 	engine_write_command("feature nps=0");
+	engine_write_command("feature memory=1");
 	engine_write_command("feature egt=\"syzygy\"");
     engine_write_command("feature done=1");
 }
@@ -733,6 +750,8 @@ bool xboard_handle_command(struct gamestate *pos, char *cmd, bool *stop)
         xboard_cmd_hint(pos);
     } else if (!strncmp(cmd, "level", 5)) {
         xboard_cmd_level(cmd);
+    } else if (!strncmp(cmd, "memory", 6)) {
+        xboard_cmd_memory(cmd, pos);
     } else if (!strncmp(cmd, "new", 3)) {
         xboard_cmd_new(pos);
     } else if (!strncmp(cmd, "nopost", 6)) {
