@@ -149,6 +149,7 @@ static void* calc_texel_error_func(void *data)
             pos->tc_type = TC_INFINITE;
             pos->sd = 0;
             pos->silent = true;
+            pos->use_tablebases = false;
             score = search_get_quiscence_score(pos);
             score = (pos->stm == WHITE)?score:-score;
 

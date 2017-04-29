@@ -143,6 +143,7 @@ void test_run_benchmark(void)
         pos->tc_type = TC_INFINITE;
         pos->sd = positions[k].depth;
         pos->silent = true;
+        pos->use_tablebases = false;
 
         (void)search_find_best_move(pos, false, &ponder_move);
         nodes += pos->nodes;
