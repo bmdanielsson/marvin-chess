@@ -31,7 +31,7 @@
  * can be configured at runtime by using the UCI Hash option.
  */
 #define DEFAULT_MAIN_HASH_SIZE 32
-#define MIN_MAIN_HASH_SIZE 16
+#define MIN_MAIN_HASH_SIZE 1
 #define MAX_MAIN_HASH_SIZE 1024
 
 /* The size to use for the pawn hash tables (in MB) */
