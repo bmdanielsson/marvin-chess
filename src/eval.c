@@ -57,7 +57,7 @@ struct eval {
  * Table with mobility scores for the different pieces. The table is
  * initialized by the eval_reset function.
  */
-static int mobility_table[NPIECES];
+static int mobility_table[NPHASES][NPIECES];
 
 /*
  * Table with scores for passed pawns based on rank. The table is
@@ -294,9 +294,9 @@ static void evaluate_knights(struct gamestate *pos, struct eval *eval, int side)
         sq = POPBIT(&pieces);
         moves = bb_knight_moves(sq)&(~pos->bb_sides[side]);
         eval->mobility[MIDDLEGAME][side] +=
-                                (BITCOUNT(moves)*mobility_table[KNIGHT+side]);
+                    (BITCOUNT(moves)*mobility_table[MIDDLEGAME][KNIGHT+side]);
         eval->mobility[ENDGAME][side] +=
-                                (BITCOUNT(moves)*mobility_table[KNIGHT+side]);
+                    (BITCOUNT(moves)*mobility_table[ENDGAME][KNIGHT+side]);
     }
 }
 
@@ -329,9 +329,9 @@ static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
         sq = POPBIT(&pieces);
         moves = bb_bishop_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
         eval->mobility[MIDDLEGAME][side] +=
-                                (BITCOUNT(moves)*mobility_table[BISHOP+side]);
+                    (BITCOUNT(moves)*mobility_table[MIDDLEGAME][BISHOP+side]);
         eval->mobility[ENDGAME][side] +=
-                                (BITCOUNT(moves)*mobility_table[BISHOP+side]);
+                    (BITCOUNT(moves)*mobility_table[ENDGAME][BISHOP+side]);
     }
 }
 
@@ -380,9 +380,9 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
         /* Mobility */
         moves = bb_rook_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
         eval->mobility[MIDDLEGAME][side] +=
-                                    (BITCOUNT(moves)*mobility_table[ROOK+side]);
+                        (BITCOUNT(moves)*mobility_table[MIDDLEGAME][ROOK+side]);
         eval->mobility[ENDGAME][side] +=
-                                    (BITCOUNT(moves)*mobility_table[ROOK+side]);
+                        (BITCOUNT(moves)*mobility_table[ENDGAME][ROOK+side]);
     }
 }
 
@@ -416,9 +416,9 @@ static void evaluate_queens(struct gamestate *pos, struct eval *eval, int side)
         /* Mobility */
         moves = bb_queen_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
         eval->mobility[MIDDLEGAME][side] +=
-                                (BITCOUNT(moves)*mobility_table[QUEEN+side]);
+                    (BITCOUNT(moves)*mobility_table[MIDDLEGAME][QUEEN+side]);
         eval->mobility[ENDGAME][side] +=
-                                (BITCOUNT(moves)*mobility_table[QUEEN+side]);
+                    (BITCOUNT(moves)*mobility_table[ENDGAME][QUEEN+side]);
     }
 }
 
@@ -552,18 +552,30 @@ static void do_eval(struct gamestate *pos, struct eval *eval)
 void eval_reset(void)
 {
     /* Initialize the mobility table */
-    mobility_table[WHITE_PAWN] = 0;
-    mobility_table[BLACK_PAWN] = 0;
-    mobility_table[WHITE_KNIGHT] = KNIGHT_MOBILITY;
-    mobility_table[BLACK_KNIGHT] = KNIGHT_MOBILITY;
-    mobility_table[WHITE_BISHOP] = BISHOP_MOBILITY;
-    mobility_table[BLACK_BISHOP] = BISHOP_MOBILITY;
-    mobility_table[WHITE_ROOK] = ROOK_MOBILITY;
-    mobility_table[BLACK_ROOK] = ROOK_MOBILITY;
-    mobility_table[WHITE_QUEEN] = QUEEN_MOBILITY;
-    mobility_table[BLACK_QUEEN] = QUEEN_MOBILITY;
-    mobility_table[WHITE_KING] = 0;
-    mobility_table[BLACK_KING] = 0;
+    mobility_table[MIDDLEGAME][WHITE_PAWN] = 0;
+    mobility_table[MIDDLEGAME][BLACK_PAWN] = 0;
+    mobility_table[MIDDLEGAME][WHITE_KNIGHT] = KNIGHT_MOBILITY_MG;
+    mobility_table[MIDDLEGAME][BLACK_KNIGHT] = KNIGHT_MOBILITY_MG;
+    mobility_table[MIDDLEGAME][WHITE_BISHOP] = BISHOP_MOBILITY_MG;
+    mobility_table[MIDDLEGAME][BLACK_BISHOP] = BISHOP_MOBILITY_MG;
+    mobility_table[MIDDLEGAME][WHITE_ROOK] = ROOK_MOBILITY_MG;
+    mobility_table[MIDDLEGAME][BLACK_ROOK] = ROOK_MOBILITY_MG;
+    mobility_table[MIDDLEGAME][WHITE_QUEEN] = QUEEN_MOBILITY_MG;
+    mobility_table[MIDDLEGAME][BLACK_QUEEN] = QUEEN_MOBILITY_MG;
+    mobility_table[MIDDLEGAME][WHITE_KING] = 0;
+    mobility_table[MIDDLEGAME][BLACK_KING] = 0;
+    mobility_table[ENDGAME][WHITE_PAWN] = 0;
+    mobility_table[ENDGAME][BLACK_PAWN] = 0;
+    mobility_table[ENDGAME][WHITE_KNIGHT] = KNIGHT_MOBILITY_EG;
+    mobility_table[ENDGAME][BLACK_KNIGHT] = KNIGHT_MOBILITY_EG;
+    mobility_table[ENDGAME][WHITE_BISHOP] = BISHOP_MOBILITY_EG;
+    mobility_table[ENDGAME][BLACK_BISHOP] = BISHOP_MOBILITY_EG;
+    mobility_table[ENDGAME][WHITE_ROOK] = ROOK_MOBILITY_EG;
+    mobility_table[ENDGAME][BLACK_ROOK] = ROOK_MOBILITY_EG;
+    mobility_table[ENDGAME][WHITE_QUEEN] = QUEEN_MOBILITY_EG;
+    mobility_table[ENDGAME][BLACK_QUEEN] = QUEEN_MOBILITY_EG;
+    mobility_table[ENDGAME][WHITE_KING] = 0;
+    mobility_table[ENDGAME][BLACK_KING] = 0;
 
     /* Initialize the passed pawns table */
     passed_pawn_scores[RANK_1] = 0;

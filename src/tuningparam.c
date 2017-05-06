@@ -45,10 +45,14 @@ enum {
     TP_PASSED_PAWN_RANK5,
     TP_PASSED_PAWN_RANK6,
     TP_PASSED_PAWN_RANK7,
-    TP_KNIGHT_MOBILITY,
-    TP_BISHOP_MOBILITY,
-    TP_ROOK_MOBILITY,
-    TP_QUEEN_MOBILITY,
+    TP_KNIGHT_MOBILITY_MG,
+    TP_BISHOP_MOBILITY_MG,
+    TP_ROOK_MOBILITY_MG,
+    TP_QUEEN_MOBILITY_MG,
+    TP_KNIGHT_MOBILITY_EG,
+    TP_BISHOP_MOBILITY_EG,
+    TP_ROOK_MOBILITY_EG,
+    TP_QUEEN_MOBILITY_EG,
     TP_PSQ_TABLE_PAWN,
     TP_PSQ_TABLE_KNIGHT,
     TP_PSQ_TABLE_BISHOP,
@@ -78,16 +82,20 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"passed_pawn_rank5", 15, 15, 0, 200},
     {"passed_pawn_rank6", 16, 16, 0, 200},
     {"passed_pawn_rank7", 17, 17, 0, 200},
-    {"knight_mobility", 18, 18, 0, 15},
-    {"bishop_mobility", 19, 19, 0, 15},
-    {"rook_mobility", 20, 20, 0, 15},
-    {"queen_mobility", 21, 21, 0, 15},
-    {"psq_table_pawn", 22, 85, -200, 200},
-    {"psq_table_knight", 86, 149, -200, 200},
-    {"psq_table_bishop", 150, 213, -200, 200},
-    {"psq_table_rook", 214, 277, -200, 200},
-    {"psq_table_king_mg", 278, 341, -200, 200},
-    {"psq_table_king_eg", 342, 405, -200, 200}
+    {"knight_mobility_mg", 18, 18, 0, 15},
+    {"bishop_mobility_mg", 19, 19, 0, 15},
+    {"rook_mobility_mg", 20, 20, 0, 15},
+    {"queen_mobility_mg", 21, 21, 0, 15},
+    {"knight_mobility_eg", 22, 22, 0, 15},
+    {"bishop_mobility_eg", 23, 23, 0, 15},
+    {"rook_mobility_eg", 24, 24, 0, 15},
+    {"queen_mobility_eg", 25, 25, 0, 15},
+    {"psq_table_pawn", 26, 89, -200, 200},
+    {"psq_table_knight", 90, 153, -200, 200},
+    {"psq_table_bishop", 154, 217, -200, 200},
+    {"psq_table_rook", 218, 281, -200, 200},
+    {"psq_table_king_mg", 282, 345, -200, 200},
+    {"psq_table_king_eg", 346, 409, -200, 200}
 };
 
 void tuning_param_assign_current(struct tuning_param *params)
@@ -150,17 +158,29 @@ void tuning_param_assign_current(struct tuning_param *params)
     start = parameter_declarations[TP_PASSED_PAWN_RANK7].start;
     PASSED_PAWN_RANK7 = params[start].current;
 
-    start = parameter_declarations[TP_KNIGHT_MOBILITY].start;
-    KNIGHT_MOBILITY = params[start].current;
+    start = parameter_declarations[TP_KNIGHT_MOBILITY_MG].start;
+    KNIGHT_MOBILITY_MG = params[start].current;
 
-    start = parameter_declarations[TP_BISHOP_MOBILITY].start;
-    BISHOP_MOBILITY = params[start].current;
+    start = parameter_declarations[TP_BISHOP_MOBILITY_MG].start;
+    BISHOP_MOBILITY_MG = params[start].current;
 
-    start = parameter_declarations[TP_ROOK_MOBILITY].start;
-    ROOK_MOBILITY = params[start].current;
+    start = parameter_declarations[TP_ROOK_MOBILITY_MG].start;
+    ROOK_MOBILITY_MG = params[start].current;
 
-    start = parameter_declarations[TP_QUEEN_MOBILITY].start;
-    QUEEN_MOBILITY = params[start].current;
+    start = parameter_declarations[TP_QUEEN_MOBILITY_MG].start;
+    QUEEN_MOBILITY_MG = params[start].current;
+
+    start = parameter_declarations[TP_KNIGHT_MOBILITY_EG].start;
+    KNIGHT_MOBILITY_EG = params[start].current;
+
+    start = parameter_declarations[TP_BISHOP_MOBILITY_EG].start;
+    BISHOP_MOBILITY_EG = params[start].current;
+
+    start = parameter_declarations[TP_ROOK_MOBILITY_EG].start;
+    ROOK_MOBILITY_EG = params[start].current;
+
+    start = parameter_declarations[TP_QUEEN_MOBILITY_EG].start;
+    QUEEN_MOBILITY_EG = params[start].current;
 
     start = parameter_declarations[TP_PSQ_TABLE_PAWN].start;
     stop = parameter_declarations[TP_PSQ_TABLE_PAWN].stop;
@@ -318,28 +338,52 @@ struct tuning_param* tuning_param_create_list(void)
     params[start].current = PASSED_PAWN_RANK7;
     params[start].active = false;
 
-    start = parameter_declarations[TP_KNIGHT_MOBILITY].start;
-    params[start].min = parameter_declarations[TP_KNIGHT_MOBILITY].min;
-    params[start].max = parameter_declarations[TP_KNIGHT_MOBILITY].max;
-    params[start].current = KNIGHT_MOBILITY;
+    start = parameter_declarations[TP_KNIGHT_MOBILITY_MG].start;
+    params[start].min = parameter_declarations[TP_KNIGHT_MOBILITY_MG].min;
+    params[start].max = parameter_declarations[TP_KNIGHT_MOBILITY_MG].max;
+    params[start].current = KNIGHT_MOBILITY_MG;
     params[start].active = false;
 
-    start = parameter_declarations[TP_BISHOP_MOBILITY].start;
-    params[start].min = parameter_declarations[TP_BISHOP_MOBILITY].min;
-    params[start].max = parameter_declarations[TP_BISHOP_MOBILITY].max;
-    params[start].current = BISHOP_MOBILITY;
+    start = parameter_declarations[TP_BISHOP_MOBILITY_MG].start;
+    params[start].min = parameter_declarations[TP_BISHOP_MOBILITY_MG].min;
+    params[start].max = parameter_declarations[TP_BISHOP_MOBILITY_MG].max;
+    params[start].current = BISHOP_MOBILITY_MG;
     params[start].active = false;
 
-    start = parameter_declarations[TP_ROOK_MOBILITY].start;
-    params[start].min = parameter_declarations[TP_ROOK_MOBILITY].min;
-    params[start].max = parameter_declarations[TP_ROOK_MOBILITY].max;
-    params[start].current = ROOK_MOBILITY;
+    start = parameter_declarations[TP_ROOK_MOBILITY_MG].start;
+    params[start].min = parameter_declarations[TP_ROOK_MOBILITY_MG].min;
+    params[start].max = parameter_declarations[TP_ROOK_MOBILITY_MG].max;
+    params[start].current = ROOK_MOBILITY_MG;
     params[start].active = false;
 
-    start = parameter_declarations[TP_QUEEN_MOBILITY].start;
-    params[start].min = parameter_declarations[TP_QUEEN_MOBILITY].min;
-    params[start].max = parameter_declarations[TP_QUEEN_MOBILITY].max;
-    params[start].current = QUEEN_MOBILITY;
+    start = parameter_declarations[TP_QUEEN_MOBILITY_MG].start;
+    params[start].min = parameter_declarations[TP_QUEEN_MOBILITY_MG].min;
+    params[start].max = parameter_declarations[TP_QUEEN_MOBILITY_MG].max;
+    params[start].current = QUEEN_MOBILITY_MG;
+    params[start].active = false;
+
+    start = parameter_declarations[TP_KNIGHT_MOBILITY_EG].start;
+    params[start].min = parameter_declarations[TP_KNIGHT_MOBILITY_EG].min;
+    params[start].max = parameter_declarations[TP_KNIGHT_MOBILITY_EG].max;
+    params[start].current = KNIGHT_MOBILITY_EG;
+    params[start].active = false;
+
+    start = parameter_declarations[TP_BISHOP_MOBILITY_EG].start;
+    params[start].min = parameter_declarations[TP_BISHOP_MOBILITY_EG].min;
+    params[start].max = parameter_declarations[TP_BISHOP_MOBILITY_EG].max;
+    params[start].current = BISHOP_MOBILITY_EG;
+    params[start].active = false;
+
+    start = parameter_declarations[TP_ROOK_MOBILITY_EG].start;
+    params[start].min = parameter_declarations[TP_ROOK_MOBILITY_EG].min;
+    params[start].max = parameter_declarations[TP_ROOK_MOBILITY_EG].max;
+    params[start].current = ROOK_MOBILITY_EG;
+    params[start].active = false;
+
+    start = parameter_declarations[TP_QUEEN_MOBILITY_EG].start;
+    params[start].min = parameter_declarations[TP_QUEEN_MOBILITY_EG].min;
+    params[start].max = parameter_declarations[TP_QUEEN_MOBILITY_EG].max;
+    params[start].current = QUEEN_MOBILITY_EG;
     params[start].active = false;
 
     start = parameter_declarations[TP_PSQ_TABLE_PAWN].start;
