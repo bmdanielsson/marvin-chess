@@ -254,7 +254,7 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
     int      see_score;
     int      best_score;
     uint32_t move;
-    bool     found;
+    bool     found_move;
     bool     in_check;
 
     /* Update search statistics */
@@ -296,7 +296,7 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
     if (!in_check) {
         best_score = score;
         if (score >= beta) {
-            return beta;
+            return score;
         }
         if (score > alpha) {
             alpha = score;
@@ -309,7 +309,7 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
     select_set_tt_move(pos, move);
 
     /* Search all moves */
-    found = false;
+    found_move = false;
     while (select_get_quiscence_move(pos, &move, &see_score)) {
         /*
          * Don't bother searching captures that
@@ -323,7 +323,7 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
         if (!board_make_move(pos, move)) {
             continue;
         }
-        found = true;
+        found_move = true;
         score = -quiescence(pos, depth-1, -beta, -alpha);
         board_unmake_move(pos);
         if (pos->abort) {
@@ -346,7 +346,7 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
      * In case the side to move is in check the all all moves are generated
      * so if no legal move was found then it must be checkmate.
      */
-    return (in_check && !found)?-CHECKMATE+pos->sply:best_score;
+    return (in_check && !found_move)?-CHECKMATE+pos->sply:best_score;
 }
 
 static int search(struct gamestate *pos, int depth, int alpha, int beta,
@@ -359,11 +359,13 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     uint32_t move;
     uint32_t best_move;
     int      movenumber;
-    bool     found;
+    bool     found_move;
     int      reduction;
     int      futility_pruning;
     bool     in_check;
     int      tt_flag;
+    bool     found_pv;
+    bool     pv_node;
 
     /* Update search statistics */
     pos->nodes++;
@@ -445,7 +447,12 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
             return 0;
         }
         if (score >= beta) {
-            return beta;
+            /*
+             * Since the score is based on doing a null move a checkmate
+             * score doesn't necessarilly indicate a forced mate. So
+             * return beta instead in this case.
+             */
+            return score < FORCED_MATE?score:beta;
         }
     }
 
@@ -490,19 +497,23 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     best_move = NOMOVE;
     tt_flag = TT_ALPHA;
     movenumber = 0;
-    found = false;
+    found_move = false;
+    found_pv = false;
+    pv_node = (beta-alpha) > 1;
     while (select_get_move(pos, &move, &see_score)) {
         if (!board_make_move(pos, move)) {
             continue;
         }
         movenumber++;
-        found = true;
+        found_move = true;
 
         /*
          * If the futility pruning flag is set then prune
-         * all moves except very tactical ones.
+         * all moves except very tactical ones. Also make
+         * sure to search at least one move.
          */
         if (futility_pruning &&
+            (movenumber > 1) &&
             !ISCAPTURE(move) &&
             !ISENPASSANT(move) &&
             !ISPROMOTION(move) &&
@@ -525,18 +536,29 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
         }
 
         /* Recursivly search the move */
-        if (reduction > 0) {
-            score = -search(pos, depth-1-reduction, -beta, -alpha, true);
+        if (!found_pv) {
+            /*
+             * Perform a full search until a pv move is found. Usually
+             * this is the first move.
+             */
+            score = -search(pos, depth-1, -beta, -alpha, true);
+        } else {
+            /* Perform a reduced depth search with a zero window */
+            score = -search(pos, depth-1-reduction, -alpha-1, -alpha, true);
+
+            /* Re-search with full depth if the move improved alpha */
+            if ((score > alpha) && (reduction > 0) && !pos->abort) {
+                score = -search(pos, depth-1, -alpha-1, -alpha, true);
+            }
 
             /*
-             * If score is better than alpha then this move might be good
-             * after all. Therefore research with full depth.
+             * Re-search with full depth and a full window if alpha was
+             * improved. If this is not a pv node then the full window
+             * is actually a null window so there is no need to re-search.
              */
-            if (!pos->abort && (score > alpha)) {
+            if (pv_node && (score > alpha) && !pos->abort) {
                 score = -search(pos, depth-1, -beta, -alpha, true);
             }
-        } else {
-            score = -search(pos, depth-1, -beta, -alpha, true);
         }
         board_unmake_move(pos);
         if (pos->abort) {
@@ -547,6 +569,7 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
         if (score > best_score) {
             best_score = score;
             best_move = move;
+            found_pv = true;
 
             /*
              * Check if the score is above the lower bound. In that
@@ -577,18 +600,15 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
         }
     }
 
-    /* Make sure that the best score is between alpha and beta */
-    best_score = CLAMP(best_score, alpha, beta);
-
     /*
-     * If no legeal move have been found then it is either checkmate
+     * If no legal move have been found then it is either checkmate
      * or stalemate. If the player is in check then it is checkmate
      * and so set the score to -CHECKMATE. Otherwise it is stalemate
      * so set the score to zero. In case of checkmate the current search
      * ply is also subtracted to make sure that a shorter mate results
      * in a higher score.
      */
-    if (!found) {
+    if (!found_move) {
         tt_flag = TT_EXACT;
         best_score = in_check?-CHECKMATE+pos->sply:0;
     }
@@ -687,9 +707,6 @@ static int search_root(struct gamestate *pos, int depth, int alpha, int beta)
 											pos->pv_table[0].moves[1]:NOMOVE;
         }
     }
-
-    /* Make sure that the best score is between alpha and beta */
-    best_score = CLAMP(best_score, alpha, beta);
 
     /* Store the result for this node in the transposition table */
     hash_tt_store(pos, best_move, depth, best_score, tt_flag);
