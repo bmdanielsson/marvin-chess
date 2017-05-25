@@ -25,6 +25,47 @@
 #include "eval.h"
 #include "chess.h"
 
+/* Define a tuning parameter and the connection evaluation parameter */
+#define DEFINE(tp, ep)                                      \
+    start = parameter_declarations[(tp)].start;             \
+    params[start].min = parameter_declarations[(tp)].min;   \
+    params[start].max = parameter_declarations[(tp)].max;   \
+    params[start].current = (ep);                           \
+    params[start].active = false;
+
+/*
+ * Define a tuning parameter of array type and the connection
+ * evaluation parameter.
+ */
+#define DEFINE_MULTIPLE(tp, ep)                             \
+    start = parameter_declarations[(tp)].start;             \
+    stop = parameter_declarations[(tp)].stop;               \
+    for (k=start;k<=stop;k++) {                             \
+        params[k].min = parameter_declarations[(tp)].min;   \
+        params[k].max = parameter_declarations[(tp)].max;   \
+        params[k].current = (ep)[k-start];                  \
+        params[k].active = false;                           \
+    }
+
+/*
+ * Assign the value of a tuning parameter to the corresponding
+ * evaluation parameter.
+ */
+#define ASSIGN(tp, ep)                          \
+    start = parameter_declarations[(tp)].start; \
+    (ep) = params[start].current;
+
+/*
+ * Assign the value of a tuning parameter of array type to the corresponding
+ * evaluation parameter.
+ */
+#define ASSIGN_MULTIPLE(tp, ep)                 \
+    start = parameter_declarations[(tp)].start; \
+    stop = parameter_declarations[(tp)].stop;   \
+    for (k=start;k<=stop;k++) {                 \
+        (ep)[k-start] = params[k].current;      \
+    }
+
 /* Identifiers for all tunable parameters */
 enum {
     TP_DOUBLE_PAWNS,
@@ -104,119 +145,38 @@ void tuning_param_assign_current(struct tuning_param *params)
     int stop;
     int k;
 
-    start = parameter_declarations[TP_DOUBLE_PAWNS].start;
-    DOUBLE_PAWNS = params[start].current;
-
-    start = parameter_declarations[TP_ISOLATED_PAWN].start;
-    ISOLATED_PAWN = params[start].current;
-
-    start = parameter_declarations[TP_ROOK_OPEN_FILE].start;
-    ROOK_OPEN_FILE = params[start].current;
-
-    start = parameter_declarations[TP_ROOK_HALF_OPEN_FILE].start;
-    ROOK_HALF_OPEN_FILE = params[start].current;
-
-    start = parameter_declarations[TP_QUEEN_OPEN_FILE].start;
-    QUEEN_OPEN_FILE = params[start].current;
-
-    start = parameter_declarations[TP_QUEEN_HALF_OPEN_FILE].start;
-    QUEEN_HALF_OPEN_FILE = params[start].current;
-
-    start = parameter_declarations[TP_ROOK_ON_7TH_MG].start;
-    ROOK_ON_7TH_MG = params[start].current;
-
-    start = parameter_declarations[TP_ROOK_ON_7TH_EG].start;
-    ROOK_ON_7TH_EG = params[start].current;
-
-    start = parameter_declarations[TP_BISHOP_PAIR].start;
-    BISHOP_PAIR = params[start].current;
-
-    start = parameter_declarations[TP_PAWN_SHIELD_RANK1].start;
-    PAWN_SHIELD_RANK1 = params[start].current;
-
-    start = parameter_declarations[TP_PAWN_SHIELD_RANK2].start;
-    PAWN_SHIELD_RANK2 = params[start].current;
-
-    start = parameter_declarations[TP_PAWN_SHIELD_HOLE].start;
-    PAWN_SHIELD_HOLE = params[start].current;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK2].start;
-    PASSED_PAWN_RANK2 = params[start].current;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK3].start;
-    PASSED_PAWN_RANK3 = params[start].current;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK4].start;
-    PASSED_PAWN_RANK4 = params[start].current;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK5].start;
-    PASSED_PAWN_RANK5 = params[start].current;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK6].start;
-    PASSED_PAWN_RANK6 = params[start].current;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK7].start;
-    PASSED_PAWN_RANK7 = params[start].current;
-
-    start = parameter_declarations[TP_KNIGHT_MOBILITY_MG].start;
-    KNIGHT_MOBILITY_MG = params[start].current;
-
-    start = parameter_declarations[TP_BISHOP_MOBILITY_MG].start;
-    BISHOP_MOBILITY_MG = params[start].current;
-
-    start = parameter_declarations[TP_ROOK_MOBILITY_MG].start;
-    ROOK_MOBILITY_MG = params[start].current;
-
-    start = parameter_declarations[TP_QUEEN_MOBILITY_MG].start;
-    QUEEN_MOBILITY_MG = params[start].current;
-
-    start = parameter_declarations[TP_KNIGHT_MOBILITY_EG].start;
-    KNIGHT_MOBILITY_EG = params[start].current;
-
-    start = parameter_declarations[TP_BISHOP_MOBILITY_EG].start;
-    BISHOP_MOBILITY_EG = params[start].current;
-
-    start = parameter_declarations[TP_ROOK_MOBILITY_EG].start;
-    ROOK_MOBILITY_EG = params[start].current;
-
-    start = parameter_declarations[TP_QUEEN_MOBILITY_EG].start;
-    QUEEN_MOBILITY_EG = params[start].current;
-
-    start = parameter_declarations[TP_PSQ_TABLE_PAWN].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_PAWN].stop;
-    for (k=start;k<=stop;k++) {
-        PSQ_TABLE_PAWN[k-start] = params[k].current;
-    }
-
-    start = parameter_declarations[TP_PSQ_TABLE_KNIGHT].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_KNIGHT].stop;
-    for (k=start;k<=stop;k++) {
-        PSQ_TABLE_KNIGHT[k-start] = params[k].current;
-    }
-
-    start = parameter_declarations[TP_PSQ_TABLE_BISHOP].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_BISHOP].stop;
-    for (k=start;k<=stop;k++) {
-        PSQ_TABLE_BISHOP[k-start] = params[k].current;
-    }
-
-    start = parameter_declarations[TP_PSQ_TABLE_ROOK].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_ROOK].stop;
-    for (k=start;k<=stop;k++) {
-        PSQ_TABLE_ROOK[k-start] = params[k].current;
-    }
-
-    start = parameter_declarations[TP_PSQ_TABLE_KING_MG].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_KING_MG].stop;
-    for (k=start;k<=stop;k++) {
-        PSQ_TABLE_KING_MG[k-start] = params[k].current;
-    }
-
-    start = parameter_declarations[TP_PSQ_TABLE_KING_EG].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_KING_EG].stop;
-    for (k=start;k<=stop;k++) {
-        PSQ_TABLE_KING_EG[k-start] = params[k].current;
-    }
+    ASSIGN(TP_DOUBLE_PAWNS, DOUBLE_PAWNS)
+    ASSIGN(TP_ISOLATED_PAWN, ISOLATED_PAWN)
+    ASSIGN(TP_ROOK_OPEN_FILE, ROOK_OPEN_FILE)
+    ASSIGN(TP_ROOK_HALF_OPEN_FILE, ROOK_HALF_OPEN_FILE)
+    ASSIGN(TP_QUEEN_OPEN_FILE, QUEEN_OPEN_FILE)
+    ASSIGN(TP_QUEEN_HALF_OPEN_FILE, QUEEN_HALF_OPEN_FILE)
+    ASSIGN(TP_ROOK_ON_7TH_MG, ROOK_ON_7TH_MG)
+    ASSIGN(TP_ROOK_ON_7TH_EG, ROOK_ON_7TH_EG)
+    ASSIGN(TP_BISHOP_PAIR, BISHOP_PAIR)
+    ASSIGN(TP_PAWN_SHIELD_RANK1, PAWN_SHIELD_RANK1)
+    ASSIGN(TP_PAWN_SHIELD_RANK2, PAWN_SHIELD_RANK2)
+    ASSIGN(TP_PAWN_SHIELD_HOLE, PAWN_SHIELD_HOLE)
+    ASSIGN(TP_PASSED_PAWN_RANK2, PASSED_PAWN_RANK2)
+    ASSIGN(TP_PASSED_PAWN_RANK3, PASSED_PAWN_RANK3)
+    ASSIGN(TP_PASSED_PAWN_RANK4, PASSED_PAWN_RANK4)
+    ASSIGN(TP_PASSED_PAWN_RANK5, PASSED_PAWN_RANK5)
+    ASSIGN(TP_PASSED_PAWN_RANK6, PASSED_PAWN_RANK6)
+    ASSIGN(TP_PASSED_PAWN_RANK7, PASSED_PAWN_RANK7)
+    ASSIGN(TP_KNIGHT_MOBILITY_MG, KNIGHT_MOBILITY_MG)
+    ASSIGN(TP_BISHOP_MOBILITY_MG, BISHOP_MOBILITY_MG)
+    ASSIGN(TP_ROOK_MOBILITY_MG, ROOK_MOBILITY_MG)
+    ASSIGN(TP_QUEEN_MOBILITY_MG, QUEEN_MOBILITY_MG)
+    ASSIGN(TP_KNIGHT_MOBILITY_EG, KNIGHT_MOBILITY_EG)
+    ASSIGN(TP_BISHOP_MOBILITY_EG, BISHOP_MOBILITY_EG)
+    ASSIGN(TP_ROOK_MOBILITY_EG, ROOK_MOBILITY_EG)
+    ASSIGN(TP_QUEEN_MOBILITY_EG, QUEEN_MOBILITY_EG)
+    ASSIGN_MULTIPLE(TP_PSQ_TABLE_PAWN, PSQ_TABLE_PAWN)
+    ASSIGN_MULTIPLE(TP_PSQ_TABLE_KNIGHT, PSQ_TABLE_KNIGHT)
+    ASSIGN_MULTIPLE(TP_PSQ_TABLE_BISHOP, PSQ_TABLE_BISHOP)
+    ASSIGN_MULTIPLE(TP_PSQ_TABLE_ROOK, PSQ_TABLE_ROOK)
+    ASSIGN_MULTIPLE(TP_PSQ_TABLE_KING_MG, PSQ_TABLE_KING_MG)
+    ASSIGN_MULTIPLE(TP_PSQ_TABLE_KING_EG, PSQ_TABLE_KING_EG)
 
     eval_reset();
 }
@@ -230,215 +190,38 @@ struct tuning_param* tuning_param_create_list(void)
 
     params = malloc(sizeof(struct tuning_param)*NUM_TUNING_PARAMS);
 
-    start = parameter_declarations[TP_DOUBLE_PAWNS].start;
-    params[start].min = parameter_declarations[TP_DOUBLE_PAWNS].min;
-    params[start].max = parameter_declarations[TP_DOUBLE_PAWNS].max;
-    params[start].current = DOUBLE_PAWNS;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_ISOLATED_PAWN].start;
-    params[start].min = parameter_declarations[TP_ISOLATED_PAWN].min;
-    params[start].max = parameter_declarations[TP_ISOLATED_PAWN].max;
-    params[start].current = ISOLATED_PAWN;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_ROOK_OPEN_FILE].start;
-    params[start].min = parameter_declarations[TP_ROOK_OPEN_FILE].min;
-    params[start].max = parameter_declarations[TP_ROOK_OPEN_FILE].max;
-    params[start].current = ROOK_OPEN_FILE;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_ROOK_HALF_OPEN_FILE].start;
-    params[start].min = parameter_declarations[TP_ROOK_HALF_OPEN_FILE].min;
-    params[start].max = parameter_declarations[TP_ROOK_HALF_OPEN_FILE].max;
-    params[start].current = ROOK_HALF_OPEN_FILE;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_QUEEN_OPEN_FILE].start;
-    params[start].min = parameter_declarations[TP_QUEEN_OPEN_FILE].min;
-    params[start].max = parameter_declarations[TP_QUEEN_OPEN_FILE].max;
-    params[start].current = QUEEN_OPEN_FILE;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_QUEEN_HALF_OPEN_FILE].start;
-    params[start].min = parameter_declarations[TP_QUEEN_HALF_OPEN_FILE].min;
-    params[start].max = parameter_declarations[TP_QUEEN_HALF_OPEN_FILE].max;
-    params[start].current = QUEEN_HALF_OPEN_FILE;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_ROOK_ON_7TH_MG].start;
-    params[start].min = parameter_declarations[TP_ROOK_ON_7TH_MG].min;
-    params[start].max = parameter_declarations[TP_ROOK_ON_7TH_MG].max;
-    params[start].current = ROOK_ON_7TH_MG;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_ROOK_ON_7TH_EG].start;
-    params[start].min = parameter_declarations[TP_ROOK_ON_7TH_EG].min;
-    params[start].max = parameter_declarations[TP_ROOK_ON_7TH_EG].max;
-    params[start].current = ROOK_ON_7TH_EG;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_BISHOP_PAIR].start;
-    params[start].min = parameter_declarations[TP_BISHOP_PAIR].min;
-    params[start].max = parameter_declarations[TP_BISHOP_PAIR].max;
-    params[start].current = BISHOP_PAIR;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_PAWN_SHIELD_RANK1].start;
-    params[start].min = parameter_declarations[TP_PAWN_SHIELD_RANK1].min;
-    params[start].max = parameter_declarations[TP_PAWN_SHIELD_RANK1].max;
-    params[start].current = PAWN_SHIELD_RANK1;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_PAWN_SHIELD_RANK2].start;
-    params[start].min = parameter_declarations[TP_PAWN_SHIELD_RANK2].min;
-    params[start].max = parameter_declarations[TP_PAWN_SHIELD_RANK2].max;
-    params[start].current = PAWN_SHIELD_RANK2;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_PAWN_SHIELD_HOLE].start;
-    params[start].min = parameter_declarations[TP_PAWN_SHIELD_HOLE].min;
-    params[start].max = parameter_declarations[TP_PAWN_SHIELD_HOLE].max;
-    params[start].current = PAWN_SHIELD_HOLE;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK2].start;
-    params[start].min = parameter_declarations[TP_PASSED_PAWN_RANK2].min;
-    params[start].max = parameter_declarations[TP_PASSED_PAWN_RANK2].max;
-    params[start].current = PASSED_PAWN_RANK2;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK3].start;
-    params[start].min = parameter_declarations[TP_PASSED_PAWN_RANK3].min;
-    params[start].max = parameter_declarations[TP_PASSED_PAWN_RANK3].max;
-    params[start].current = PASSED_PAWN_RANK3;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK4].start;
-    params[start].min = parameter_declarations[TP_PASSED_PAWN_RANK4].min;
-    params[start].max = parameter_declarations[TP_PASSED_PAWN_RANK4].max;
-    params[start].current = PASSED_PAWN_RANK4;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK5].start;
-    params[start].min = parameter_declarations[TP_PASSED_PAWN_RANK5].min;
-    params[start].max = parameter_declarations[TP_PASSED_PAWN_RANK5].max;
-    params[start].current = PASSED_PAWN_RANK5;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK6].start;
-    params[start].min = parameter_declarations[TP_PASSED_PAWN_RANK6].min;
-    params[start].max = parameter_declarations[TP_PASSED_PAWN_RANK6].max;
-    params[start].current = PASSED_PAWN_RANK6;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_PASSED_PAWN_RANK7].start;
-    params[start].min = parameter_declarations[TP_PASSED_PAWN_RANK7].min;
-    params[start].max = parameter_declarations[TP_PASSED_PAWN_RANK7].max;
-    params[start].current = PASSED_PAWN_RANK7;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_KNIGHT_MOBILITY_MG].start;
-    params[start].min = parameter_declarations[TP_KNIGHT_MOBILITY_MG].min;
-    params[start].max = parameter_declarations[TP_KNIGHT_MOBILITY_MG].max;
-    params[start].current = KNIGHT_MOBILITY_MG;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_BISHOP_MOBILITY_MG].start;
-    params[start].min = parameter_declarations[TP_BISHOP_MOBILITY_MG].min;
-    params[start].max = parameter_declarations[TP_BISHOP_MOBILITY_MG].max;
-    params[start].current = BISHOP_MOBILITY_MG;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_ROOK_MOBILITY_MG].start;
-    params[start].min = parameter_declarations[TP_ROOK_MOBILITY_MG].min;
-    params[start].max = parameter_declarations[TP_ROOK_MOBILITY_MG].max;
-    params[start].current = ROOK_MOBILITY_MG;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_QUEEN_MOBILITY_MG].start;
-    params[start].min = parameter_declarations[TP_QUEEN_MOBILITY_MG].min;
-    params[start].max = parameter_declarations[TP_QUEEN_MOBILITY_MG].max;
-    params[start].current = QUEEN_MOBILITY_MG;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_KNIGHT_MOBILITY_EG].start;
-    params[start].min = parameter_declarations[TP_KNIGHT_MOBILITY_EG].min;
-    params[start].max = parameter_declarations[TP_KNIGHT_MOBILITY_EG].max;
-    params[start].current = KNIGHT_MOBILITY_EG;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_BISHOP_MOBILITY_EG].start;
-    params[start].min = parameter_declarations[TP_BISHOP_MOBILITY_EG].min;
-    params[start].max = parameter_declarations[TP_BISHOP_MOBILITY_EG].max;
-    params[start].current = BISHOP_MOBILITY_EG;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_ROOK_MOBILITY_EG].start;
-    params[start].min = parameter_declarations[TP_ROOK_MOBILITY_EG].min;
-    params[start].max = parameter_declarations[TP_ROOK_MOBILITY_EG].max;
-    params[start].current = ROOK_MOBILITY_EG;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_QUEEN_MOBILITY_EG].start;
-    params[start].min = parameter_declarations[TP_QUEEN_MOBILITY_EG].min;
-    params[start].max = parameter_declarations[TP_QUEEN_MOBILITY_EG].max;
-    params[start].current = QUEEN_MOBILITY_EG;
-    params[start].active = false;
-
-    start = parameter_declarations[TP_PSQ_TABLE_PAWN].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_PAWN].stop;
-    for (k=start;k<=stop;k++) {
-        params[k].min = parameter_declarations[TP_PSQ_TABLE_PAWN].min;
-        params[k].max = parameter_declarations[TP_PSQ_TABLE_PAWN].max;
-        params[k].current = PSQ_TABLE_PAWN[k-start];
-        params[k].active = false;
-    }
-
-    start = parameter_declarations[TP_PSQ_TABLE_KNIGHT].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_KNIGHT].stop;
-    for (k=start;k<=stop;k++) {
-        params[k].min = parameter_declarations[TP_PSQ_TABLE_KNIGHT].min;
-        params[k].max = parameter_declarations[TP_PSQ_TABLE_KNIGHT].max;
-        params[k].current = PSQ_TABLE_KNIGHT[k-start];
-        params[k].active = false;
-    }
-
-    start = parameter_declarations[TP_PSQ_TABLE_BISHOP].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_BISHOP].stop;
-    for (k=start;k<=stop;k++) {
-        params[k].min = parameter_declarations[TP_PSQ_TABLE_BISHOP].min;
-        params[k].max = parameter_declarations[TP_PSQ_TABLE_BISHOP].max;
-        params[k].current = PSQ_TABLE_BISHOP[k-start];
-        params[k].active = false;
-    }
-
-    start = parameter_declarations[TP_PSQ_TABLE_ROOK].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_ROOK].stop;
-    for (k=start;k<=stop;k++) {
-        params[k].min = parameter_declarations[TP_PSQ_TABLE_ROOK].min;
-        params[k].max = parameter_declarations[TP_PSQ_TABLE_ROOK].max;
-        params[k].current = PSQ_TABLE_ROOK[k-start];
-        params[k].active = false;
-    }
-
-    start = parameter_declarations[TP_PSQ_TABLE_KING_MG].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_KING_MG].stop;
-    for (k=start;k<=stop;k++) {
-        params[k].min = parameter_declarations[TP_PSQ_TABLE_KING_MG].min;
-        params[k].max = parameter_declarations[TP_PSQ_TABLE_KING_MG].max;
-        params[k].current = PSQ_TABLE_KING_MG[k-start];
-        params[k].active = false;
-    }
-
-    start = parameter_declarations[TP_PSQ_TABLE_KING_EG].start;
-    stop = parameter_declarations[TP_PSQ_TABLE_KING_EG].stop;
-    for (k=start;k<=stop;k++) {
-        params[k].min = parameter_declarations[TP_PSQ_TABLE_KING_EG].min;
-        params[k].max = parameter_declarations[TP_PSQ_TABLE_KING_EG].max;
-        params[k].current = PSQ_TABLE_KING_EG[k-start];
-        params[k].active = false;
-    }
+    DEFINE(TP_DOUBLE_PAWNS, DOUBLE_PAWNS)
+    DEFINE(TP_ISOLATED_PAWN, ISOLATED_PAWN)
+    DEFINE(TP_ROOK_OPEN_FILE, ROOK_OPEN_FILE)
+    DEFINE(TP_ROOK_HALF_OPEN_FILE, ROOK_HALF_OPEN_FILE)
+    DEFINE(TP_QUEEN_OPEN_FILE, QUEEN_OPEN_FILE)
+    DEFINE(TP_QUEEN_HALF_OPEN_FILE, QUEEN_HALF_OPEN_FILE)
+    DEFINE(TP_ROOK_ON_7TH_MG, ROOK_ON_7TH_MG)
+    DEFINE(TP_ROOK_ON_7TH_EG, ROOK_ON_7TH_EG)
+    DEFINE(TP_BISHOP_PAIR, BISHOP_PAIR)
+    DEFINE(TP_PAWN_SHIELD_RANK1, PAWN_SHIELD_RANK1)
+    DEFINE(TP_PAWN_SHIELD_RANK2, PAWN_SHIELD_RANK2)
+    DEFINE(TP_PAWN_SHIELD_HOLE, PAWN_SHIELD_HOLE)
+    DEFINE(TP_PASSED_PAWN_RANK2, PASSED_PAWN_RANK2)
+    DEFINE(TP_PASSED_PAWN_RANK3, PASSED_PAWN_RANK3)
+    DEFINE(TP_PASSED_PAWN_RANK4, PASSED_PAWN_RANK4)
+    DEFINE(TP_PASSED_PAWN_RANK5, PASSED_PAWN_RANK5)
+    DEFINE(TP_PASSED_PAWN_RANK6, PASSED_PAWN_RANK6)
+    DEFINE(TP_PASSED_PAWN_RANK7, PASSED_PAWN_RANK7)
+    DEFINE(TP_KNIGHT_MOBILITY_MG, KNIGHT_MOBILITY_MG)
+    DEFINE(TP_BISHOP_MOBILITY_MG, BISHOP_MOBILITY_MG)
+    DEFINE(TP_ROOK_MOBILITY_MG, ROOK_MOBILITY_MG)
+    DEFINE(TP_QUEEN_MOBILITY_MG, QUEEN_MOBILITY_MG)
+    DEFINE(TP_KNIGHT_MOBILITY_EG, KNIGHT_MOBILITY_EG)
+    DEFINE(TP_BISHOP_MOBILITY_EG, BISHOP_MOBILITY_EG)
+    DEFINE(TP_ROOK_MOBILITY_EG, ROOK_MOBILITY_EG)
+    DEFINE(TP_QUEEN_MOBILITY_EG, QUEEN_MOBILITY_EG)
+    DEFINE_MULTIPLE(TP_PSQ_TABLE_PAWN, PSQ_TABLE_PAWN)
+    DEFINE_MULTIPLE(TP_PSQ_TABLE_KNIGHT, PSQ_TABLE_KNIGHT)
+    DEFINE_MULTIPLE(TP_PSQ_TABLE_BISHOP, PSQ_TABLE_BISHOP)
+    DEFINE_MULTIPLE(TP_PSQ_TABLE_ROOK, PSQ_TABLE_ROOK)
+    DEFINE_MULTIPLE(TP_PSQ_TABLE_KING_MG, PSQ_TABLE_KING_MG)
+    DEFINE_MULTIPLE(TP_PSQ_TABLE_KING_EG, PSQ_TABLE_KING_EG)
 
     return params;
 }
