@@ -623,12 +623,6 @@ int eval_evaluate(struct gamestate *pos)
 
     /* Adjust score for game phase */
     phase = calculate_game_phase(pos);
-    if (phase < 0) {
-        char fenstr[256];
-        fen_build_string(pos, fenstr);
-        printf("%s\n", fenstr);
-    }
-    assert(phase >= 0 && phase <= 256);
     score = calculate_tapered_eval(phase, score_mg, score_eg);
 
     return score;
@@ -663,7 +657,6 @@ void eval_display(struct gamestate *pos)
 
     /* Adjust score for game phase */
     phase = calculate_game_phase(pos);
-    assert(phase >= 0 && phase <= 256);
     score = calculate_tapered_eval(phase, eval.sum[MIDDLEGAME][BOTH],
                                    eval.sum[ENDGAME][BOTH]);
 
