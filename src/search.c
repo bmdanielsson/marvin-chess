@@ -45,17 +45,23 @@
 /* Calculates if it is time to check the clock and poll for commands */
 #define CHECKUP(n) (((n)&1023)==0)
 
+/* The depth at which to start considering futility pruning */
+#define FUTILITY_DEPTH 3
+
 /*
  * Margins used for futility pruning. The array should be
  * indexed by depth-1.
  */
-static int futility_margin[3] = {300, 500, 900};
+static int futility_margin[FUTILITY_DEPTH] = {300, 500, 900};
+
+/* The depth at which to start considering razoring */
+#define RAZORING_DEPTH 3
 
 /*
  * Margins used for razoring. The array should be
  * indexed by depth-1.
  */
-static int razoring_margin[3] = {100, 200, 300};
+static int razoring_margin[RAZORING_DEPTH] = {100, 200, 300};
 
 /*
  * Aspiration window sizes. If the search fails low or high
@@ -367,6 +373,9 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     bool     found_pv;
     bool     pv_node;
 
+    /* Set node type */
+    pv_node = (beta-alpha) > 1;
+
     /* Update search statistics */
     pos->nodes++;
 
@@ -468,9 +477,9 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
      * full search.
      */
     if (!in_check &&
+        !pv_node &&
         (move == NOMOVE) &&
-        (abs(alpha) < 10000) &&
-        (depth <= 3) &&
+        (depth <= RAZORING_DEPTH) &&
         ((score+razoring_margin[depth-1]) <= alpha)) {
         if (depth == 1) {
             return quiescence(pos, 0, alpha, beta);
@@ -485,9 +494,8 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
      * no point searching further.
      */
     futility_pruning = false;
-    if ((depth <= 3) &&
+    if ((depth <= FUTILITY_DEPTH) &&
         !in_check &&
-        (abs(alpha) < 10000) &&
         ((score+futility_margin[depth-1]) <= alpha)) {
         futility_pruning = true;
     }
@@ -499,7 +507,6 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     movenumber = 0;
     found_move = false;
     found_pv = false;
-    pv_node = (beta-alpha) > 1;
     while (select_get_move(pos, &move, &see_score)) {
         if (!board_make_move(pos, move)) {
             continue;
