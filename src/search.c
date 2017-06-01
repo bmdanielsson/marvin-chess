@@ -471,6 +471,16 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
      */
     score = eval_evaluate(pos);
 
+    /* Reverse futility pruning */
+    if ((depth <= FUTILITY_DEPTH) &&
+        !in_check &&
+        !pv_node &&
+        board_has_non_pawn(pos, pos->stm) &&
+        ((score-futility_margin[depth-1]) >= beta) &&
+        (score < KNOWN_WIN)) {
+        return score;
+    }
+
     /*
      * Try Razoring. If the current score indicates that we are far below
      * alpha then we're in a really bad place and it's no point doing a
