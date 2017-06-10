@@ -680,19 +680,17 @@ static int search_root(struct gamestate *pos, int depth, int alpha, int beta)
 
         /* Check if a new best move have been found */
         if (score > best_score) {
+            /* Update the best score and best move for this iteration */
             best_score = score;
             best_move = move;
 
-            /*
-             * Check if the score is above the lower bound. In that
-             * case a new PV move may have been found.
-             */
+            /* Check if the score is above the lower bound */
             if (score > alpha) {
                 /*
-                 * Check if the score is above the upper bound. If it is then
-                 * the move is "too good" and our opponent would never let
-                 * us reach this position. This means that we don't need to
-                 * search this position further.
+                 * Check if the score is above the upper bound. If it is, then
+                 * a re-search will be triggered with a larger aspiration
+                 * window. So the search can be stopped directly in order to
+                 * save some time.
                  */
                 if (score >= beta) {
                     add_killer_move(pos, move, see_score);
@@ -702,26 +700,25 @@ static int search_root(struct gamestate *pos, int depth, int alpha, int beta)
 
                 /*
                  * Update the lower bound with the new score. Also
-                 * update the principle variation with our new best move.
+                 * update the principle variation with our new best
+                 * move.
                  */
                 tt_flag = TT_EXACT;
                 alpha = score;
                 update_pv(pos, move);
                 engine_send_pv_info(pos, score);
                 update_history_table(pos, move, depth);
-            }
 
-            /*
-             * In case the search fails high don't update the
-			 * returned best move. If the pv is longer than one
-			 * then also update the ponder move. If there is no
-			 * ponder move we have to overwrite the old one
-			 * otherwise the ponder move may be illegal when there
-			 * is a new move.
-             */
-            pos->best_move = move;
-			pos->ponder_move = (pos->pv_table[0].length > 1)?
-											pos->pv_table[0].moves[1]:NOMOVE;
+                /*
+                 * Update the best move from the search and the ponder move.
+                 * The moves are only updated when the score is inside the
+                 * aspiration window since it's only then the score can be
+                 * trusted.
+                 */
+                pos->best_move = move;
+                pos->ponder_move = (pos->pv_table[0].length > 1)?
+                                            pos->pv_table[0].moves[1]:NOMOVE;
+            }
         }
     }
 
