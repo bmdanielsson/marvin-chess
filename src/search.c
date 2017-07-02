@@ -344,6 +344,7 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
                     break;
                 }
                 alpha = score;
+                update_pv(pos, move);
             }
         }
     }
@@ -937,6 +938,5 @@ int search_get_quiscence_score(struct gamestate *pos)
     pos->resolving_root_fail = false;
 
     tc_configure_time_control(pos, TC_INFINITE, 0, 0, 0);
-
     return quiescence(pos, 0, -INFINITE_SCORE, INFINITE_SCORE);
 }

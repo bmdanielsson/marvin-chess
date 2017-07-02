@@ -54,6 +54,7 @@
 /* Training position */
 struct trainingpos {
     char    *epd;
+    char    *fen_quiet;
     double  result;
 };
 
@@ -86,6 +87,7 @@ struct worker {
     int                 last_pos;
     double              k;
     double              sum;
+    bool                update_pv;
     enum worker_state   state;
 };
 
@@ -96,8 +98,51 @@ static pthread_cond_t workers_start_cond;
 static pthread_cond_t workers_finished_cond;
 
 /* Workers used for calculating errors */
-struct worker   *workers = NULL;
-static int      nworkerthreads = 0;
+struct worker *workers = NULL;
+static int    nworkerthreads = 0;
+
+static void mark_pv_for_update(void)
+{
+    int k;
+
+    for (k=0;k<nworkerthreads;k++) {
+        workers[k].update_pv = true;
+    }
+}
+
+static void find_quiet_trainingset(struct gamestate *pos, struct worker *worker)
+{
+    int                iter;
+    struct pv          *pv;
+    struct trainingset *trainingset;
+    int                k;
+    char               fenstr[FEN_MAX_LENGTH];
+
+    /* Iterate over all training positions */
+    trainingset = worker->trainingset;
+    for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
+        /* Setup position */
+        board_reset(pos);
+        (void)fen_setup_board(pos, trainingset->positions[iter].epd, true);
+
+        /* Do a quiscence search to get the pv */
+        search_reset_data(pos);
+        pos->tc_type = TC_INFINITE;
+        pos->sd = 0;
+        pos->silent = true;
+        pos->use_tablebases = false;
+        (void)search_get_quiscence_score(pos);
+
+        /* Find the position at the end of the pv */
+        pv = &pos->pv_table[0];
+        for (k=0;k<pv->length;k++) {
+           board_make_move(pos, pv->moves[k]);
+        }
+        fen_build_string(pos, fenstr);
+        free(trainingset->positions[iter].fen_quiet);
+        trainingset->positions[iter].fen_quiet = strdup(fenstr);
+    }
+}
 
 static double calc_texel_sigmoid(int score, double k)
 {
@@ -137,12 +182,19 @@ static void* calc_texel_error_func(void *data)
             break;
         }
 
+        /* Check if the pv should be updated */
+        if (worker->update_pv) {
+            find_quiet_trainingset(pos, worker);
+            worker->update_pv = false;
+        }
+
         /* Iterate over all training positions assigned to this worker */
         worker->sum = 0.0;
         for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
             /* Setup position */
             board_reset(pos);
-            (void)fen_setup_board(pos, trainingset->positions[iter].epd, true);
+            (void)fen_setup_board(pos, trainingset->positions[iter].fen_quiet,
+                                  true);
 
             /* Do a quiscence search to get a score for the position */
             search_reset_data(pos);
@@ -150,7 +202,7 @@ static void* calc_texel_error_func(void *data)
             pos->sd = 0;
             pos->silent = true;
             pos->use_tablebases = false;
-            score = search_get_quiscence_score(pos);
+            score = eval_evaluate(pos);
             score = (pos->stm == WHITE)?score:-score;
 
             /* Calculate error */
@@ -226,6 +278,7 @@ static void local_optimize(struct tuningset *tuningset,
     int     delta;
 
     /* Calculate current error */
+    mark_pv_for_update();
     tuning_param_assign_current(tuningset->params);
     best_e = calc_texel_error(trainingset, K);
     printf("Initial error: %f\n", best_e);
@@ -303,6 +356,7 @@ static void local_optimize(struct tuningset *tuningset,
 
         /* Output the result after the current iteration */
         niterations++;
+        mark_pv_for_update();
         printf("\rIteration %d complete, error %f\n", niterations, best_e);
         sprintf(path, TUNING_ITERATION_RESULT_FILE, niterations);
         fp = fopen(path, "w");
@@ -345,7 +399,7 @@ static struct trainingset* read_trainingset(struct gamestate *pos, char *file)
     }
 
     /* Allocate an array to hold the training positions */
-    trainingset = malloc(sizeof(trainingset));
+    trainingset = malloc(sizeof(struct trainingset));
     ntot = (int)sb.st_size/APPROX_EPD_LENGTH;
     trainingset->positions = malloc(ntot*sizeof(struct trainingpos));
     trainingset->size = 0;
@@ -391,6 +445,7 @@ static struct trainingset* read_trainingset(struct gamestate *pos, char *file)
 
         /* Update training set */
         trainingset->positions[trainingset->size].epd = strdup(buffer);
+        trainingset->positions[trainingset->size].fen_quiet = NULL;
         trainingset->size++;
 
         /* Next position */
@@ -427,7 +482,7 @@ static struct tuningset* read_tuningset(char *file)
     char              *iter;
 
     /* Allocate a tuningset */
-    tuningset = malloc(sizeof(tuningset));
+    tuningset = malloc(sizeof(struct tuningset));
     tuningset->params = tuning_param_create_list();
     tuningset->size = NUM_TUNING_PARAMS;
     tuningset->nactive = 0;
