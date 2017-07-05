@@ -23,6 +23,21 @@
 #include "bitboard.h"
 #include "validation.h"
 
+int see_material[NPIECES] = {
+    100,    /* White pawn */
+    100,    /* Black pawn */
+    325,    /* White knight */
+    325,    /* Black knight */
+    325,    /* White bishop */
+    325,    /* Black bishop */
+    500,    /* White rook */
+    500,    /* Black rook */
+    975,    /* White queen */
+    975,    /* Black queen */
+    20000,  /* White king */
+    20000   /* Black king */
+};
+
 static uint64_t find_xray_attackers(struct gamestate *pos, uint64_t occ,
                                     int target, uint64_t attacker)
 {
@@ -120,7 +135,7 @@ int see_calculate_score(struct gamestate *pos, uint32_t move)
     attacker = sq_mask[from];
     side = COLOR(piece);
     depth = 0;
-    score[0] = material_values[pos->pieces[to]];
+    score[0] = see_material[pos->pieces[to]];
     occ = pos->bb_all;
 
     /* Find all pieces that attacks the target square */
@@ -131,7 +146,7 @@ int see_calculate_score(struct gamestate *pos, uint32_t move)
     do {
         /* Resolve capture and calculate score at this depth */
         depth++;
-        score[depth] = material_values[piece] - score[depth-1];
+        score[depth] = see_material[piece] - score[depth-1];
 
         /* Remove the attacker from the set of attackers */
         attackers &= ~attacker;

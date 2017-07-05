@@ -65,7 +65,7 @@ static int calculate_see_score(struct gamestate *pos, uint32_t move)
     if (ISCAPTURE(move)) {
         return see_calculate_score(pos, move);
     } else if (ISENPASSANT(move)) {
-        return material_values[PAWN+FLIP_COLOR(pos->stm)]/2;
+        return see_material[PAWN+FLIP_COLOR(pos->stm)]/2;
     }
     return 0;
 }

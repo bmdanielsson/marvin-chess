@@ -100,6 +100,10 @@ enum {
     TP_PSQ_TABLE_ROOK,
     TP_PSQ_TABLE_KING_MG,
     TP_PSQ_TABLE_KING_EG,
+    TP_KNIGHT_MATERIAL_VALUE,
+    TP_BISHOP_MATERIAL_VALUE,
+    TP_ROOK_MATERIAL_VALUE,
+    TP_QUEEN_MATERIAL_VALUE,
     NUM_PARAM_DECLARATIONS
 };
 
@@ -136,7 +140,11 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"psq_table_bishop", 154, 217, -200, 200},
     {"psq_table_rook", 218, 281, -200, 200},
     {"psq_table_king_mg", 282, 345, -200, 200},
-    {"psq_table_king_eg", 346, 409, -200, 200}
+    {"psq_table_king_eg", 346, 409, -200, 200},
+    {"knight_material_value", 410, 410, 200, 400},
+    {"bishop_material_value", 411, 411, 200, 400},
+    {"rook_material_value", 412, 412, 400, 600},
+    {"queen_material_value", 413, 413, 700, 1100}
 };
 
 void tuning_param_assign_current(struct tuning_param *params)
@@ -177,6 +185,10 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN_MULTIPLE(TP_PSQ_TABLE_ROOK, PSQ_TABLE_ROOK)
     ASSIGN_MULTIPLE(TP_PSQ_TABLE_KING_MG, PSQ_TABLE_KING_MG)
     ASSIGN_MULTIPLE(TP_PSQ_TABLE_KING_EG, PSQ_TABLE_KING_EG)
+    ASSIGN(TP_KNIGHT_MATERIAL_VALUE, KNIGHT_MATERIAL_VALUE)
+    ASSIGN(TP_BISHOP_MATERIAL_VALUE, BISHOP_MATERIAL_VALUE)
+    ASSIGN(TP_ROOK_MATERIAL_VALUE, ROOK_MATERIAL_VALUE)
+    ASSIGN(TP_QUEEN_MATERIAL_VALUE, QUEEN_MATERIAL_VALUE)
 
     eval_reset();
 }
@@ -222,6 +234,10 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE_MULTIPLE(TP_PSQ_TABLE_ROOK, PSQ_TABLE_ROOK)
     DEFINE_MULTIPLE(TP_PSQ_TABLE_KING_MG, PSQ_TABLE_KING_MG)
     DEFINE_MULTIPLE(TP_PSQ_TABLE_KING_EG, PSQ_TABLE_KING_EG)
+    DEFINE(TP_KNIGHT_MATERIAL_VALUE, KNIGHT_MATERIAL_VALUE)
+    DEFINE(TP_BISHOP_MATERIAL_VALUE, BISHOP_MATERIAL_VALUE)
+    DEFINE(TP_ROOK_MATERIAL_VALUE, ROOK_MATERIAL_VALUE)
+    DEFINE(TP_QUEEN_MATERIAL_VALUE, QUEEN_MATERIAL_VALUE)
 
     return params;
 }

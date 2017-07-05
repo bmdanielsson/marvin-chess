@@ -35,6 +35,12 @@
 #define QUEEN_PHASE     4
 
 /*
+ * The material value for pawns is not tuned in order to make sure there
+ * is fix base value for all scores.
+ */
+#define PAWN_BASE_VALUE 100
+
+/*
  * Different evaluation components. The first two elements of each array
  * is the evaluation for each side, and the third contains the summarized
  * evaluation of the specific component (from white's pov).
@@ -65,21 +71,11 @@ static int mobility_table[NPHASES][NPIECES];
  */
 static int passed_pawn_scores[NRANKS];
 
-/* Material values for all pieces */
-int material_values[NPIECES] = {
-    100,    /* White pawn */
-    100,    /* Black pawn */
-    325,    /* White knight */
-    325,    /* Black knight */
-    325,    /* White bishop */
-    325,    /* Black bishop */
-    500,    /* White rook */
-    500,    /* Black rook */
-    975,    /* White queen */
-    975,    /* Black queen */
-    20000,  /* White king */
-    20000   /* Black king */
-};
+/*
+ * Material values for all pieces. The table is
+ * initialized by the eval_reset function.
+ */
+int material_values[NPIECES];
 
 /*
  * Calculate a numerical value between 0 and 256 for
@@ -586,6 +582,20 @@ void eval_reset(void)
     passed_pawn_scores[RANK_6] = PASSED_PAWN_RANK6;
     passed_pawn_scores[RANK_7] = PASSED_PAWN_RANK7;
     passed_pawn_scores[RANK_8] = 0;
+
+    /* Initialize the material table */
+    material_values[WHITE_PAWN] = PAWN_BASE_VALUE;
+    material_values[BLACK_PAWN] = PAWN_BASE_VALUE;
+    material_values[WHITE_KNIGHT] = KNIGHT_MATERIAL_VALUE;
+    material_values[BLACK_KNIGHT] = KNIGHT_MATERIAL_VALUE;
+    material_values[WHITE_BISHOP] = BISHOP_MATERIAL_VALUE;
+    material_values[BLACK_BISHOP] = BISHOP_MATERIAL_VALUE;
+    material_values[WHITE_ROOK] = ROOK_MATERIAL_VALUE;
+    material_values[BLACK_ROOK] = ROOK_MATERIAL_VALUE;
+    material_values[WHITE_QUEEN] = QUEEN_MATERIAL_VALUE;
+    material_values[BLACK_QUEEN] = QUEEN_MATERIAL_VALUE;
+    material_values[WHITE_KING] = 20000;
+    material_values[BLACK_KING] = 20000;
 }
 
 int eval_evaluate(struct gamestate *pos)
