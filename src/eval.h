@@ -23,20 +23,6 @@
 /* Material values for all pieces */
 extern int material_values[NPIECES];
 
-/* Tunable evaluation parameters */
-extern int tp_double_pawns;
-extern int tp_isolated_pawn;
-extern int tp_rook_open_file;
-extern int tp_rook_half_open_file;
-extern int tp_queen_open_file;
-extern int tp_queen_half_open_file;
-extern int tp_rook_on_7th_mg;
-extern int tp_rook_on_7th_eg;
-extern int tp_bishop_pair;
-extern int tp_pawn_shield_rank1;
-extern int tp_pawn_shield_rank2;
-extern int tp_pawn_shield_hole;
-
 /* Reset the evaluation module */
 void eval_reset(void);
 
