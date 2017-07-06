@@ -767,13 +767,6 @@ int eval_psq(struct gamestate *pos, int side, bool endgame)
         case BLACK_BISHOP:
             score += PSQ_TABLE_BISHOP[MIRROR(sq)];
             break;
-        case WHITE_KING:
-            score += endgame?PSQ_TABLE_KING_EG[sq]:PSQ_TABLE_KING_MG[sq];
-            break;
-        case BLACK_KING:
-            score += endgame?
-                PSQ_TABLE_KING_EG[MIRROR(sq)]:PSQ_TABLE_KING_MG[MIRROR(sq)];
-            break;
         case WHITE_ROOK:
             score += PSQ_TABLE_ROOK[sq];
             break;
@@ -781,7 +774,17 @@ int eval_psq(struct gamestate *pos, int side, bool endgame)
             score += PSQ_TABLE_ROOK[MIRROR(sq)];
             break;
         case WHITE_QUEEN:
+            score += PSQ_TABLE_QUEEN[sq];
+            break;
         case BLACK_QUEEN:
+            score += PSQ_TABLE_QUEEN[MIRROR(sq)];
+            break;
+        case WHITE_KING:
+            score += endgame?PSQ_TABLE_KING_EG[sq]:PSQ_TABLE_KING_MG[sq];
+            break;
+        case BLACK_KING:
+            score += endgame?
+                PSQ_TABLE_KING_EG[MIRROR(sq)]:PSQ_TABLE_KING_MG[MIRROR(sq)];
             break;
         default:
                 assert(false);
@@ -820,11 +823,6 @@ void eval_update_psq_score(struct gamestate *pos, int add, int piece, int sq)
         pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_BISHOP[sq]);
         pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_BISHOP[sq]);
         break;
-    case WHITE_KING:
-    case BLACK_KING:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_KING_MG[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_KING_EG[sq]);
-        break;
     case WHITE_ROOK:
     case BLACK_ROOK:
         pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_ROOK[sq]);
@@ -832,6 +830,13 @@ void eval_update_psq_score(struct gamestate *pos, int add, int piece, int sq)
         break;
     case WHITE_QUEEN:
     case BLACK_QUEEN:
+        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_QUEEN[sq]);
+        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_QUEEN[sq]);
+        break;
+    case WHITE_KING:
+    case BLACK_KING:
+        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_KING_MG[sq]);
+        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_KING_EG[sq]);
         break;
     default:
         assert(false);

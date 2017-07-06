@@ -23,7 +23,7 @@
 #include "chess.h"
 
 /* The total number of tunable parameters */
-#define NUM_TUNING_PARAMS 414
+#define NUM_TUNING_PARAMS 478
 
 /* Declaration for a tuning parameter */
 struct param_decl {

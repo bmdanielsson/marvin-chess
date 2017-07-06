@@ -98,6 +98,7 @@ enum {
     TP_PSQ_TABLE_KNIGHT,
     TP_PSQ_TABLE_BISHOP,
     TP_PSQ_TABLE_ROOK,
+    TP_PSQ_TABLE_QUEEN,
     TP_PSQ_TABLE_KING_MG,
     TP_PSQ_TABLE_KING_EG,
     TP_KNIGHT_MATERIAL_VALUE,
@@ -139,12 +140,13 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"psq_table_knight", 90, 153, -200, 200},
     {"psq_table_bishop", 154, 217, -200, 200},
     {"psq_table_rook", 218, 281, -200, 200},
-    {"psq_table_king_mg", 282, 345, -200, 200},
-    {"psq_table_king_eg", 346, 409, -200, 200},
-    {"knight_material_value", 410, 410, 200, 400},
-    {"bishop_material_value", 411, 411, 200, 400},
-    {"rook_material_value", 412, 412, 400, 600},
-    {"queen_material_value", 413, 413, 700, 1100}
+    {"psq_table_queen", 282, 345, -200, 200},
+    {"psq_table_king_mg", 346, 409, -200, 200},
+    {"psq_table_king_eg", 410, 473, -200, 200},
+    {"knight_material_value", 474, 474, 200, 400},
+    {"bishop_material_value", 475, 475, 200, 400},
+    {"rook_material_value", 476, 476, 400, 600},
+    {"queen_material_value", 477, 477, 700, 1100}
 };
 
 void tuning_param_assign_current(struct tuning_param *params)
@@ -183,6 +185,7 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN_MULTIPLE(TP_PSQ_TABLE_KNIGHT, PSQ_TABLE_KNIGHT)
     ASSIGN_MULTIPLE(TP_PSQ_TABLE_BISHOP, PSQ_TABLE_BISHOP)
     ASSIGN_MULTIPLE(TP_PSQ_TABLE_ROOK, PSQ_TABLE_ROOK)
+    ASSIGN_MULTIPLE(TP_PSQ_TABLE_QUEEN, PSQ_TABLE_QUEEN)
     ASSIGN_MULTIPLE(TP_PSQ_TABLE_KING_MG, PSQ_TABLE_KING_MG)
     ASSIGN_MULTIPLE(TP_PSQ_TABLE_KING_EG, PSQ_TABLE_KING_EG)
     ASSIGN(TP_KNIGHT_MATERIAL_VALUE, KNIGHT_MATERIAL_VALUE)
@@ -232,6 +235,7 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE_MULTIPLE(TP_PSQ_TABLE_KNIGHT, PSQ_TABLE_KNIGHT)
     DEFINE_MULTIPLE(TP_PSQ_TABLE_BISHOP, PSQ_TABLE_BISHOP)
     DEFINE_MULTIPLE(TP_PSQ_TABLE_ROOK, PSQ_TABLE_ROOK)
+    DEFINE_MULTIPLE(TP_PSQ_TABLE_QUEEN, PSQ_TABLE_QUEEN)
     DEFINE_MULTIPLE(TP_PSQ_TABLE_KING_MG, PSQ_TABLE_KING_MG)
     DEFINE_MULTIPLE(TP_PSQ_TABLE_KING_EG, PSQ_TABLE_KING_EG)
     DEFINE(TP_KNIGHT_MATERIAL_VALUE, KNIGHT_MATERIAL_VALUE)
