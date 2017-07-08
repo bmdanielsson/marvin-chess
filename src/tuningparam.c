@@ -146,7 +146,7 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"knight_material_value", 474, 474, 200, 400},
     {"bishop_material_value", 475, 475, 200, 400},
     {"rook_material_value", 476, 476, 400, 600},
-    {"queen_material_value", 477, 477, 700, 1100}
+    {"queen_material_value", 477, 477, 700, 1400}
 };
 
 void tuning_param_assign_current(struct tuning_param *params)
