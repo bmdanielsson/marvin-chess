@@ -31,9 +31,6 @@
 #include "validation.h"
 #include "moveselect.h"
 
-/* The version of the benchmark */
-#define BENCHMARK_VERSION "1.3"
-
 /* Positions used for benchmark */
 struct benchmark_positions {
     /* The FEN string of the position */
@@ -130,8 +127,6 @@ void test_run_benchmark(void)
     time_t           start;
     time_t           total;
     uint32_t         ponder_move;
-
-    printf("Benchmark v%s\n", BENCHMARK_VERSION);
 
     pos = create_game_state(DEFAULT_MAIN_HASH_SIZE);
     nodes = 0ULL;
