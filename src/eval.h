@@ -20,9 +20,6 @@
 
 #include "chess.h"
 
-/* Material values for all pieces */
-extern int material_values[NPIECES];
-
 /* Reset the evaluation module */
 void eval_reset(void);
 
@@ -50,6 +47,15 @@ void eval_display(struct gamestate *pos);
  * @return Returns the material score.
  */
 int eval_material(struct gamestate *pos, int side);
+
+/*
+ * Incrementally update the material score for a piece.
+ *
+ * @param add Indicates if the piece was added or removed.
+ * @param pos The board structure.
+ * @param piece The piece.
+ */
+void eval_update_material_score(struct gamestate *pos, int add, int piece);
 
 /*
  * Calculate the piece/square table score for a specific side.

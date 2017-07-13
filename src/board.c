@@ -49,7 +49,7 @@ static void add_piece(struct gamestate *pos, int piece, int square)
     SETBIT(pos->bb_sides[COLOR(piece)], square);
     SETBIT(pos->bb_all, square);
     pos->pieces[square] = piece;
-    pos->material[COLOR(piece)] += material_values[piece];
+    eval_update_material_score(pos, true, piece);
     eval_update_psq_score(pos, true, piece, square);
 }
 
@@ -59,7 +59,7 @@ static void remove_piece(struct gamestate *pos, int piece, int square)
     CLEARBIT(pos->bb_sides[COLOR(piece)], square);
     CLEARBIT(pos->bb_all, square);
     pos->pieces[square] = NO_PIECE;
-    pos->material[COLOR(piece)] -= material_values[piece];
+    eval_update_material_score(pos, false, piece);
     eval_update_psq_score(pos, false, piece, square);
 }
 

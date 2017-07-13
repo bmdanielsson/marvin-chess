@@ -75,7 +75,7 @@ static int passed_pawn_scores[NRANKS];
  * Material values for all pieces. The table is
  * initialized by the eval_reset function.
  */
-int material_values[NPIECES];
+static int material_values[NPIECES];
 
 /*
  * Calculate a numerical value between 0 and 256 for
@@ -731,6 +731,46 @@ int eval_material(struct gamestate *pos, int side)
     }
 
     return score;
+}
+
+void eval_update_material_score(struct gamestate *pos, int add, int piece)
+{
+    int delta;
+    int color;
+
+    assert(valid_board(pos));
+    assert(valid_piece(piece));
+
+    delta = add?1:-1;
+    color = COLOR(piece);
+    switch (piece) {
+    case WHITE_PAWN:
+    case BLACK_PAWN:
+        pos->material[color] += (delta*material_values[piece]);
+        break;
+    case WHITE_KNIGHT:
+    case BLACK_KNIGHT:
+        pos->material[color] += (delta*material_values[piece]);
+        break;
+    case WHITE_BISHOP:
+    case BLACK_BISHOP:
+        pos->material[color] += (delta*material_values[piece]);
+        break;
+    case WHITE_ROOK:
+    case BLACK_ROOK:
+        pos->material[color] += (delta*material_values[piece]);
+        break;
+    case WHITE_QUEEN:
+    case BLACK_QUEEN:
+        pos->material[color] += (delta*material_values[piece]);
+        break;
+    case WHITE_KING:
+    case BLACK_KING:
+        break;
+    default:
+        assert(false);
+        break;
+    }
 }
 
 int eval_psq(struct gamestate *pos, int side, bool endgame)
