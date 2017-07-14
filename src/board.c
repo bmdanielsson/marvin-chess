@@ -264,15 +264,10 @@ bool board_make_move(struct gamestate *pos, uint32_t move)
         return false;
     }
 
-    assert(pos->material[WHITE] == eval_material(pos, WHITE));
-    assert(pos->material[BLACK] == eval_material(pos, BLACK));
-    assert(pos->psq[MIDDLEGAME][WHITE] == eval_psq(pos, WHITE, false));
-    assert(pos->psq[MIDDLEGAME][BLACK] == eval_psq(pos, BLACK, false));
-    assert(pos->psq[ENDGAME][WHITE] == eval_psq(pos, WHITE, true));
-    assert(pos->psq[ENDGAME][BLACK] == eval_psq(pos, BLACK, true));
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_board(pos));
+    assert(valid_scores(pos));
 
     return true;
 }
@@ -343,15 +338,10 @@ void board_unmake_move(struct gamestate *pos)
     /* Update position and game information */
     pos->stm = move_color;
 
-    assert(pos->material[WHITE] == eval_material(pos, WHITE));
-    assert(pos->material[BLACK] == eval_material(pos, BLACK));
-    assert(pos->psq[MIDDLEGAME][WHITE] == eval_psq(pos, WHITE, false));
-    assert(pos->psq[MIDDLEGAME][BLACK] == eval_psq(pos, BLACK, false));
-    assert(pos->psq[ENDGAME][WHITE] == eval_psq(pos, WHITE, true));
-    assert(pos->psq[ENDGAME][BLACK] == eval_psq(pos, BLACK, true));
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_board(pos));
+    assert(valid_scores(pos));
 }
 
 void board_make_null_move(struct gamestate *pos)

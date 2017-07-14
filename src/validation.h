@@ -73,4 +73,12 @@ bool valid_move(uint32_t move);
 bool valid_gen_quiscenece_moves(struct gamestate *pos, bool checks,
                                 struct movelist *list);
 
+/*
+ * Check if incrementally updated score are correct.
+ *
+ * @param pos The chess position.
+ * @return Returns true if the scores are correct.
+ */
+bool valid_scores(struct gamestate *pos);
+
 #endif

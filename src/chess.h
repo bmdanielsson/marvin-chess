@@ -503,7 +503,7 @@ struct gamestate {
      * The material score and piece/square table score for each
      * player. These value is incrementally updated during the search.
      */
-    int material[NSIDES];
+    int material[NPHASES][NSIDES];
     int psq[NPHASES][NSIDES];
 
     /* The current search depth in plies */

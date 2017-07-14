@@ -75,7 +75,8 @@ static int passed_pawn_scores[NRANKS];
  * Material values for all pieces. The table is
  * initialized by the eval_reset function.
  */
-static int material_values[NPIECES];
+static int material_values_mg[NPIECES];
+static int material_values_eg[NPIECES];
 
 /*
  * Calculate a numerical value between 0 and 256 for
@@ -472,8 +473,8 @@ static void do_eval(struct gamestate *pos, struct eval *eval)
     for (k=0;k<NPHASES;k++) {
         eval->psq[k][WHITE] = pos->psq[k][WHITE];
         eval->psq[k][BLACK] = pos->psq[k][BLACK];
-        eval->material[k][WHITE] = pos->material[WHITE];
-        eval->material[k][BLACK] = pos->material[BLACK];
+        eval->material[k][WHITE] = pos->material[k][WHITE];
+        eval->material[k][BLACK] = pos->material[k][BLACK];
     }
 
     /* Check if the position is present in the pawn transposition table */
@@ -584,18 +585,30 @@ void eval_reset(void)
     passed_pawn_scores[RANK_8] = 0;
 
     /* Initialize the material table */
-    material_values[WHITE_PAWN] = PAWN_BASE_VALUE;
-    material_values[BLACK_PAWN] = PAWN_BASE_VALUE;
-    material_values[WHITE_KNIGHT] = KNIGHT_MATERIAL_VALUE;
-    material_values[BLACK_KNIGHT] = KNIGHT_MATERIAL_VALUE;
-    material_values[WHITE_BISHOP] = BISHOP_MATERIAL_VALUE;
-    material_values[BLACK_BISHOP] = BISHOP_MATERIAL_VALUE;
-    material_values[WHITE_ROOK] = ROOK_MATERIAL_VALUE;
-    material_values[BLACK_ROOK] = ROOK_MATERIAL_VALUE;
-    material_values[WHITE_QUEEN] = QUEEN_MATERIAL_VALUE;
-    material_values[BLACK_QUEEN] = QUEEN_MATERIAL_VALUE;
-    material_values[WHITE_KING] = 20000;
-    material_values[BLACK_KING] = 20000;
+    material_values_mg[WHITE_PAWN] = PAWN_BASE_VALUE;
+    material_values_mg[BLACK_PAWN] = PAWN_BASE_VALUE;
+    material_values_mg[WHITE_KNIGHT] = KNIGHT_MATERIAL_VALUE_MG;
+    material_values_mg[BLACK_KNIGHT] = KNIGHT_MATERIAL_VALUE_MG;
+    material_values_mg[WHITE_BISHOP] = BISHOP_MATERIAL_VALUE_MG;
+    material_values_mg[BLACK_BISHOP] = BISHOP_MATERIAL_VALUE_MG;
+    material_values_mg[WHITE_ROOK] = ROOK_MATERIAL_VALUE_MG;
+    material_values_mg[BLACK_ROOK] = ROOK_MATERIAL_VALUE_MG;
+    material_values_mg[WHITE_QUEEN] = QUEEN_MATERIAL_VALUE_MG;
+    material_values_mg[BLACK_QUEEN] = QUEEN_MATERIAL_VALUE_MG;
+    material_values_mg[WHITE_KING] = 20000;
+    material_values_mg[BLACK_KING] = 20000;
+    material_values_eg[WHITE_PAWN] = PAWN_BASE_VALUE;
+    material_values_eg[BLACK_PAWN] = PAWN_BASE_VALUE;
+    material_values_eg[WHITE_KNIGHT] = KNIGHT_MATERIAL_VALUE_EG;
+    material_values_eg[BLACK_KNIGHT] = KNIGHT_MATERIAL_VALUE_EG;
+    material_values_eg[WHITE_BISHOP] = BISHOP_MATERIAL_VALUE_EG;
+    material_values_eg[BLACK_BISHOP] = BISHOP_MATERIAL_VALUE_EG;
+    material_values_eg[WHITE_ROOK] = ROOK_MATERIAL_VALUE_EG;
+    material_values_eg[BLACK_ROOK] = ROOK_MATERIAL_VALUE_EG;
+    material_values_eg[WHITE_QUEEN] = QUEEN_MATERIAL_VALUE_EG;
+    material_values_eg[BLACK_QUEEN] = QUEEN_MATERIAL_VALUE_EG;
+    material_values_eg[WHITE_KING] = 20000;
+    material_values_eg[BLACK_KING] = 20000;
 }
 
 int eval_evaluate(struct gamestate *pos)
@@ -607,12 +620,7 @@ int eval_evaluate(struct gamestate *pos)
     int         score_eg;
 
     assert(valid_board(pos));
-    assert(pos->material[WHITE] == eval_material(pos, WHITE));
-    assert(pos->material[BLACK] == eval_material(pos, BLACK));
-    assert(pos->psq[MIDDLEGAME][WHITE] == eval_psq(pos, WHITE, false));
-    assert(pos->psq[MIDDLEGAME][BLACK] == eval_psq(pos, BLACK, false));
-    assert(pos->psq[ENDGAME][WHITE] == eval_psq(pos, WHITE, true));
-    assert(pos->psq[ENDGAME][BLACK] == eval_psq(pos, BLACK, true));
+    assert(valid_scores(pos));
 
     /*
      * If no player have enough material left
@@ -645,12 +653,7 @@ void eval_display(struct gamestate *pos)
     int         score;
 
     assert(valid_board(pos));
-    assert(pos->material[WHITE] == eval_material(pos, WHITE));
-    assert(pos->material[BLACK] == eval_material(pos, BLACK));
-    assert(pos->psq[MIDDLEGAME][WHITE] == eval_psq(pos, WHITE, false));
-    assert(pos->psq[MIDDLEGAME][BLACK] == eval_psq(pos, BLACK, false));
-    assert(pos->psq[ENDGAME][WHITE] == eval_psq(pos, WHITE, true));
-    assert(pos->psq[ENDGAME][BLACK] == eval_psq(pos, BLACK, true));
+    assert(valid_scores(pos));
 
     /*
      * If no player have enough material left
@@ -717,7 +720,7 @@ void eval_display(struct gamestate *pos)
     printf("Score:      %d (for white)\n", score);
 }
 
-int eval_material(struct gamestate *pos, int side)
+int eval_material(struct gamestate *pos, int side, bool endgame)
 {
     int score;
     int piece;
@@ -727,7 +730,11 @@ int eval_material(struct gamestate *pos, int side)
 
     score = 0;
     for (piece=side;piece<NPIECES;piece+=2) {
-        score += BITCOUNT(pos->bb_pieces[piece])*material_values[piece];
+        if (!endgame) {
+            score += BITCOUNT(pos->bb_pieces[piece])*material_values_mg[piece];
+        } else {
+            score += BITCOUNT(pos->bb_pieces[piece])*material_values_eg[piece];
+        }
     }
 
     return score;
@@ -746,23 +753,28 @@ void eval_update_material_score(struct gamestate *pos, int add, int piece)
     switch (piece) {
     case WHITE_PAWN:
     case BLACK_PAWN:
-        pos->material[color] += (delta*material_values[piece]);
+        pos->material[MIDDLEGAME][color] += (delta*material_values_mg[piece]);
+        pos->material[ENDGAME][color] += (delta*material_values_eg[piece]);
         break;
     case WHITE_KNIGHT:
     case BLACK_KNIGHT:
-        pos->material[color] += (delta*material_values[piece]);
+        pos->material[MIDDLEGAME][color] += (delta*material_values_mg[piece]);
+        pos->material[ENDGAME][color] += (delta*material_values_eg[piece]);
         break;
     case WHITE_BISHOP:
     case BLACK_BISHOP:
-        pos->material[color] += (delta*material_values[piece]);
+        pos->material[MIDDLEGAME][color] += (delta*material_values_mg[piece]);
+        pos->material[ENDGAME][color] += (delta*material_values_eg[piece]);
         break;
     case WHITE_ROOK:
     case BLACK_ROOK:
-        pos->material[color] += (delta*material_values[piece]);
+        pos->material[MIDDLEGAME][color] += (delta*material_values_mg[piece]);
+        pos->material[ENDGAME][color] += (delta*material_values_eg[piece]);
         break;
     case WHITE_QUEEN:
     case BLACK_QUEEN:
-        pos->material[color] += (delta*material_values[piece]);
+        pos->material[MIDDLEGAME][color] += (delta*material_values_mg[piece]);
+        pos->material[ENDGAME][color] += (delta*material_values_eg[piece]);
         break;
     case WHITE_KING:
     case BLACK_KING:

@@ -44,9 +44,10 @@ void eval_display(struct gamestate *pos);
  *
  * @param pos The board structure.
  * @param side The side to calculate material for.
+ * @param endgame If the score should be or the endgame.
  * @return Returns the material score.
  */
-int eval_material(struct gamestate *pos, int side);
+int eval_material(struct gamestate *pos, int side, bool endgame);
 
 /*
  * Incrementally update the material score for a piece.

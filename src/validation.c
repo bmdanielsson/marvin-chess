@@ -22,6 +22,7 @@
 #include "key.h"
 #include "movegen.h"
 #include "board.h"
+#include "eval.h"
 #include "debug.h"
 
 bool valid_board(struct gamestate *pos)
@@ -224,4 +225,17 @@ bool valid_gen_quiscenece_moves(struct gamestate *pos, bool checks,
     }
 
     return nmoves == nmoves2;
+}
+
+bool valid_scores(struct gamestate *pos)
+{
+    return
+        pos->material[MIDDLEGAME][WHITE] == eval_material(pos, WHITE, false) &&
+        pos->material[MIDDLEGAME][BLACK] == eval_material(pos, BLACK, false) &&
+        pos->material[ENDGAME][WHITE] == eval_material(pos, WHITE, true) &&
+        pos->material[ENDGAME][BLACK] == eval_material(pos, BLACK, true) &&
+        pos->psq[MIDDLEGAME][WHITE] == eval_psq(pos, WHITE, false) &&
+        pos->psq[MIDDLEGAME][BLACK] == eval_psq(pos, BLACK, false) &&
+        pos->psq[ENDGAME][WHITE] == eval_psq(pos, WHITE, true) &&
+        pos->psq[ENDGAME][BLACK] == eval_psq(pos, BLACK, true);
 }
