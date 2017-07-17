@@ -802,34 +802,39 @@ int eval_psq(struct gamestate *pos, int side, bool endgame)
         piece = pos->pieces[sq];
         switch (piece) {
         case WHITE_PAWN:
-            score += PSQ_TABLE_PAWN[sq];
+            score += endgame?PSQ_TABLE_PAWN_EG[sq]:PSQ_TABLE_PAWN_MG[sq];
             break;
         case BLACK_PAWN:
-            score += PSQ_TABLE_PAWN[MIRROR(sq)];
+            score += endgame?
+                PSQ_TABLE_PAWN_EG[MIRROR(sq)]:PSQ_TABLE_PAWN_MG[MIRROR(sq)];
             break;
         case WHITE_KNIGHT:
-            score += PSQ_TABLE_KNIGHT[sq];
+            score += endgame?PSQ_TABLE_KNIGHT_EG[sq]:PSQ_TABLE_KNIGHT_MG[sq];
             break;
         case BLACK_KNIGHT:
-            score += PSQ_TABLE_KNIGHT[MIRROR(sq)];
+            score += endgame?
+                PSQ_TABLE_KNIGHT_EG[MIRROR(sq)]:PSQ_TABLE_KNIGHT_MG[MIRROR(sq)];
             break;
         case WHITE_BISHOP:
-            score += PSQ_TABLE_BISHOP[sq];
+            score += endgame?PSQ_TABLE_BISHOP_EG[sq]:PSQ_TABLE_BISHOP_MG[sq];
             break;
         case BLACK_BISHOP:
-            score += PSQ_TABLE_BISHOP[MIRROR(sq)];
+            score += endgame?
+                PSQ_TABLE_BISHOP_EG[MIRROR(sq)]:PSQ_TABLE_BISHOP_MG[MIRROR(sq)];
             break;
         case WHITE_ROOK:
-            score += PSQ_TABLE_ROOK[sq];
+            score += endgame?PSQ_TABLE_ROOK_EG[sq]:PSQ_TABLE_ROOK_MG[sq];
             break;
         case BLACK_ROOK:
-            score += PSQ_TABLE_ROOK[MIRROR(sq)];
+            score += endgame?
+                PSQ_TABLE_ROOK_EG[MIRROR(sq)]:PSQ_TABLE_ROOK_MG[MIRROR(sq)];
             break;
         case WHITE_QUEEN:
-            score += PSQ_TABLE_QUEEN[sq];
+            score += endgame?PSQ_TABLE_QUEEN_EG[sq]:PSQ_TABLE_QUEEN_MG[sq];
             break;
         case BLACK_QUEEN:
-            score += PSQ_TABLE_QUEEN[MIRROR(sq)];
+            score += endgame?
+                PSQ_TABLE_QUEEN_EG[MIRROR(sq)]:PSQ_TABLE_QUEEN_MG[MIRROR(sq)];
             break;
         case WHITE_KING:
             score += endgame?PSQ_TABLE_KING_EG[sq]:PSQ_TABLE_KING_MG[sq];
@@ -862,28 +867,28 @@ void eval_update_psq_score(struct gamestate *pos, int add, int piece, int sq)
     switch (piece) {
     case WHITE_PAWN:
     case BLACK_PAWN:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_PAWN[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_PAWN[sq]);
+        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_PAWN_MG[sq]);
+        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_PAWN_EG[sq]);
         break;
     case WHITE_KNIGHT:
     case BLACK_KNIGHT:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_KNIGHT[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_KNIGHT[sq]);
+        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_KNIGHT_MG[sq]);
+        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_KNIGHT_EG[sq]);
         break;
     case WHITE_BISHOP:
     case BLACK_BISHOP:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_BISHOP[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_BISHOP[sq]);
+        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_BISHOP_MG[sq]);
+        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_BISHOP_EG[sq]);
         break;
     case WHITE_ROOK:
     case BLACK_ROOK:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_ROOK[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_ROOK[sq]);
+        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_ROOK_MG[sq]);
+        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_ROOK_EG[sq]);
         break;
     case WHITE_QUEEN:
     case BLACK_QUEEN:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_QUEEN[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_QUEEN[sq]);
+        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_QUEEN_MG[sq]);
+        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_QUEEN_EG[sq]);
         break;
     case WHITE_KING:
     case BLACK_KING:
