@@ -70,6 +70,12 @@ static int razoring_margin[RAZORING_DEPTH] = {100, 200, 300};
  */
 static int aspiration_window[] = {25, 50, 100, 200, 400, INFINITE_SCORE};
 
+/* The maximum depth at which to do late move pruning */
+#define LMP_DEPTH 6
+
+/* Move counts for the different depths to use for late move pruning */
+static int lmp_counts[LMP_DEPTH+1] = {0, 5, 10, 20, 35, 55};
+
 static void update_history_table(struct gamestate *pos, uint32_t move,
                                  int depth)
 {
@@ -108,6 +114,12 @@ static void add_killer_move(struct gamestate *pos, uint32_t move, int see_score)
 
     pos->killer_table[pos->sply][1] = pos->killer_table[pos->sply][0];
     pos->killer_table[pos->sply][0] = move;
+}
+
+static bool is_killer(struct gamestate *pos, uint32_t move)
+{
+    return (pos->killer_table[pos->sply][0] == move) ||
+            (pos->killer_table[pos->sply][1] == move);
 }
 
 static bool probe_wdl_tables(struct gamestate *pos, int *score)
@@ -254,6 +266,30 @@ static bool checkup(struct gamestate *pos)
     return pos->abort;
 }
 
+static bool is_pawn_push(struct gamestate *pos, uint32_t move)
+{
+    int from;
+    int to;
+    int piece;
+    int color;
+
+    from = FROM(move);
+    to = TO(move);
+    piece = pos->pieces[from];
+    color = COLOR(piece);
+
+    if (VALUE(pos->pieces[from]) != PAWN) {
+        return false;
+    }
+    if ((color == WHITE) && (RANKNR(to) >= RANK_6)) {
+        return true;
+    }
+    if ((color == BLACK) && (RANKNR(to) <= RANK_3)) {
+        return true;
+    }
+    return false;
+}
+
 static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
 {
     int      score;
@@ -373,6 +409,10 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     int      tt_flag;
     bool     found_pv;
     bool     pv_node;
+    bool     pawn_push;
+    bool     killer;
+    int      hist;
+    bool     gives_check;
 
     /* Set node type */
     pv_node = (beta-alpha) > 1;
@@ -519,9 +559,13 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     found_move = false;
     found_pv = false;
     while (select_get_move(pos, &move, &see_score)) {
+        pawn_push = is_pawn_push(pos, move);
+        killer = is_killer(pos, move);
+        hist = pos->history_table[pos->stm][FROM(move)][TO(move)];
         if (!board_make_move(pos, move)) {
             continue;
         }
+        gives_check = board_in_check(pos, pos->stm);
         movenumber++;
         found_move = true;
 
@@ -535,7 +579,25 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
             !ISCAPTURE(move) &&
             !ISENPASSANT(move) &&
             !ISPROMOTION(move) &&
-            !board_in_check(pos, pos->stm)) {
+            !gives_check) {
+            board_unmake_move(pos);
+            continue;
+        }
+
+        /* Late move pruning */
+        if (!pv_node &&
+            depth < LMP_DEPTH &&
+            (movenumber > lmp_counts[depth]) &&
+            !in_check &&
+            (movenumber > 1) &&
+            !ISCAPTURE(move) &&
+            !ISENPASSANT(move) &&
+            !ISPROMOTION(move) &&
+            !gives_check &&
+            !pawn_push &&
+            !killer &&
+            (abs(alpha) < KNOWN_WIN) &&
+            (hist == 0)) {
             board_unmake_move(pos);
             continue;
         }
