@@ -284,8 +284,6 @@ struct unmake {
     uint64_t key;
     /* The unique pawn key before the move was made */
     uint64_t pawnkey;
-    /* Indicates if the side to move before the move was made was in check */
-    bool in_check;
 };
 
 /* The different supported time controls */

@@ -45,22 +45,18 @@
 /* Calculates if it is time to check the clock and poll for commands */
 #define CHECKUP(n) (((n)&1023)==0)
 
-/* The depth at which to start considering futility pruning */
-#define FUTILITY_DEPTH 3
-
 /*
  * Margins used for futility pruning. The array should be
  * indexed by depth-1.
  */
+#define FUTILITY_DEPTH 3
 static int futility_margin[FUTILITY_DEPTH] = {300, 500, 900};
-
-/* The depth at which to start considering razoring */
-#define RAZORING_DEPTH 3
 
 /*
  * Margins used for razoring. The array should be
  * indexed by depth-1.
  */
+#define RAZORING_DEPTH 3
 static int razoring_margin[RAZORING_DEPTH] = {100, 200, 300};
 
 /*
@@ -70,10 +66,8 @@ static int razoring_margin[RAZORING_DEPTH] = {100, 200, 300};
  */
 static int aspiration_window[] = {25, 50, 100, 200, 400, INFINITE_SCORE};
 
-/* The maximum depth at which to do late move pruning */
-#define LMP_DEPTH 6
-
 /* Move counts for the different depths to use for late move pruning */
+#define LMP_DEPTH 6
 static int lmp_counts[LMP_DEPTH+1] = {0, 5, 10, 20, 35, 55};
 
 static void update_history_table(struct gamestate *pos, uint32_t move,
@@ -116,10 +110,39 @@ static void add_killer_move(struct gamestate *pos, uint32_t move, int see_score)
     pos->killer_table[pos->sply][0] = move;
 }
 
-static bool is_killer(struct gamestate *pos, uint32_t move)
+static bool is_killer_move(struct gamestate *pos, uint32_t move)
 {
     return (pos->killer_table[pos->sply][0] == move) ||
             (pos->killer_table[pos->sply][1] == move);
+}
+
+static bool is_pawn_push(struct gamestate *pos, uint32_t move)
+{
+    int from;
+    int to;
+    int piece;
+    int color;
+
+    from = FROM(move);
+    to = TO(move);
+    piece = pos->pieces[from];
+    color = COLOR(piece);
+
+    if (VALUE(pos->pieces[from]) != PAWN) {
+        return false;
+    }
+    if ((color == WHITE) && (RANKNR(to) >= RANK_6)) {
+        return true;
+    }
+    if ((color == BLACK) && (RANKNR(to) <= RANK_3)) {
+        return true;
+    }
+    return false;
+}
+
+static bool is_tactical_move(uint32_t move)
+{
+    return ISCAPTURE(move) || ISENPASSANT(move) || ISPROMOTION(move);
 }
 
 static bool probe_wdl_tables(struct gamestate *pos, int *score)
@@ -266,30 +289,6 @@ static bool checkup(struct gamestate *pos)
     return pos->abort;
 }
 
-static bool is_pawn_push(struct gamestate *pos, uint32_t move)
-{
-    int from;
-    int to;
-    int piece;
-    int color;
-
-    from = FROM(move);
-    to = TO(move);
-    piece = pos->pieces[from];
-    color = COLOR(piece);
-
-    if (VALUE(pos->pieces[from]) != PAWN) {
-        return false;
-    }
-    if ((color == WHITE) && (RANKNR(to) >= RANK_6)) {
-        return true;
-    }
-    if ((color == BLACK) && (RANKNR(to) <= RANK_3)) {
-        return true;
-    }
-    return false;
-}
-
 static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
 {
     int      score;
@@ -412,7 +411,7 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     bool     pawn_push;
     bool     killer;
     int      hist;
-    bool     gives_check;
+    bool     tactical;
 
     /* Set node type */
     pv_node = (beta-alpha) > 1;
@@ -517,8 +516,7 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
         !in_check &&
         !pv_node &&
         board_has_non_pawn(pos, pos->stm) &&
-        ((score-futility_margin[depth-1]) >= beta) &&
-        (score < KNOWN_WIN)) {
+        ((score-futility_margin[depth-1]) >= beta)) {
         return score;
     }
 
@@ -546,7 +544,6 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
      */
     futility_pruning = false;
     if ((depth <= FUTILITY_DEPTH) &&
-        !in_check &&
         ((score+futility_margin[depth-1]) <= alpha)) {
         futility_pruning = true;
     }
@@ -560,40 +557,37 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     found_pv = false;
     while (select_get_move(pos, &move, &see_score)) {
         pawn_push = is_pawn_push(pos, move);
-        killer = is_killer(pos, move);
+        killer = is_killer_move(pos, move);
         hist = pos->history_table[pos->stm][FROM(move)][TO(move)];
         if (!board_make_move(pos, move)) {
             continue;
         }
-        gives_check = board_in_check(pos, pos->stm);
+        tactical = is_tactical_move(move) || in_check ||
+                    board_in_check(pos, pos->stm);
         movenumber++;
         found_move = true;
 
         /*
-         * If the futility pruning flag is set then prune
-         * all moves except very tactical ones. Also make
-         * sure to search at least one move.
+         * If the futility pruning flag is set then prune all moves except
+         * tactical ones. Also make sure to search at least one move.
          */
         if (futility_pruning &&
             (movenumber > 1) &&
-            !ISCAPTURE(move) &&
-            !ISENPASSANT(move) &&
-            !ISPROMOTION(move) &&
-            !gives_check) {
+            !tactical) {
             board_unmake_move(pos);
             continue;
         }
 
-        /* Late move pruning */
+        /*
+         * LMP (Late Move Pruning). If a move is sorted late in the list and
+         * it has not been good in the past then prune it unless there are
+         * obvious tactics. Also make sure to search at least one move.
+         */
         if (!pv_node &&
-            depth < LMP_DEPTH &&
+            (depth < LMP_DEPTH) &&
             (movenumber > lmp_counts[depth]) &&
-            !in_check &&
             (movenumber > 1) &&
-            !ISCAPTURE(move) &&
-            !ISENPASSANT(move) &&
-            !ISPROMOTION(move) &&
-            !gives_check &&
+            !tactical &&
             !pawn_push &&
             !killer &&
             (abs(alpha) < KNOWN_WIN) &&
@@ -608,9 +602,7 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
          * depth. Exceptions are made for tactical moves, like captures and
          * promotions.
          */
-        reduction = ((movenumber > 3) && (depth > 3) &&
-                     (!ISCAPTURE(move)) && (!ISPROMOTION(move)) &&
-                     (!in_check) && (!board_in_check(pos, pos->stm)))?1:0;
+        reduction = ((movenumber > 3) && (depth > 3) && !tactical)?1:0;
         if ((reduction > 0) && (movenumber > 6)) {
             reduction++;
         }
