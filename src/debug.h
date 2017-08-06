@@ -80,4 +80,11 @@ void dbg_print_movelist(struct movelist *list);
  */
 void dbg_print_pv(struct pv *pv);
 
+/*
+ * Interactivly browse the trasposition table.
+ *
+ * @param pos The board structure.
+ */
+void dbg_browse_transposition_table(struct gamestate *pos);
+
 #endif

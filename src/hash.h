@@ -86,6 +86,15 @@ bool hash_tt_lookup(struct gamestate *pos, int depth, int alpha, int beta,
                     uint32_t *move, int *score);
 
 /*
+ * Lookup the current position in the main transposition table.
+ *
+ * @param pos The board structure.
+ * @return Returns a pointer to the transposition table item or NULL if
+ *         the position was not found.
+ */
+struct tt_item* hash_tt_lookup_raw(struct gamestate *pos);
+
+/*
  * Make sure that the PV is present in the main transposition table.
  *
  * @param pos The board structure.

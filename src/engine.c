@@ -61,6 +61,15 @@ static void cmd_bench(void)
 
 /*
  * Custom command
+ * Syntax: browse
+ */
+static void cmd_browse(struct gamestate *pos)
+{
+    dbg_browse_transposition_table(pos);
+}
+
+/*
+ * Custom command
  * Syntax: display
  */
 static void cmd_display(struct gamestate *pos)
@@ -166,6 +175,8 @@ void engine_loop(struct gamestate *pos)
         handled = true;
         if (!strncmp(cmd, "bench", 5)) {
             cmd_bench();
+        } else if (!strncmp(cmd, "browse", 6)) {
+            cmd_browse(pos);
         } else if (!strncmp(cmd, "display", 7)) {
             cmd_display(pos);
         } else if (!strncmp(cmd, "divide", 6)) {

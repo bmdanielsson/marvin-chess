@@ -287,6 +287,31 @@ bool hash_tt_lookup(struct gamestate *pos, int depth, int alpha, int beta,
     return cutoff;
 }
 
+struct tt_item* hash_tt_lookup_raw(struct gamestate *pos)
+{
+    uint32_t         idx;
+    struct tt_bucket *bucket;
+    struct tt_item   *item;
+    int              k;
+
+    assert(valid_board(pos));
+
+    if (pos->tt_table == NULL) {
+        return NULL;
+    }
+
+    idx = (uint32_t)(pos->key%pos->tt_size);
+    bucket = &pos->tt_table[idx];
+    for (k=0;k<TT_BUCKET_SIZE;k++) {
+        item = &bucket->items[k];
+        if (pos->key == item->key) {
+            return item;
+        }
+    }
+
+    return NULL;
+}
+
 void hash_tt_insert_pv(struct gamestate *pos, struct pv *pv)
 {
     int      k;
