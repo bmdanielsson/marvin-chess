@@ -306,8 +306,12 @@ struct book_entry {
  * which represents a single position.
  */
 struct tt_item {
-    /* The key of this position */
-    uint64_t key;
+    /*
+     * The key of this position. It is split into two parts in order to
+     * avoid the need for 8-byte alignment of the struct.
+     */
+    uint32_t key_low;
+    uint32_t key_high;
     /* The best move found */
     uint32_t move;
     /*
@@ -324,23 +328,29 @@ struct tt_item {
     uint8_t type;
     /* The time when the position was stored */
     uint8_t date;
-    /*
-     * Dummy field added to make sure that the struct has the
-     * same size for both 32-bit and 64-bit builds.
-     */
-    uint32_t padding;
 };
 
 /* The number of items stored in each transposition table bucket */
 #define TT_BUCKET_SIZE 3
 
-/* Transposition table bucket */
+/*
+ * Transposition table bucket. The size should be a
+ * power-of-2 for best performance.
+ */
 struct tt_bucket {
     /* Items stored in this bucket */
     struct tt_item items[TT_BUCKET_SIZE];
+    /*
+     * Padding added to make sure that the
+     * size of the struct is a power-of-2.
+     */
+    uint32_t padding;
 };
 
-/* An item in the pawn transposition table */
+/*
+ * An item in the pawn transposition table. The size should be a
+ * power-of-2 for best performance.
+ */
 struct pawntt_item {
     /* The pawn key */
     uint64_t pawnkey;
@@ -352,8 +362,8 @@ struct pawntt_item {
     /* Indicates if the item is being used */
     bool used;
     /*
-     * Dummy field added to make sure that the struct has the
-     * same size for both 32-bit and 64-bit builds.
+     * Padding added to make sure that the
+     * size of the struct is a power-of-2.
      */
     uint32_t padding;
 };

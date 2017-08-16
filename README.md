@@ -9,7 +9,7 @@ Marvin was originally released as closed source in 2002 and activly developed un
 ### Configuration
 
 When started Marvin looks for a configuration file called marvin.ini in the same directory as the excutable. This file can be used to configure the engine. Currently the following options are recognized:
-* HASH_SIZE: The amount of memory used for the main hash table (in MB).
+* HASH_SIZE: The amount of memory used for the main hash table (in MB). For best performance the size should be a power-of-2.
 * LOG_LEVEL: The log level. If set to 2 the engine will log all commands that are sent and received.
 * SYZYGY_PATH: Path to where the Syzygy tablebases are located.
 

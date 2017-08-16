@@ -27,12 +27,35 @@
 #include "board.h"
 #include "config.h"
 
+/* Macros for managing the hash key stored in struct tt_item */
+#define KEY_LOW(k)  ((uint32_t)((k)&0x00000000FFFFFFFF))
+#define KEY_HIGH(k) ((uint32_t)(((k)>>32)&0x00000000FFFFFFFF))
+#define KEY_EQUALS(k, i) \
+                (k) == ((((uint64_t)(i)->key_high)<<32)|(uint64_t)(i)->key_low)
+#define KEY_IS_ZERO(i) ((i)->key_low == 0ULL) && ((i)->key_high == 0ULL)
+
+static int largest_power_of_2(int size, int item_size)
+{
+    int largest;
+    int nitems;
+
+    nitems = (size*1024*1024)/item_size;
+    largest = 1;
+    while (largest <= nitems) {
+        largest <<= 1;
+    }
+    largest >>= 1;
+
+    return largest;
+}
+
 static void allocate_tt(struct gamestate *pos, int size)
 {
-    pos->tt_size = (size*1024*1024)/sizeof(struct tt_bucket);
+    pos->tt_size = largest_power_of_2(size, sizeof(struct tt_bucket));
     pos->tt_table = malloc(pos->tt_size*sizeof(struct tt_bucket));
     if (pos->tt_table == NULL) {
-        pos->tt_size = (MIN_MAIN_HASH_SIZE*1024*1024)/sizeof(struct tt_bucket);
+        pos->tt_size = largest_power_of_2(MIN_MAIN_HASH_SIZE,
+                                          sizeof(struct tt_bucket));
         pos->tt_table = malloc(pos->tt_size*sizeof(struct tt_bucket));
     }
     assert(pos->tt_table != NULL);
@@ -40,9 +63,9 @@ static void allocate_tt(struct gamestate *pos, int size)
 
 static void allocate_pawntt(struct gamestate *pos, int size)
 {
-    pos->pawntt_size = (size*1024*1024)/sizeof(struct pawntt_item);
+    pos->pawntt_size = largest_power_of_2(size, sizeof(struct pawntt_item));
     pos->pawntt_table = malloc(pos->pawntt_size*sizeof(struct pawntt_item));
-    assert(pos->tt_table != NULL);
+    assert(pos->pawntt_table != NULL);
 }
 
 static bool check_tt_cutoff(struct gamestate *pos, struct tt_item *item,
@@ -172,7 +195,7 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
     }
 
     /* Find the correct bucket */
-    idx = (uint32_t)(pos->key%pos->tt_size);
+    idx = (uint32_t)(pos->key&(pos->tt_size-1));
     bucket = &pos->tt_table[idx];
 
     /*
@@ -192,7 +215,7 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
          * which case it is inserted it unless the existing
          * item has the same move.
          */
-        if (pos->key == item->key) {
+        if (KEY_EQUALS(pos->key, item)) {
             if (type == TT_PV) {
                 if (move != item->move) {
                     worst_item = item;
@@ -210,7 +233,7 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
              * the current position.
              */
             return;
-        } else if (item->key == 0ULL) {
+        } else if (KEY_IS_ZERO(item)) {
             worst_item = item;
             break;
         }
@@ -232,10 +255,11 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
     assert(worst_item != NULL);
 
     /* Replace the worst item */
-    if (worst_item->key == 0ULL) {
+    if (KEY_IS_ZERO(worst_item)) {
         pos->tt_used++;
     }
-    worst_item->key = pos->key;
+    worst_item->key_high = KEY_HIGH(pos->key);
+    worst_item->key_low = KEY_LOW(pos->key);
     worst_item->move = move;
     worst_item->score = score;
     worst_item->depth = depth;
@@ -263,7 +287,7 @@ bool hash_tt_lookup(struct gamestate *pos, int depth, int alpha, int beta,
     }
 
     /* Find the correct bucket */
-    idx = (uint32_t)(pos->key%pos->tt_size);
+    idx = (uint32_t)(pos->key&(pos->tt_size-1));
     bucket = &pos->tt_table[idx];
 
     /*
@@ -277,7 +301,7 @@ bool hash_tt_lookup(struct gamestate *pos, int depth, int alpha, int beta,
     for (k=0;k<TT_BUCKET_SIZE;k++) {
         item = &bucket->items[k];
 
-        if (pos->key == item->key) {
+        if (KEY_EQUALS(pos->key, item)) {
             *move = item->move;
             cutoff = check_tt_cutoff(pos, item, depth, alpha, beta, score);
             break;
@@ -300,11 +324,11 @@ struct tt_item* hash_tt_lookup_raw(struct gamestate *pos)
         return NULL;
     }
 
-    idx = (uint32_t)(pos->key%pos->tt_size);
+    idx = (uint32_t)(pos->key&(pos->tt_size-1));
     bucket = &pos->tt_table[idx];
     for (k=0;k<TT_BUCKET_SIZE;k++) {
         item = &bucket->items[k];
-        if (pos->key == item->key) {
+        if (KEY_EQUALS(pos->key, item)) {
             return item;
         }
     }
@@ -379,7 +403,7 @@ void hash_pawntt_store(struct gamestate *pos, struct pawntt_item *item)
     }
 
     /* Find the correct position in the table */
-    idx = (uint32_t)(pos->pawnkey%pos->pawntt_size);
+    idx = (uint32_t)(pos->pawnkey&(pos->pawntt_size-1));
 
     /*
      * Insert the item in the table. An always-replace strategy
@@ -406,7 +430,7 @@ bool hash_pawntt_lookup(struct gamestate *pos, struct pawntt_item *item)
      * if it contains an item for this position.
      */
     found = false;
-    idx = (uint32_t)(pos->pawnkey%pos->pawntt_size);
+    idx = (uint32_t)(pos->pawnkey&(pos->pawntt_size-1));
     if (pos->pawntt_table[idx].pawnkey == pos->pawnkey) {
         found = true;
         *item = pos->pawntt_table[idx];
