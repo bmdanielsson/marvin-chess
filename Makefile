@@ -3,15 +3,9 @@ popcnt = yes
 variant = release
 
 # Command line arguments
-.PHONY : popcnt
-ifeq ($(popcnt), yes)
-    CPPFLAGS += -DHAS_POPCNT
-    CFLAGS += -msse3 -mpopcnt
-else
-    CPPFLAGS += -DTB_NO_HW_POP_COUNT
-endif
 .PHONY : arch
 ifeq ($(arch), x86)
+    popcnt = no
     CFLAGS += -m32
     ARCH += -m32
 else
@@ -19,6 +13,13 @@ ifeq ($(arch), x86-64)
     CFLAGS += -m64
     ARCH += -m64
 endif
+endif
+.PHONY : popcnt
+ifeq ($(popcnt), yes)
+    CPPFLAGS += -DHAS_POPCNT
+    CFLAGS += -msse3 -mpopcnt
+else
+    CPPFLAGS += -DTB_NO_HW_POP_COUNT
 endif
 .PHONY : variant
 ifeq ($(variant), release)
