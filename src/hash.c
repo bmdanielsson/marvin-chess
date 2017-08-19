@@ -25,6 +25,7 @@
 #include "validation.h"
 #include "search.h"
 #include "board.h"
+#include "utils.h"
 #include "config.h"
 
 /* Macros for managing the hash key stored in struct tt_item */
@@ -52,11 +53,13 @@ static int largest_power_of_2(int size, int item_size)
 static void allocate_tt(struct gamestate *pos, int size)
 {
     pos->tt_size = largest_power_of_2(size, sizeof(struct tt_bucket));
-    pos->tt_table = malloc(pos->tt_size*sizeof(struct tt_bucket));
+    pos->tt_table = aligned_malloc(CACHE_LINE_SIZE,
+                                   pos->tt_size*sizeof(struct tt_bucket));
     if (pos->tt_table == NULL) {
         pos->tt_size = largest_power_of_2(MIN_MAIN_HASH_SIZE,
                                           sizeof(struct tt_bucket));
-        pos->tt_table = malloc(pos->tt_size*sizeof(struct tt_bucket));
+        pos->tt_table = aligned_malloc(CACHE_LINE_SIZE,
+                                       pos->tt_size*sizeof(struct tt_bucket));
     }
     assert(pos->tt_table != NULL);
 }
@@ -64,7 +67,8 @@ static void allocate_tt(struct gamestate *pos, int size)
 static void allocate_pawntt(struct gamestate *pos, int size)
 {
     pos->pawntt_size = largest_power_of_2(size, sizeof(struct pawntt_item));
-    pos->pawntt_table = malloc(pos->pawntt_size*sizeof(struct pawntt_item));
+    pos->pawntt_table = aligned_malloc(CACHE_LINE_SIZE,
+                                   pos->pawntt_size*sizeof(struct pawntt_item));
     assert(pos->pawntt_table != NULL);
 }
 
@@ -122,7 +126,7 @@ void hash_tt_create_table(struct gamestate *pos, int size)
 
 void hash_tt_destroy_table(struct gamestate *pos)
 {
-    free(pos->tt_table);
+    aligned_free(pos->tt_table);
     pos->tt_table = NULL;
     pos->tt_size = 0;
     pos->date = 0;
@@ -370,7 +374,7 @@ void hash_pawntt_create_table(struct gamestate *pos, int size)
 
 void hash_pawntt_destroy_table(struct gamestate *pos)
 {
-    free(pos->pawntt_table);
+    aligned_free(pos->pawntt_table);
     pos->pawntt_table = NULL;
     pos->pawntt_size = 0;
 }

@@ -240,3 +240,34 @@ char* skip_whitespace(char *str)
     }
     return str;
 }
+
+void* aligned_malloc(int alignment, int size)
+{
+#ifdef HAS_ALIGNED_MALLOC
+#ifdef WINDOWS
+    return _aligned_malloc(size, alignment);
+#else
+    void *ptr;
+    if (posix_memalign(&ptr, alignment, size)) {
+        ptr = NULL;
+    }
+    return ptr;
+#endif
+#else
+    (void)alignment;
+    return malloc(size);
+#endif
+}
+
+void aligned_free(void *ptr)
+{
+#ifdef HAS_ALIGNED_MALLOC
+#ifdef WINDOWS
+    _aligned_free(ptr);
+#else
+    free(ptr);
+#endif
+#else
+    free(ptr);
+#endif
+}

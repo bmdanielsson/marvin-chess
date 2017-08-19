@@ -27,6 +27,9 @@
 #define MAX(a, b)       ((a) > (b))?(a):(b)
 #define CLAMP(x, a, b)  MAX((a), MIN((x), (b)))
 
+/* The cache line size */
+#define CACHE_LINE_SIZE 64
+
 /*
  * Calculate the number of bits that are set in a 64-bit value.
  *
@@ -111,5 +114,21 @@ uint64_t read_uint64(uint8_t *buffer);
  * @return Returns a pointer to the first non-space character in the string.
  */
 char* skip_whitespace(char *str);
+
+/*
+ * Allocate memory with a specific alignment.
+ *
+ * @param alignment The required alignment.
+ * @param size The amount of memory to allocate.
+ * @return Returns a pointer to the allocated memory.
+ */
+void* aligned_malloc(int alignment, int size);
+
+/*
+ * Free memory allocated with aligned_malloc.
+ *
+ * @param ptr Pointer to the memory to free.
+ */
+void aligned_free(void *ptr);
 
 #endif

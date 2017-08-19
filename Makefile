@@ -1,5 +1,6 @@
 # Default options
 popcnt = yes
+memalign = yes
 variant = release
 
 # Command line arguments
@@ -20,6 +21,10 @@ ifeq ($(popcnt), yes)
     CFLAGS += -msse3 -mpopcnt
 else
     CPPFLAGS += -DTB_NO_HW_POP_COUNT
+endif
+.PHONY : memalign
+ifeq ($(memalign), yes)
+    CPPFLAGS += -DHAS_ALIGNED_MALLOC
 endif
 .PHONY : variant
 ifeq ($(variant), release)
