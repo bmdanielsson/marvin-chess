@@ -442,3 +442,9 @@ bool hash_pawntt_lookup(struct gamestate *pos, struct pawntt_item *item)
 
     return found && item->used;
 }
+
+void hash_prefetch(struct gamestate *pos)
+{
+    PREFETCH_ADDRESS(&pos->tt_table[pos->key&(pos->tt_size-1)]);
+    PREFETCH_ADDRESS(&pos->pawntt_table[pos->pawnkey&(pos->pawntt_size-1)]);
+}

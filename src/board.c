@@ -25,6 +25,7 @@
 #include "validation.h"
 #include "debug.h"
 #include "eval.h"
+#include "hash.h"
 
 /*
  * Array of masks for updating castling permissions. For instance
@@ -255,6 +256,9 @@ bool board_make_move(struct gamestate *pos, uint32_t move)
     pos->stm = FLIP_COLOR(pos->stm);
     pos->key = key_update_side(pos->key, pos->stm);
 
+    /* Prefetch hash table entries */
+    hash_prefetch(pos);
+
     /*
      * If the king was left in check then the move
      * was illegal and should be undone.
@@ -370,6 +374,9 @@ void board_make_null_move(struct gamestate *pos)
     }
     pos->stm = FLIP_COLOR(pos->stm);
     pos->key = key_update_side(pos->key, pos->stm);
+
+    /* Prefetch hash table entries */
+    hash_prefetch(pos);
 
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));

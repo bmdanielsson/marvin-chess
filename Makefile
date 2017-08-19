@@ -1,6 +1,7 @@
 # Default options
 popcnt = yes
 memalign = yes
+prefetch = yes
 variant = release
 
 # Command line arguments
@@ -25,6 +26,10 @@ endif
 .PHONY : memalign
 ifeq ($(memalign), yes)
     CPPFLAGS += -DHAS_ALIGNED_MALLOC
+endif
+.PHONY : prefetch
+ifeq ($(prefetch), yes)
+    CPPFLAGS += -DHAS_PREFETCH
 endif
 .PHONY : variant
 ifeq ($(variant), release)

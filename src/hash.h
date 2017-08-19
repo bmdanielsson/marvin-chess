@@ -147,6 +147,13 @@ void hash_pawntt_store(struct gamestate *pos, struct pawntt_item *item);
  * @param item Location where the found item is stored.
  * @return Returns true if the position was found, false otherwise.
  */
- bool hash_pawntt_lookup(struct gamestate *pos, struct pawntt_item *item);
+bool hash_pawntt_lookup(struct gamestate *pos, struct pawntt_item *item);
+
+/*
+ * Prefetch hash table entries for a specific position.
+ *
+ * @param pos The position.
+ */
+void hash_prefetch(struct gamestate *pos);
 
 #endif
