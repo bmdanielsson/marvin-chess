@@ -48,7 +48,8 @@
 struct eval {
     bool in_pawntt;
     struct pawntt_item pawntt;
-    bool endgame[2];
+    bool endgame[NSIDES];
+    uint64_t coverage[NSIDES];
     int material[NPHASES][3];
     int material_adj[NPHASES][3];
     int psq[NPHASES][3];
@@ -255,6 +256,9 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
                                     passed_pawn_scores[side==WHITE?rank:7-rank];
             SETBIT(item->passers[side], sq);
         }
+
+        /* Update pawn coverage */
+        item->coverage[side] |= bb_pawn_attacks_from(sq, side);
     }
 
     /*
@@ -283,18 +287,26 @@ static void evaluate_knights(struct gamestate *pos, struct eval *eval, int side)
 {
     uint64_t pieces;
     uint64_t moves;
+    uint64_t safe_moves;
+    uint64_t coverage;
     int      sq;
 
     /* Calculate mobility */
+    coverage = 0ULL;
     pieces = pos->bb_pieces[KNIGHT+side];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         moves = bb_knight_moves(sq)&(~pos->bb_sides[side]);
-        eval->mobility[MIDDLEGAME][side] +=
-                    (BITCOUNT(moves)*mobility_table[MIDDLEGAME][KNIGHT+side]);
-        eval->mobility[ENDGAME][side] +=
-                    (BITCOUNT(moves)*mobility_table[ENDGAME][KNIGHT+side]);
+        coverage |= moves;
+        safe_moves = moves&(~eval->pawntt.coverage[FLIP_COLOR(side)]);
+        eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
+                                    mobility_table[MIDDLEGAME][KNIGHT+side]);
+        eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
+                                    mobility_table[ENDGAME][KNIGHT+side]);
     }
+
+    /* Update coverage */
+    eval->coverage[side] |= coverage;
 }
 
 /*
@@ -305,6 +317,8 @@ static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
 {
     uint64_t pieces;
     uint64_t moves;
+    uint64_t safe_moves;
+    uint64_t coverage;
     int      sq;
 
     /*
@@ -321,15 +335,21 @@ static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
     }
 
     /* Calculate mobility */
+    coverage = 0ULL;
     pieces = pos->bb_pieces[BISHOP+side];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         moves = bb_bishop_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
-        eval->mobility[MIDDLEGAME][side] +=
-                    (BITCOUNT(moves)*mobility_table[MIDDLEGAME][BISHOP+side]);
-        eval->mobility[ENDGAME][side] +=
-                    (BITCOUNT(moves)*mobility_table[ENDGAME][BISHOP+side]);
+        coverage |= moves;
+        safe_moves = moves&(~eval->pawntt.coverage[FLIP_COLOR(side)]);
+        eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
+                                    mobility_table[MIDDLEGAME][BISHOP+side]);
+        eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
+                                    mobility_table[ENDGAME][BISHOP+side]);
     }
+
+    /* Update coverage */
+    eval->coverage[side] |= coverage;
 }
 
 /*
@@ -343,9 +363,12 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
     uint64_t pieces;
     uint64_t all_pawns;
     uint64_t moves;
+    uint64_t safe_moves;
+    uint64_t coverage;
     int      sq;
     int      file;
 
+    coverage = 0ULL;
     all_pawns = pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN];
     pieces = pos->bb_pieces[ROOK+side];
     while (pieces != 0ULL) {
@@ -376,11 +399,16 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
 
         /* Mobility */
         moves = bb_rook_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
-        eval->mobility[MIDDLEGAME][side] +=
-                        (BITCOUNT(moves)*mobility_table[MIDDLEGAME][ROOK+side]);
-        eval->mobility[ENDGAME][side] +=
-                        (BITCOUNT(moves)*mobility_table[ENDGAME][ROOK+side]);
+        coverage |= moves;
+        safe_moves = moves&(~eval->pawntt.coverage[FLIP_COLOR(side)]);
+        eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
+                                        mobility_table[MIDDLEGAME][ROOK+side]);
+        eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
+                                        mobility_table[ENDGAME][ROOK+side]);
     }
+
+    /* Update coverage */
+    eval->coverage[side] |= coverage;
 }
 
 /*
@@ -392,6 +420,7 @@ static void evaluate_queens(struct gamestate *pos, struct eval *eval, int side)
     uint64_t pieces;
     uint64_t all_pawns;
     uint64_t moves;
+    uint64_t safe_moves;
     int      sq;
     int      file;
 
@@ -412,10 +441,11 @@ static void evaluate_queens(struct gamestate *pos, struct eval *eval, int side)
 
         /* Mobility */
         moves = bb_queen_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
-        eval->mobility[MIDDLEGAME][side] +=
-                    (BITCOUNT(moves)*mobility_table[MIDDLEGAME][QUEEN+side]);
-        eval->mobility[ENDGAME][side] +=
-                    (BITCOUNT(moves)*mobility_table[ENDGAME][QUEEN+side]);
+        safe_moves = moves&(~eval->coverage[FLIP_COLOR(side)]);
+        eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
+                                    mobility_table[MIDDLEGAME][QUEEN+side]);
+        eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
+                                    mobility_table[ENDGAME][QUEEN+side]);
     }
 }
 
@@ -486,6 +516,8 @@ static void do_eval(struct gamestate *pos, struct eval *eval)
         evaluate_pawn_structure(pos, eval, WHITE);
         evaluate_pawn_structure(pos, eval, BLACK);
     }
+    eval->coverage[WHITE] |= eval->pawntt.coverage[WHITE];
+    eval->coverage[BLACK] |= eval->pawntt.coverage[BLACK];
     evaluate_knights(pos, eval, WHITE);
     evaluate_knights(pos, eval, BLACK);
     evaluate_bishops(pos, eval, WHITE);

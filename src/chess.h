@@ -356,6 +356,8 @@ struct pawntt_item {
     uint64_t pawnkey;
     /* Bitboards of all passed pawns */
     uint64_t passers[NSIDES];
+    /* Bitboard of all squares covered by pawns */
+    uint64_t coverage[NSIDES];
     /* The score of pawn related terms for each side */
     int pawn_shield[NSIDES][2];
     int score[NPHASES][NSIDES];
@@ -365,7 +367,7 @@ struct pawntt_item {
      * Padding added to make sure that the
      * size of the struct is a power-of-2.
      */
-    uint32_t padding;
+    uint8_t padding[52];
 };
 
 /* Enum for different chess protocols */
