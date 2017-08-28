@@ -39,11 +39,13 @@
 #include "bitboard.h"
 #include "tbprobe.h"
 
-/* The number of plies to reduce the depth with when doing a null move */
-#define NULLMOVE_REDUCTION 2
-
 /* Calculates if it is time to check the clock and poll for commands */
 #define CHECKUP(n) (((n)&1023)==0)
+
+/* Configuration constants for null move pruning */
+#define NULLMOVE_DEPTH 3
+#define NULLMOVE_BASE_REDUCTION 2
+#define NULLMOVE_DIVISOR 6
 
 /*
  * Margins used for futility pruning. The array should be
@@ -482,30 +484,6 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     }
 
     /*
-     * Null move pruning. If the opponent can't beat beta even when given
-     * a free move then there is no point doing a full search. However
-     * some care has to be taken since the idea will fail in so-called
-     * zugzwang positions (positions where all moves makes the position worse).
-     */
-    if (try_null && !in_check && ((depth-NULLMOVE_REDUCTION-1) > 0) &&
-        board_has_non_pawn(pos, pos->stm)) {
-        board_make_null_move(pos);
-        score = -search(pos, depth-1-NULLMOVE_REDUCTION, -beta, -beta+1, false);
-        board_unmake_null_move(pos);
-        if (pos->abort) {
-            return 0;
-        }
-        if (score >= beta) {
-            /*
-             * Since the score is based on doing a null move a checkmate
-             * score doesn't necessarilly indicate a forced mate. So
-             * return beta instead in this case.
-             */
-            return score < FORCED_MATE?score:beta;
-        }
-    }
-
-    /*
      * Evaluate the position in order to get a score
      * to use for pruning decisions.
      */
@@ -534,6 +512,33 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
             return quiescence(pos, 0, alpha, beta);
         }
         depth--;
+    }
+
+    /*
+     * Null move pruning. If the opponent can't beat beta even when given
+     * a free move then there is no point doing a full search. However
+     * some care has to be taken since the idea will fail in zugzwang
+     * positions.
+     */
+    if (try_null &&
+        !in_check &&
+        (depth > NULLMOVE_DEPTH) &&
+        board_has_non_pawn(pos, pos->stm)) {
+        reduction = NULLMOVE_BASE_REDUCTION + depth/NULLMOVE_DIVISOR;
+        board_make_null_move(pos);
+        score = -search(pos, depth-reduction-1, -beta, -beta+1, false);
+        board_unmake_null_move(pos);
+        if (pos->abort) {
+            return 0;
+        }
+        if (score >= beta) {
+            /*
+             * Since the score is based on doing a null move a checkmate
+             * score doesn't necessarilly indicate a forced mate. So
+             * return beta instead in this case.
+             */
+            return score < FORCED_MATE?score:beta;
+        }
     }
 
     /*
@@ -616,7 +621,7 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
             score = -search(pos, depth-1, -beta, -alpha, true);
         } else {
             /* Perform a reduced depth search with a zero window */
-            score = -search(pos, depth-1-reduction, -alpha-1, -alpha, true);
+            score = -search(pos, depth-reduction-1, -alpha-1, -alpha, true);
 
             /* Re-search with full depth if the move improved alpha */
             if ((score > alpha) && (reduction > 0) && !pos->abort) {
