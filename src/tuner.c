@@ -277,7 +277,7 @@ static void local_optimize(struct tuningset *tuningset,
     int     count;
     int     delta;
 
-    /* Calculate current error */
+    /* Generate a quiet trainingset and calculate the initial error */
     mark_pv_for_update();
     tuning_param_assign_current(tuningset->params);
     best_e = calc_texel_error(trainingset, K);
@@ -356,7 +356,6 @@ static void local_optimize(struct tuningset *tuningset,
 
         /* Output the result after the current iteration */
         niterations++;
-        mark_pv_for_update();
         printf("\rIteration %d complete, error %f\n", niterations, best_e);
         sprintf(path, TUNING_ITERATION_RESULT_FILE, niterations);
         fp = fopen(path, "w");
