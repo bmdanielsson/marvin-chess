@@ -70,7 +70,8 @@ static int mobility_table[NPHASES][NPIECES];
  * Table with scores for passed pawns based on rank. The table is
  * initialized by the eval_reset function.
  */
-static int passed_pawn_scores[NRANKS];
+static int passed_pawn_scores_mg[NRANKS];
+static int passed_pawn_scores_eg[NRANKS];
 
 /*
  * Material values for all pieces. The table is
@@ -234,8 +235,8 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
         left = (file!=FILE_A)?pos->bb_pieces[side+PAWN]&file_mask[file-1]:0ULL;
         right = (file!=FILE_H)?pos->bb_pieces[side+PAWN]&file_mask[file+1]:0ULL;
         if ((left == 0ULL) && (right == 0ULL)) {
-            item->score[MIDDLEGAME][side] += ISOLATED_PAWN;
-            item->score[ENDGAME][side] += ISOLATED_PAWN;
+            item->score[MIDDLEGAME][side] += ISOLATED_PAWN_MG;
+            item->score[ENDGAME][side] += ISOLATED_PAWN_EG;
         }
 
         /*
@@ -251,9 +252,9 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
         blockers = (left|middle|right)&ranks_ahead_mask[rank][side];
         if (blockers == 0ULL) {
             item->score[MIDDLEGAME][side] +=
-                                    passed_pawn_scores[side==WHITE?rank:7-rank];
+                                passed_pawn_scores_mg[side==WHITE?rank:7-rank];
             item->score[ENDGAME][side] +=
-                                    passed_pawn_scores[side==WHITE?rank:7-rank];
+                                passed_pawn_scores_eg[side==WHITE?rank:7-rank];
             SETBIT(item->passers[side], sq);
         }
 
@@ -268,8 +269,8 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
     for (k=0;k<NFILES;k++) {
         pawns = pos->bb_pieces[side+PAWN]&file_mask[k];
         if (BITCOUNT(pawns) >= 2) {
-            item->score[MIDDLEGAME][side] += DOUBLE_PAWNS;
-            item->score[ENDGAME][side] += DOUBLE_PAWNS;
+            item->score[MIDDLEGAME][side] += DOUBLE_PAWNS_MG;
+            item->score[ENDGAME][side] += DOUBLE_PAWNS_EG;
         }
     }
 
@@ -330,8 +331,8 @@ static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
      * that the bishops operate on different color squares.
      */
     if (BITCOUNT(pos->bb_pieces[side+BISHOP]) >= 2) {
-        eval->material_adj[MIDDLEGAME][side] += BISHOP_PAIR;
-        eval->material_adj[ENDGAME][side] += BISHOP_PAIR;
+        eval->material_adj[MIDDLEGAME][side] += BISHOP_PAIR_MG;
+        eval->material_adj[ENDGAME][side] += BISHOP_PAIR_EG;
     }
 
     /* Calculate mobility */
@@ -377,11 +378,11 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
 
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
-            eval->positional[MIDDLEGAME][side] += ROOK_OPEN_FILE;
-            eval->positional[ENDGAME][side] += ROOK_OPEN_FILE;
+            eval->positional[MIDDLEGAME][side] += ROOK_OPEN_FILE_MG;
+            eval->positional[ENDGAME][side] += ROOK_OPEN_FILE_EG;
         } else if ((file_mask[file]&pos->bb_pieces[PAWN+side]) == 0ULL) {
-            eval->positional[MIDDLEGAME][side] += ROOK_HALF_OPEN_FILE;
-            eval->positional[ENDGAME][side] += ROOK_HALF_OPEN_FILE;
+            eval->positional[MIDDLEGAME][side] += ROOK_HALF_OPEN_FILE_MG;
+            eval->positional[ENDGAME][side] += ROOK_HALF_OPEN_FILE_EG;
         }
 
         /* 7th rank */
@@ -432,11 +433,11 @@ static void evaluate_queens(struct gamestate *pos, struct eval *eval, int side)
 
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
-            eval->positional[MIDDLEGAME][side] += QUEEN_OPEN_FILE;
-            eval->positional[ENDGAME][side] += QUEEN_OPEN_FILE;
+            eval->positional[MIDDLEGAME][side] += QUEEN_OPEN_FILE_MG;
+            eval->positional[ENDGAME][side] += QUEEN_OPEN_FILE_EG;
         } else if ((file_mask[file]&pos->bb_pieces[PAWN+side]) == 0ULL) {
-            eval->positional[MIDDLEGAME][side] += QUEEN_HALF_OPEN_FILE;
-            eval->positional[ENDGAME][side] += QUEEN_HALF_OPEN_FILE;
+            eval->positional[MIDDLEGAME][side] += QUEEN_HALF_OPEN_FILE_MG;
+            eval->positional[ENDGAME][side] += QUEEN_HALF_OPEN_FILE_EG;
         }
 
         /* Mobility */
@@ -607,14 +608,22 @@ void eval_reset(void)
     mobility_table[ENDGAME][BLACK_KING] = 0;
 
     /* Initialize the passed pawns table */
-    passed_pawn_scores[RANK_1] = 0;
-    passed_pawn_scores[RANK_2] = PASSED_PAWN_RANK2;
-    passed_pawn_scores[RANK_3] = PASSED_PAWN_RANK3;
-    passed_pawn_scores[RANK_4] = PASSED_PAWN_RANK4;
-    passed_pawn_scores[RANK_5] = PASSED_PAWN_RANK5;
-    passed_pawn_scores[RANK_6] = PASSED_PAWN_RANK6;
-    passed_pawn_scores[RANK_7] = PASSED_PAWN_RANK7;
-    passed_pawn_scores[RANK_8] = 0;
+    passed_pawn_scores_mg[RANK_1] = 0;
+    passed_pawn_scores_mg[RANK_2] = PASSED_PAWN_RANK2_MG;
+    passed_pawn_scores_mg[RANK_3] = PASSED_PAWN_RANK3_MG;
+    passed_pawn_scores_mg[RANK_4] = PASSED_PAWN_RANK4_MG;
+    passed_pawn_scores_mg[RANK_5] = PASSED_PAWN_RANK5_MG;
+    passed_pawn_scores_mg[RANK_6] = PASSED_PAWN_RANK6_MG;
+    passed_pawn_scores_mg[RANK_7] = PASSED_PAWN_RANK7_MG;
+    passed_pawn_scores_mg[RANK_8] = 0;
+    passed_pawn_scores_eg[RANK_1] = 0;
+    passed_pawn_scores_eg[RANK_2] = PASSED_PAWN_RANK2_EG;
+    passed_pawn_scores_eg[RANK_3] = PASSED_PAWN_RANK3_EG;
+    passed_pawn_scores_eg[RANK_4] = PASSED_PAWN_RANK4_EG;
+    passed_pawn_scores_eg[RANK_5] = PASSED_PAWN_RANK5_EG;
+    passed_pawn_scores_eg[RANK_6] = PASSED_PAWN_RANK6_EG;
+    passed_pawn_scores_eg[RANK_7] = PASSED_PAWN_RANK7_EG;
+    passed_pawn_scores_eg[RANK_8] = 0;
 
     /* Initialize the material table */
     material_values_mg[WHITE_PAWN] = PAWN_BASE_VALUE;

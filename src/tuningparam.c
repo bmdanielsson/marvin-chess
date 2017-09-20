@@ -68,24 +68,37 @@
 
 /* Identifiers for all tunable parameters */
 enum {
-    TP_DOUBLE_PAWNS,
-    TP_ISOLATED_PAWN,
-    TP_ROOK_OPEN_FILE,
-    TP_ROOK_HALF_OPEN_FILE,
-    TP_QUEEN_OPEN_FILE,
-    TP_QUEEN_HALF_OPEN_FILE,
+    TP_DOUBLE_PAWNS_MG,
+    TP_DOUBLE_PAWNS_EG,
+    TP_ISOLATED_PAWN_MG,
+    TP_ISOLATED_PAWN_EG,
+    TP_ROOK_OPEN_FILE_MG,
+    TP_ROOK_OPEN_FILE_EG,
+    TP_ROOK_HALF_OPEN_FILE_MG,
+    TP_ROOK_HALF_OPEN_FILE_EG,
+    TP_QUEEN_OPEN_FILE_MG,
+    TP_QUEEN_OPEN_FILE_EG,
+    TP_QUEEN_HALF_OPEN_FILE_MG,
+    TP_QUEEN_HALF_OPEN_FILE_EG,
     TP_ROOK_ON_7TH_MG,
     TP_ROOK_ON_7TH_EG,
-    TP_BISHOP_PAIR,
+    TP_BISHOP_PAIR_MG,
+    TP_BISHOP_PAIR_EG,
     TP_PAWN_SHIELD_RANK1,
     TP_PAWN_SHIELD_RANK2,
     TP_PAWN_SHIELD_HOLE,
-    TP_PASSED_PAWN_RANK2,
-    TP_PASSED_PAWN_RANK3,
-    TP_PASSED_PAWN_RANK4,
-    TP_PASSED_PAWN_RANK5,
-    TP_PASSED_PAWN_RANK6,
-    TP_PASSED_PAWN_RANK7,
+    TP_PASSED_PAWN_RANK2_MG,
+    TP_PASSED_PAWN_RANK3_MG,
+    TP_PASSED_PAWN_RANK4_MG,
+    TP_PASSED_PAWN_RANK5_MG,
+    TP_PASSED_PAWN_RANK6_MG,
+    TP_PASSED_PAWN_RANK7_MG,
+    TP_PASSED_PAWN_RANK2_EG,
+    TP_PASSED_PAWN_RANK3_EG,
+    TP_PASSED_PAWN_RANK4_EG,
+    TP_PASSED_PAWN_RANK5_EG,
+    TP_PASSED_PAWN_RANK6_EG,
+    TP_PASSED_PAWN_RANK7_EG,
     TP_KNIGHT_MOBILITY_MG,
     TP_BISHOP_MOBILITY_MG,
     TP_ROOK_MOBILITY_MG,
@@ -119,52 +132,65 @@ enum {
 
 /* Definitions for all tunable parameters */
 struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
-    {"double_pawns", 0, 0, -150, 0},
-    {"isolated_pawn", 1, 1, -150, 0},
-    {"rook_open_file", 2, 2, 0, 150},
-    {"rook_half_open_file", 3, 3, 0, 150},
-    {"queen_open_file", 4, 4, 0, 150},
-    {"queen_half_open_file", 5, 5, 0, 150},
-    {"rook_on_7th_mg", 6, 6, 0, 150},
-    {"rook_on_7th_eg", 7, 7, 0, 150},
-    {"bishop_pair", 8, 8, 0, 200},
-    {"pawn_shield_rank1", 9, 9, 0, 100},
-    {"pawn_shield_rank2", 10, 10, 0, 100},
-    {"pawn_shield_hole", 11, 11, -100, 0},
-    {"passed_pawn_rank2", 12, 12, 0, 200},
-    {"passed_pawn_rank3", 13, 13, 0, 200},
-    {"passed_pawn_rank4", 14, 14, 0, 200},
-    {"passed_pawn_rank5", 15, 15, 0, 200},
-    {"passed_pawn_rank6", 16, 16, 0, 200},
-    {"passed_pawn_rank7", 17, 17, 0, 200},
-    {"knight_mobility_mg", 18, 18, 0, 15},
-    {"bishop_mobility_mg", 19, 19, 0, 15},
-    {"rook_mobility_mg", 20, 20, 0, 15},
-    {"queen_mobility_mg", 21, 21, 0, 15},
-    {"knight_mobility_eg", 22, 22, 0, 15},
-    {"bishop_mobility_eg", 23, 23, 0, 15},
-    {"rook_mobility_eg", 24, 24, 0, 15},
-    {"queen_mobility_eg", 25, 25, 0, 15},
-    {"psq_table_pawn_mg", 26, 89, -200, 200},
-    {"psq_table_knight_mg", 90, 153, -200, 200},
-    {"psq_table_bishop_mg", 154, 217, -200, 200},
-    {"psq_table_rook_mg", 218, 281, -200, 200},
-    {"psq_table_queen_mg", 282, 345, -200, 200},
-    {"psq_table_king_mg", 346, 409, -200, 200},
-    {"psq_table_pawn_eg", 410, 473, -200, 200},
-    {"psq_table_knight_eg", 474, 537, -200, 200},
-    {"psq_table_bishop_eg", 538, 601, -200, 200},
-    {"psq_table_rook_eg", 602, 665, -200, 200},
-    {"psq_table_queen_eg", 666, 729, -200, 200},
-    {"psq_table_king_eg", 730, 793, -200, 200},
-    {"knight_material_value_mg", 794, 794, 200, 400},
-    {"bishop_material_value_mg", 795, 795, 200, 400},
-    {"rook_material_value_mg", 796, 796, 400, 600},
-    {"queen_material_value_mg", 797, 797, 700, 1400},
-    {"knight_material_value_eg", 798, 798, 200, 400},
-    {"bishop_material_value_eg", 799, 799, 200, 400},
-    {"rook_material_value_eg", 800, 800, 400, 600},
-    {"queen_material_value_eg", 801, 801, 700, 1400}
+    {"double_pawns_mg", 0, 0, -150, 0},
+    {"double_pawns_eg", 1, 1, -150, 0},
+    {"isolated_pawn_mg", 2, 2, -150, 0},
+    {"isolated_pawn_eg", 3, 3, -150, 0},
+    {"rook_open_file_mg", 4, 4, 0, 150},
+    {"rook_open_file_eg", 5, 5, 0, 150},
+    {"rook_half_open_file_mg", 6, 6, 0, 150},
+    {"rook_half_open_file_eg", 7, 7, 0, 150},
+    {"queen_open_file_mg", 8, 8, 0, 150},
+    {"queen_open_file_eg", 9, 9, 0, 150},
+    {"queen_half_open_file_mg", 10, 10, 0, 150},
+    {"queen_half_open_file_eg", 11, 11, 0, 150},
+    {"rook_on_7th_mg", 12, 12, 0, 150},
+    {"rook_on_7th_eg", 13, 13, 0, 150},
+    {"bishop_pair_mg", 14, 14, 0, 200},
+    {"bishop_pair_eg", 15, 15, 0, 200},
+    {"pawn_shield_rank1", 16, 16, 0, 100},
+    {"pawn_shield_rank2", 17, 17, 0, 100},
+    {"pawn_shield_hole", 18, 18, -100, 0},
+    {"passed_pawn_rank2_mg", 19, 19, 0, 200},
+    {"passed_pawn_rank3_mg", 20, 20, 0, 200},
+    {"passed_pawn_rank4_mg", 21, 21, 0, 200},
+    {"passed_pawn_rank5_mg", 22, 22, 0, 200},
+    {"passed_pawn_rank6_mg", 23, 23, 0, 200},
+    {"passed_pawn_rank7_mg", 24, 24, 0, 200},
+    {"passed_pawn_rank2_eg", 25, 25, 0, 200},
+    {"passed_pawn_rank3_eg", 26, 26, 0, 200},
+    {"passed_pawn_rank4_eg", 27, 27, 0, 200},
+    {"passed_pawn_rank5_eg", 28, 28, 0, 200},
+    {"passed_pawn_rank6_eg", 29, 29, 0, 200},
+    {"passed_pawn_rank7_eg", 30, 30, 0, 200},
+    {"knight_mobility_mg", 31, 31, 0, 15},
+    {"bishop_mobility_mg", 32, 32, 0, 15},
+    {"rook_mobility_mg", 33, 33, 0, 15},
+    {"queen_mobility_mg", 34, 34, 0, 15},
+    {"knight_mobility_eg", 35, 35, 0, 15},
+    {"bishop_mobility_eg", 36, 36, 0, 15},
+    {"rook_mobility_eg", 37, 37, 0, 15},
+    {"queen_mobility_eg", 38, 38, 0, 15},
+    {"psq_table_pawn_mg", 39, 102, -200, 200},
+    {"psq_table_knight_mg", 103, 166, -200, 200},
+    {"psq_table_bishop_mg", 167, 230, -200, 200},
+    {"psq_table_rook_mg", 231, 294, -200, 200},
+    {"psq_table_queen_mg", 295, 358, -200, 200},
+    {"psq_table_king_mg", 359, 422, -200, 200},
+    {"psq_table_pawn_eg", 423, 486, -200, 200},
+    {"psq_table_knight_eg", 487, 550, -200, 200},
+    {"psq_table_bishop_eg", 551, 614, -200, 200},
+    {"psq_table_rook_eg", 615, 678, -200, 200},
+    {"psq_table_queen_eg", 679, 742, -200, 200},
+    {"psq_table_king_eg", 743, 806, -200, 200},
+    {"knight_material_value_mg", 807, 807, 200, 400},
+    {"bishop_material_value_mg", 808, 808, 200, 400},
+    {"rook_material_value_mg", 809, 809, 400, 600},
+    {"queen_material_value_mg", 810, 810, 700, 1400},
+    {"knight_material_value_eg", 811, 811, 200, 400},
+    {"bishop_material_value_eg", 812, 812, 200, 400},
+    {"rook_material_value_eg", 813, 813, 400, 600},
+    {"queen_material_value_eg", 814, 814, 700, 1400}
 };
 
 void tuning_param_assign_current(struct tuning_param *params)
@@ -173,24 +199,37 @@ void tuning_param_assign_current(struct tuning_param *params)
     int stop;
     int k;
 
-    ASSIGN(TP_DOUBLE_PAWNS, DOUBLE_PAWNS)
-    ASSIGN(TP_ISOLATED_PAWN, ISOLATED_PAWN)
-    ASSIGN(TP_ROOK_OPEN_FILE, ROOK_OPEN_FILE)
-    ASSIGN(TP_ROOK_HALF_OPEN_FILE, ROOK_HALF_OPEN_FILE)
-    ASSIGN(TP_QUEEN_OPEN_FILE, QUEEN_OPEN_FILE)
-    ASSIGN(TP_QUEEN_HALF_OPEN_FILE, QUEEN_HALF_OPEN_FILE)
+    ASSIGN(TP_DOUBLE_PAWNS_MG, DOUBLE_PAWNS_MG)
+    ASSIGN(TP_DOUBLE_PAWNS_EG, DOUBLE_PAWNS_EG)
+    ASSIGN(TP_ISOLATED_PAWN_MG, ISOLATED_PAWN_MG)
+    ASSIGN(TP_ISOLATED_PAWN_EG, ISOLATED_PAWN_EG)
+    ASSIGN(TP_ROOK_OPEN_FILE_MG, ROOK_OPEN_FILE_MG)
+    ASSIGN(TP_ROOK_OPEN_FILE_EG, ROOK_OPEN_FILE_EG)
+    ASSIGN(TP_ROOK_HALF_OPEN_FILE_MG, ROOK_HALF_OPEN_FILE_MG)
+    ASSIGN(TP_ROOK_HALF_OPEN_FILE_EG, ROOK_HALF_OPEN_FILE_EG)
+    ASSIGN(TP_QUEEN_OPEN_FILE_MG, QUEEN_OPEN_FILE_MG)
+    ASSIGN(TP_QUEEN_OPEN_FILE_EG, QUEEN_OPEN_FILE_EG)
+    ASSIGN(TP_QUEEN_HALF_OPEN_FILE_MG, QUEEN_HALF_OPEN_FILE_MG)
+    ASSIGN(TP_QUEEN_HALF_OPEN_FILE_EG, QUEEN_HALF_OPEN_FILE_EG)
     ASSIGN(TP_ROOK_ON_7TH_MG, ROOK_ON_7TH_MG)
     ASSIGN(TP_ROOK_ON_7TH_EG, ROOK_ON_7TH_EG)
-    ASSIGN(TP_BISHOP_PAIR, BISHOP_PAIR)
+    ASSIGN(TP_BISHOP_PAIR_MG, BISHOP_PAIR_MG)
+    ASSIGN(TP_BISHOP_PAIR_EG, BISHOP_PAIR_EG)
     ASSIGN(TP_PAWN_SHIELD_RANK1, PAWN_SHIELD_RANK1)
     ASSIGN(TP_PAWN_SHIELD_RANK2, PAWN_SHIELD_RANK2)
     ASSIGN(TP_PAWN_SHIELD_HOLE, PAWN_SHIELD_HOLE)
-    ASSIGN(TP_PASSED_PAWN_RANK2, PASSED_PAWN_RANK2)
-    ASSIGN(TP_PASSED_PAWN_RANK3, PASSED_PAWN_RANK3)
-    ASSIGN(TP_PASSED_PAWN_RANK4, PASSED_PAWN_RANK4)
-    ASSIGN(TP_PASSED_PAWN_RANK5, PASSED_PAWN_RANK5)
-    ASSIGN(TP_PASSED_PAWN_RANK6, PASSED_PAWN_RANK6)
-    ASSIGN(TP_PASSED_PAWN_RANK7, PASSED_PAWN_RANK7)
+    ASSIGN(TP_PASSED_PAWN_RANK2_MG, PASSED_PAWN_RANK2_MG)
+    ASSIGN(TP_PASSED_PAWN_RANK3_MG, PASSED_PAWN_RANK3_MG)
+    ASSIGN(TP_PASSED_PAWN_RANK4_MG, PASSED_PAWN_RANK4_MG)
+    ASSIGN(TP_PASSED_PAWN_RANK5_MG, PASSED_PAWN_RANK5_MG)
+    ASSIGN(TP_PASSED_PAWN_RANK6_MG, PASSED_PAWN_RANK6_MG)
+    ASSIGN(TP_PASSED_PAWN_RANK7_MG, PASSED_PAWN_RANK7_MG)
+    ASSIGN(TP_PASSED_PAWN_RANK2_EG, PASSED_PAWN_RANK2_EG)
+    ASSIGN(TP_PASSED_PAWN_RANK3_EG, PASSED_PAWN_RANK3_EG)
+    ASSIGN(TP_PASSED_PAWN_RANK4_EG, PASSED_PAWN_RANK4_EG)
+    ASSIGN(TP_PASSED_PAWN_RANK5_EG, PASSED_PAWN_RANK5_EG)
+    ASSIGN(TP_PASSED_PAWN_RANK6_EG, PASSED_PAWN_RANK6_EG)
+    ASSIGN(TP_PASSED_PAWN_RANK7_EG, PASSED_PAWN_RANK7_EG)
     ASSIGN(TP_KNIGHT_MOBILITY_MG, KNIGHT_MOBILITY_MG)
     ASSIGN(TP_BISHOP_MOBILITY_MG, BISHOP_MOBILITY_MG)
     ASSIGN(TP_ROOK_MOBILITY_MG, ROOK_MOBILITY_MG)
@@ -232,24 +271,37 @@ struct tuning_param* tuning_param_create_list(void)
 
     params = malloc(sizeof(struct tuning_param)*NUM_TUNING_PARAMS);
 
-    DEFINE(TP_DOUBLE_PAWNS, DOUBLE_PAWNS)
-    DEFINE(TP_ISOLATED_PAWN, ISOLATED_PAWN)
-    DEFINE(TP_ROOK_OPEN_FILE, ROOK_OPEN_FILE)
-    DEFINE(TP_ROOK_HALF_OPEN_FILE, ROOK_HALF_OPEN_FILE)
-    DEFINE(TP_QUEEN_OPEN_FILE, QUEEN_OPEN_FILE)
-    DEFINE(TP_QUEEN_HALF_OPEN_FILE, QUEEN_HALF_OPEN_FILE)
+    DEFINE(TP_DOUBLE_PAWNS_MG, DOUBLE_PAWNS_MG)
+    DEFINE(TP_DOUBLE_PAWNS_EG, DOUBLE_PAWNS_EG)
+    DEFINE(TP_ISOLATED_PAWN_MG, ISOLATED_PAWN_MG)
+    DEFINE(TP_ISOLATED_PAWN_EG, ISOLATED_PAWN_EG)
+    DEFINE(TP_ROOK_OPEN_FILE_MG, ROOK_OPEN_FILE_MG)
+    DEFINE(TP_ROOK_OPEN_FILE_EG, ROOK_OPEN_FILE_EG)
+    DEFINE(TP_ROOK_HALF_OPEN_FILE_MG, ROOK_HALF_OPEN_FILE_MG)
+    DEFINE(TP_ROOK_HALF_OPEN_FILE_EG, ROOK_HALF_OPEN_FILE_EG)
+    DEFINE(TP_QUEEN_OPEN_FILE_MG, QUEEN_OPEN_FILE_MG)
+    DEFINE(TP_QUEEN_OPEN_FILE_EG, QUEEN_OPEN_FILE_EG)
+    DEFINE(TP_QUEEN_HALF_OPEN_FILE_MG, QUEEN_HALF_OPEN_FILE_MG)
+    DEFINE(TP_QUEEN_HALF_OPEN_FILE_EG, QUEEN_HALF_OPEN_FILE_EG)
     DEFINE(TP_ROOK_ON_7TH_MG, ROOK_ON_7TH_MG)
     DEFINE(TP_ROOK_ON_7TH_EG, ROOK_ON_7TH_EG)
-    DEFINE(TP_BISHOP_PAIR, BISHOP_PAIR)
+    DEFINE(TP_BISHOP_PAIR_MG, BISHOP_PAIR_MG)
+    DEFINE(TP_BISHOP_PAIR_EG, BISHOP_PAIR_EG)
     DEFINE(TP_PAWN_SHIELD_RANK1, PAWN_SHIELD_RANK1)
     DEFINE(TP_PAWN_SHIELD_RANK2, PAWN_SHIELD_RANK2)
     DEFINE(TP_PAWN_SHIELD_HOLE, PAWN_SHIELD_HOLE)
-    DEFINE(TP_PASSED_PAWN_RANK2, PASSED_PAWN_RANK2)
-    DEFINE(TP_PASSED_PAWN_RANK3, PASSED_PAWN_RANK3)
-    DEFINE(TP_PASSED_PAWN_RANK4, PASSED_PAWN_RANK4)
-    DEFINE(TP_PASSED_PAWN_RANK5, PASSED_PAWN_RANK5)
-    DEFINE(TP_PASSED_PAWN_RANK6, PASSED_PAWN_RANK6)
-    DEFINE(TP_PASSED_PAWN_RANK7, PASSED_PAWN_RANK7)
+    DEFINE(TP_PASSED_PAWN_RANK2_MG, PASSED_PAWN_RANK2_MG)
+    DEFINE(TP_PASSED_PAWN_RANK3_MG, PASSED_PAWN_RANK3_MG)
+    DEFINE(TP_PASSED_PAWN_RANK4_MG, PASSED_PAWN_RANK4_MG)
+    DEFINE(TP_PASSED_PAWN_RANK5_MG, PASSED_PAWN_RANK5_MG)
+    DEFINE(TP_PASSED_PAWN_RANK6_MG, PASSED_PAWN_RANK6_MG)
+    DEFINE(TP_PASSED_PAWN_RANK7_MG, PASSED_PAWN_RANK7_MG)
+    DEFINE(TP_PASSED_PAWN_RANK2_EG, PASSED_PAWN_RANK2_EG)
+    DEFINE(TP_PASSED_PAWN_RANK3_EG, PASSED_PAWN_RANK3_EG)
+    DEFINE(TP_PASSED_PAWN_RANK4_EG, PASSED_PAWN_RANK4_EG)
+    DEFINE(TP_PASSED_PAWN_RANK5_EG, PASSED_PAWN_RANK5_EG)
+    DEFINE(TP_PASSED_PAWN_RANK6_EG, PASSED_PAWN_RANK6_EG)
+    DEFINE(TP_PASSED_PAWN_RANK7_EG, PASSED_PAWN_RANK7_EG)
     DEFINE(TP_KNIGHT_MOBILITY_MG, KNIGHT_MOBILITY_MG)
     DEFINE(TP_BISHOP_MOBILITY_MG, BISHOP_MOBILITY_MG)
     DEFINE(TP_ROOK_MOBILITY_MG, ROOK_MOBILITY_MG)
