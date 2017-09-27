@@ -115,17 +115,26 @@ static void cmd_eval(struct gamestate *pos)
 static void cmd_info(void)
 {
     char *dummy;
+    char str[256];
     bool is_64bit;
 
     is_64bit = sizeof(dummy) == 8;
 
+    str[0] = '\0';
+    sprintf(str, "%s %s (%s", APP_NAME, APP_VERSION,
+            is_64bit?"64-bit":"32-bit");
 #ifdef HAS_POPCNT
-    printf("%s %s (%s, popcnt)\n", APP_NAME, APP_VERSION,
-           is_64bit?"64-bit":"32-bit");
-#else
-    printf("%s %s (%s)\n", APP_NAME, APP_VERSION,
-           is_64bit?"64-bit":"32-bit");
+    strcat(str, ", popcnt");
 #endif
+#ifdef HAS_ALIGNED_MALLOC
+    strcat(str, ", memalign");
+#endif
+#ifdef HAS_PREFETCH
+    strcat(str, ", prefetch");
+#endif
+    strcat(str, ")");
+    printf("%s\n", str);
+
     printf("%s\n", APP_AUTHOR);
 }
 
