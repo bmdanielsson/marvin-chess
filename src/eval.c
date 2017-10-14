@@ -50,14 +50,13 @@ struct eval {
     struct pawntt_item pawntt;
     bool endgame[NSIDES];
     uint64_t coverage[NSIDES];
-    int material[NPHASES][3];
-    int material_adj[NPHASES][3];
-    int psq[NPHASES][3];
-    int pawn_structure[NPHASES][3];
-    int king_safety[NPHASES][3];
-    int positional[NPHASES][3];
-    int mobility[NPHASES][3];
-    int sum[NPHASES][3];
+    int material[NPHASES][NSIDES];
+    int material_adj[NPHASES][NSIDES];
+    int psq[NPHASES][NSIDES];
+    int pawn_structure[NPHASES][NSIDES];
+    int king_safety[NPHASES][NSIDES];
+    int positional[NPHASES][NSIDES];
+    int mobility[NPHASES][NSIDES];
 };
 
 /*
@@ -546,38 +545,6 @@ static void do_eval(struct gamestate *pos, struct eval *eval)
     if (!eval->in_pawntt) {
         hash_pawntt_store(pos, &eval->pawntt);
     }
-
-    /* Summarize each evaluation term from white's pov */
-    for (k=0;k<NPHASES;k++) {
-        eval->material[k][BOTH] =
-                            eval->material[k][WHITE] - eval->material[k][BLACK];
-        eval->material_adj[k][BOTH] =
-                    eval->material_adj[k][WHITE] - eval->material_adj[k][BLACK];
-        eval->psq[k][BOTH] = eval->psq[k][WHITE] - eval->psq[k][BLACK];
-        eval->pawn_structure[k][BOTH] =
-                eval->pawn_structure[k][WHITE] - eval->pawn_structure[k][BLACK];
-        eval->king_safety[k][BOTH] =
-                    eval->king_safety[k][WHITE] - eval->king_safety[k][BLACK];
-        eval->positional[k][BOTH] =
-                        eval->positional[k][WHITE] - eval->positional[k][BLACK];
-        eval->mobility[k][BOTH] =
-                            eval->mobility[k][WHITE] - eval->mobility[k][BLACK];
-    }
-
-    /* Summarize the evaluation terms for each side */
-    for (k=0;k<NPHASES;k++) {
-        eval->sum[k][WHITE] =
-                    eval->material[k][WHITE] + eval->material_adj[k][WHITE] +
-                    eval->psq[k][WHITE] + eval->pawn_structure[k][WHITE] +
-                    eval->king_safety[k][WHITE] + eval->positional[k][WHITE] +
-                    eval->mobility[k][WHITE];
-        eval->sum[k][BLACK] =
-                    eval->material[k][BLACK] + eval->material_adj[k][BLACK] +
-                    eval->psq[k][BLACK] + eval->pawn_structure[k][BLACK] +
-                    eval->king_safety[k][BLACK] + eval->positional[k][BLACK] +
-                    eval->mobility[k][BLACK];
-        eval->sum[k][BOTH] = eval->sum[k][WHITE] - eval->sum[k][BLACK];
-    }
 }
 
 void eval_reset(void)
@@ -656,10 +623,9 @@ void eval_reset(void)
 int eval_evaluate(struct gamestate *pos)
 {
     struct eval eval;
+    int         k;
     int         phase;
-    int         score;
-    int         score_mg;
-    int         score_eg;
+    int         score[NPHASES];
 
     assert(valid_board(pos));
     assert(valid_scores(pos));
@@ -675,24 +641,49 @@ int eval_evaluate(struct gamestate *pos)
     /* Evaluate the position */
     do_eval(pos, &eval);
 
-    /* Convert the score to be from side to move's point of view */
-    score_mg = (pos->stm == WHITE)?
-                        eval.sum[MIDDLEGAME][BOTH]:-eval.sum[MIDDLEGAME][BOTH];
-    score_eg = (pos->stm == WHITE)?
-                        eval.sum[ENDGAME][BOTH]:-eval.sum[ENDGAME][BOTH];
+    /* Summarize each evaluation term from side to moves's pov */
+    for (k=0;k<NPHASES;k++) {
+        score[k] = 0;
 
-    /* Adjust score for game phase */
+        score[k] += eval.material[k][WHITE];
+        score[k] += eval.material_adj[k][WHITE];
+        score[k] += eval.psq[k][WHITE];
+        score[k] += eval.pawn_structure[k][WHITE];
+        score[k] += eval.king_safety[k][WHITE];
+        score[k] += eval.positional[k][WHITE];
+        score[k] += eval.mobility[k][WHITE];
+
+        score[k] -= eval.material[k][BLACK];
+        score[k] -= eval.material_adj[k][BLACK];
+        score[k] -= eval.psq[k][BLACK];
+        score[k] -= eval.pawn_structure[k][BLACK];
+        score[k] -= eval.king_safety[k][BLACK];
+        score[k] -= eval.positional[k][BLACK];
+        score[k] -= eval.mobility[k][BLACK];
+
+        score[k] = (pos->stm == WHITE)?score[k]:-score[k];
+    }
+
+    /* Return score adjusted for game phase */
     phase = calculate_game_phase(pos);
-    score = calculate_tapered_eval(phase, score_mg, score_eg);
-
-    return score;
+    return calculate_tapered_eval(phase, score[MIDDLEGAME], score[ENDGAME]);
 }
 
 void eval_display(struct gamestate *pos)
 {
     struct eval eval;
+    int         k;
     int         phase;
     int         score;
+    int         sum[NPHASES][NSIDES];
+    int         sum_white_pov[NPHASES];
+    int         material[NPHASES];
+    int         material_adj[NPHASES];
+    int         psq[NPHASES];
+    int         pawn_structure[NPHASES];
+    int         king_safety[NPHASES];
+    int         positional[NPHASES];
+    int         mobility[NPHASES];
 
     assert(valid_board(pos));
     assert(valid_scores(pos));
@@ -710,53 +701,90 @@ void eval_display(struct gamestate *pos)
     /* Evaluate the position */
     do_eval(pos, &eval);
 
+    /* Summarize each evaluation term from white's pov */
+    for (k=0;k<NPHASES;k++) {
+        material[k] = eval.material[k][WHITE];
+        material[k] -= eval.material[k][BLACK];
+
+        material_adj[k] = eval.material_adj[k][WHITE];
+        material_adj[k] -= eval.material_adj[k][BLACK];
+
+        psq[k] = eval.psq[k][WHITE];
+        psq[k] -= eval.psq[k][BLACK];
+
+        pawn_structure[k] = eval.pawn_structure[k][WHITE];
+        pawn_structure[k] -= eval.pawn_structure[k][BLACK];
+
+        king_safety[k] = eval.king_safety[k][WHITE];
+        king_safety[k] -= eval.king_safety[k][BLACK];
+
+        positional[k] = eval.positional[k][WHITE];
+        positional[k] -= eval.positional[k][BLACK];
+
+        mobility[k] = eval.mobility[k][WHITE];
+        mobility[k] -= eval.mobility[k][BLACK];
+    }
+
+    /* Summarize the evaluation terms for each side */
+    for (k=0;k<NPHASES;k++) {
+        sum[k][WHITE] = eval.material[k][WHITE] + eval.material_adj[k][WHITE] +
+                        eval.psq[k][WHITE] + eval.pawn_structure[k][WHITE] +
+                        eval.king_safety[k][WHITE] + eval.positional[k][WHITE] +
+                        eval.mobility[k][WHITE];
+        sum[k][BLACK] = eval.material[k][BLACK] + eval.material_adj[k][BLACK] +
+                        eval.psq[k][BLACK] + eval.pawn_structure[k][BLACK] +
+                        eval.king_safety[k][BLACK] + eval.positional[k][BLACK] +
+                        eval.mobility[k][BLACK];
+        sum_white_pov[k] = sum[k][WHITE] - sum[k][BLACK];
+    }
+
     /* Adjust score for game phase */
     phase = calculate_game_phase(pos);
-    score = calculate_tapered_eval(phase, eval.sum[MIDDLEGAME][BOTH],
-                                   eval.sum[ENDGAME][BOTH]);
+    score = calculate_tapered_eval(phase, sum_white_pov[MIDDLEGAME],
+                                   sum_white_pov[ENDGAME]);
 
     /* Print the evaluation */
     printf("  Evaluation Term       White        Black         Total\n");
     printf("                      MG     EG    MG     EG     MG     EG\n");
     printf("-------------------------------------------------------------\n");
     printf("Material                                      %5d   %5d\n",
-           eval.material[MIDDLEGAME][BOTH], eval.material[ENDGAME][BOTH]);
+           material[MIDDLEGAME], material[ENDGAME]);
     printf("Material adjustment %5d  %5d %5d  %5d %5d   %5d\n",
            eval.material_adj[MIDDLEGAME][WHITE],
            eval.material_adj[ENDGAME][WHITE],
            eval.material_adj[MIDDLEGAME][BLACK],
            eval.material_adj[ENDGAME][BLACK],
-           eval.material_adj[MIDDLEGAME][BOTH],
-           eval.material_adj[ENDGAME][BOTH]);
+           material_adj[MIDDLEGAME],
+           material_adj[ENDGAME]);
     printf("Piece/square tables %5d  %5d %5d  %5d %5d   %5d\n",
            eval.psq[MIDDLEGAME][WHITE], eval.psq[ENDGAME][WHITE],
            eval.psq[MIDDLEGAME][BLACK], eval.psq[ENDGAME][BLACK],
-           eval.psq[MIDDLEGAME][BOTH], eval.psq[ENDGAME][BOTH]);
+           psq[MIDDLEGAME], psq[ENDGAME]);
     printf("Pawn structure      %5d  %5d %5d  %5d %5d   %5d\n",
            eval.pawn_structure[MIDDLEGAME][WHITE],
            eval.pawn_structure[ENDGAME][WHITE],
            eval.pawn_structure[MIDDLEGAME][BLACK],
            eval.pawn_structure[ENDGAME][BLACK],
-           eval.pawn_structure[MIDDLEGAME][BOTH],
-           eval.pawn_structure[ENDGAME][BOTH]);
+           pawn_structure[MIDDLEGAME],
+           pawn_structure[ENDGAME]);
     printf("King safety         %5d  %5d %5d  %5d %5d   %5d\n",
            eval.king_safety[MIDDLEGAME][WHITE],
            eval.king_safety[ENDGAME][WHITE],
            eval.king_safety[MIDDLEGAME][BLACK],
            eval.king_safety[ENDGAME][BLACK],
-           eval.king_safety[MIDDLEGAME][BOTH],
-           eval.king_safety[ENDGAME][BOTH]);
+           king_safety[MIDDLEGAME],
+           king_safety[ENDGAME]);
     printf("Positional themes   %5d  %5d %5d  %5d %5d   %5d\n",
            eval.positional[MIDDLEGAME][WHITE], eval.positional[ENDGAME][WHITE],
            eval.positional[MIDDLEGAME][BLACK], eval.positional[ENDGAME][BLACK],
-           eval.positional[MIDDLEGAME][BOTH], eval.positional[ENDGAME][BOTH]);
+           positional[MIDDLEGAME], positional[ENDGAME]);
     printf("Mobility            %5d  %5d %5d  %5d %5d   %5d\n",
            eval.mobility[MIDDLEGAME][WHITE], eval.mobility[ENDGAME][WHITE],
            eval.mobility[MIDDLEGAME][BLACK], eval.mobility[ENDGAME][BLACK],
-           eval.mobility[MIDDLEGAME][BOTH], eval.mobility[ENDGAME][BOTH]);
+           mobility[MIDDLEGAME], mobility[ENDGAME]);
     printf("-------------------------------------------------------------\n");
     printf("Total                                         %5d   %5d\n",
-           eval.sum[MIDDLEGAME][BOTH], eval.sum[ENDGAME][BOTH]);
+           sum_white_pov[MIDDLEGAME], sum_white_pov[ENDGAME]);
     printf("\n");
     printf("Game phase: %d [0, 256]\n", phase);
     printf("Score:      %d (for white)\n", score);
