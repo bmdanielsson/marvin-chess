@@ -212,12 +212,10 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
     uint64_t            pawns;
     int                 k;
     int                 file;
-    uint64_t            left;
-    uint64_t            right;
-    uint64_t            middle;
-    int                 opp_side;
     int                 rank;
-    uint64_t            blockers;
+    int                 opp_side;
+    uint64_t            opp_squares;
+    uint64_t            attackspan;
     struct pawntt_item  *item;
 
     item = &eval->pawntt;
@@ -227,30 +225,25 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
         sq = POPBIT(&pieces);
         file = FILENR(sq);
         rank = RANKNR(sq);
+        attackspan = rear_attackspan[side][sq]|front_attackspan[side][sq];
 
         /*
          * Look for isolated pawns. Isolated pawns are pawns
          * with no friendly pawns on the adjacent files.
          */
-        left = (file!=FILE_A)?pos->bb_pieces[side+PAWN]&file_mask[file-1]:0ULL;
-        right = (file!=FILE_H)?pos->bb_pieces[side+PAWN]&file_mask[file+1]:0ULL;
-        if ((left == 0ULL) && (right == 0ULL)) {
+        if ((attackspan&pos->bb_pieces[side+PAWN]) == 0ULL) {
             item->score[MIDDLEGAME][side] += ISOLATED_PAWN_MG;
             item->score[ENDGAME][side] += ISOLATED_PAWN_EG;
         }
+
 
         /*
          * Look for passed pawns. Passed pawns are pawns
          * with no opposing pawns on the same file or on
          * adjacent files.
          */
-        left = (file!=FILE_A)?
-                        pos->bb_pieces[opp_side+PAWN]&file_mask[file-1]:0ULL;
-        right = (file!=FILE_H)?
-                        pos->bb_pieces[opp_side+PAWN]&file_mask[file+1]:0ULL;
-        middle = pos->bb_pieces[opp_side+PAWN]&file_mask[file];
-        blockers = (left|middle|right)&ranks_ahead_mask[rank][side];
-        if (blockers == 0ULL) {
+        opp_squares = (attackspan|file_mask[file])&ranks_ahead_mask[rank][side];
+        if ((opp_squares&pos->bb_pieces[opp_side+PAWN]) == 0ULL) {
             item->score[MIDDLEGAME][side] +=
                                 passed_pawn_scores_mg[side==WHITE?rank:7-rank];
             item->score[ENDGAME][side] +=

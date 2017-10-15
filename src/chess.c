@@ -43,6 +43,10 @@ uint64_t a8h1_masks[NDIAGONALS];
 
 uint64_t ranks_ahead_mask[NRANKS][NSIDES];
 
+uint64_t front_attackspan[NSIDES][NSQUARES];
+
+uint64_t rear_attackspan[NSIDES][NSQUARES];
+
 char piece2char[NPIECES+1] = {
     'P', 'p', 'N', 'n', 'B', 'b', 'R', 'r', 'Q', 'q', 'K', 'k', '.'
 };
@@ -165,6 +169,60 @@ void chess_data_init(void)
         sq = SQUARE(file, rank);
         a8h1_masks[k] = bb_slider_moves(0ULL, sq, 1, -1)|sq_mask[sq];
         k++;
+    }
+
+    /* Initialize the front attackspans masks */
+    for (sq=0;sq<NSQUARES;sq++) {
+        front_attackspan[WHITE][sq] = 0ULL;
+        front_attackspan[BLACK][sq] = 0ULL;
+        if ((sq <= 7) || (sq >= 56)) {
+            continue;
+        }
+        for (k=sq;k<56;k+=8) {
+            file = FILENR(sq);
+            if (file != FILE_A) {
+                front_attackspan[WHITE][sq] |= sq_mask[k+7];
+            }
+            if (file != FILE_H) {
+                front_attackspan[WHITE][sq] |= sq_mask[k+9];
+            }
+        }
+        for (k=sq;k>7;k-=8) {
+            file = FILENR(sq);
+            if (file != FILE_A) {
+                front_attackspan[BLACK][sq] |= sq_mask[k-9];
+            }
+            if (file != FILE_H) {
+                front_attackspan[BLACK][sq] |= sq_mask[k-7];
+            }
+        }
+    }
+
+    /* Initialize the rear attackspans masks */
+    for (sq=0;sq<NSQUARES;sq++) {
+        rear_attackspan[WHITE][sq] = 0ULL;
+        rear_attackspan[BLACK][sq] = 0ULL;
+        if ((sq <= 7) || (sq >= 56)) {
+            continue;
+        }
+        for (k=sq;k>=0;k-=8) {
+            file = FILENR(sq);
+            if (file != FILE_A) {
+                rear_attackspan[WHITE][sq] |= sq_mask[k-1];
+            }
+            if (file != FILE_H) {
+                rear_attackspan[WHITE][sq] |= sq_mask[k+1];
+            }
+        }
+        for (k=sq;k<=63;k+=8) {
+            file = FILENR(sq);
+            if (file != FILE_A) {
+                rear_attackspan[BLACK][sq] |= sq_mask[k-1];
+            }
+            if (file != FILE_H) {
+                rear_attackspan[BLACK][sq] |= sq_mask[k+1];
+            }
+        }
     }
 }
 
