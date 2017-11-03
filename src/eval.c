@@ -34,6 +34,12 @@
 #define ROOK_PHASE      2
 #define QUEEN_PHASE     4
 
+/* Attack weights for the different piece types */
+#define KNIGHT_ATTACK_WEIGHT    1
+#define BISHOP_ATTACK_WEIGHT    1
+#define ROOK_ATTACK_WEIGHT      2
+#define QUEEN_ATTACK_WEIGHT     4
+
 /*
  * The material value for pawns is not tuned in order to make sure there
  * is fix base value for all scores.
@@ -50,11 +56,14 @@ struct eval {
     struct pawntt_item pawntt;
     bool endgame[NSIDES];
     uint64_t coverage[NSIDES];
+    int nbr_king_attackers[NPIECES];
+
     int material[NPHASES][NSIDES];
     int material_adj[NPHASES][NSIDES];
     int psq[NPHASES][NSIDES];
     int pawn_structure[NPHASES][NSIDES];
     int king_safety[NPHASES][NSIDES];
+    int king_preassure[NPHASES][NSIDES];
     int positional[NPHASES][NSIDES];
     int mobility[NPHASES][NSIDES];
 };
@@ -79,6 +88,19 @@ static int passed_pawn_scores_eg[NRANKS];
  */
 static int material_values_mg[NPIECES];
 static int material_values_eg[NPIECES];
+
+/* Table of attack weights for all pieces */
+static int piece_attack_weights[NPIECES] = {
+    0, 0,
+    KNIGHT_ATTACK_WEIGHT, KNIGHT_ATTACK_WEIGHT,
+    BISHOP_ATTACK_WEIGHT, BISHOP_ATTACK_WEIGHT,
+    ROOK_ATTACK_WEIGHT, ROOK_ATTACK_WEIGHT,
+    QUEEN_ATTACK_WEIGHT, QUEEN_ATTACK_WEIGHT,
+    0, 0
+};
+
+/* Weights for the number of king attackers */
+static int nbr_attackers_weight[8];
 
 /*
  * Calculate a numerical value between 0 and 256 for
@@ -284,19 +306,30 @@ static void evaluate_knights(struct gamestate *pos, struct eval *eval, int side)
     uint64_t safe_moves;
     uint64_t coverage;
     int      sq;
+    int      king_sq;
+    int      opp_side;
 
     /* Calculate mobility */
     coverage = 0ULL;
     pieces = pos->bb_pieces[KNIGHT+side];
+    opp_side = FLIP_COLOR(side);
+    king_sq = LSB(pos->bb_pieces[KING+opp_side]);
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         moves = bb_knight_moves(sq)&(~pos->bb_sides[side]);
         coverage |= moves;
+
+        /* Mobility */
         safe_moves = moves&(~eval->pawntt.coverage[FLIP_COLOR(side)]);
         eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_mg[KNIGHT+side]);
         eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[KNIGHT+side]);
+
+        /* Preassure on enemy king */
+        if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
+            eval->nbr_king_attackers[KNIGHT+side]++;
+        }
     }
 
     /* Update coverage */
@@ -314,6 +347,8 @@ static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
     uint64_t safe_moves;
     uint64_t coverage;
     int      sq;
+    int      king_sq;
+    int      opp_side;
 
     /*
      * Check if both bishops are still on the board. To be correct
@@ -331,15 +366,24 @@ static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
     /* Calculate mobility */
     coverage = 0ULL;
     pieces = pos->bb_pieces[BISHOP+side];
+    opp_side = FLIP_COLOR(side);
+    king_sq = LSB(pos->bb_pieces[KING+opp_side]);
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         moves = bb_bishop_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
         coverage |= moves;
+
+        /* Mobility */
         safe_moves = moves&(~eval->pawntt.coverage[FLIP_COLOR(side)]);
         eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_mg[BISHOP+side]);
         eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[BISHOP+side]);
+
+        /* Preassure on enemy king */
+        if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
+            eval->nbr_king_attackers[BISHOP+side]++;
+        }
     }
 
     /* Update coverage */
@@ -361,13 +405,19 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
     uint64_t coverage;
     int      sq;
     int      file;
+    int      king_sq;
+    int      opp_side;
 
     coverage = 0ULL;
     all_pawns = pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN];
     pieces = pos->bb_pieces[ROOK+side];
+    opp_side = FLIP_COLOR(side);
+    king_sq = LSB(pos->bb_pieces[KING+opp_side]);
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         file = FILENR(sq);
+        moves = bb_rook_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
+        coverage |= moves;
 
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
@@ -392,13 +442,16 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
         }
 
         /* Mobility */
-        moves = bb_rook_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
-        coverage |= moves;
         safe_moves = moves&(~eval->pawntt.coverage[FLIP_COLOR(side)]);
         eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_mg[ROOK+side]);
         eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[ROOK+side]);
+
+        /* Preassure on enemy king */
+        if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
+            eval->nbr_king_attackers[ROOK+side]++;
+        }
     }
 
     /* Update coverage */
@@ -417,12 +470,17 @@ static void evaluate_queens(struct gamestate *pos, struct eval *eval, int side)
     uint64_t safe_moves;
     int      sq;
     int      file;
+    int      king_sq;
+    int      opp_side;
 
     all_pawns = pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN];
     pieces = pos->bb_pieces[QUEEN+side];
+    opp_side = FLIP_COLOR(side);
+    king_sq = LSB(pos->bb_pieces[KING+opp_side]);
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         file = FILENR(sq);
+        moves = bb_queen_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
 
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
@@ -434,20 +492,24 @@ static void evaluate_queens(struct gamestate *pos, struct eval *eval, int side)
         }
 
         /* Mobility */
-        moves = bb_queen_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
         safe_moves = moves&(~eval->coverage[FLIP_COLOR(side)]);
         eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_mg[QUEEN+side]);
         eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[QUEEN+side]);
+
+        /* Preassure on enemy king */
+        if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
+            eval->nbr_king_attackers[QUEEN+side]++;
+        }
     }
 }
 
 /*
  * - pawn shield
+ * - king preassure
  */
-static void evaluate_king_safety(struct gamestate *pos, struct eval *eval,
-                                 int side)
+static void evaluate_king(struct gamestate *pos, struct eval *eval, int side)
 {
     const uint64_t      queenside[NSIDES] = {
                                         sq_mask[A1]|sq_mask[B1]|sq_mask[C1],
@@ -456,6 +518,8 @@ static void evaluate_king_safety(struct gamestate *pos, struct eval *eval,
                                         sq_mask[F1]|sq_mask[G1]|sq_mask[H1],
                                         sq_mask[F8]|sq_mask[G8]|sq_mask[H8]};
     struct pawntt_item  *item;
+    int                 piece;
+    int                 nattackers;
 
     /*
      * If the king has moved to the side then it is good to keep a
@@ -485,6 +549,27 @@ static void evaluate_king_safety(struct gamestate *pos, struct eval *eval,
      * don't try to hide it behind a pawn shield.
      */
     eval->king_safety[ENDGAME][side] = 0;
+
+    /* Calculate preassure on the enemy king */
+    nattackers = 0;
+    eval->king_preassure[MIDDLEGAME][side] = 0;
+    eval->king_preassure[ENDGAME][side] = 0;
+    for (piece=KNIGHT+side;piece<NPIECES;piece+=2) {
+        eval->king_preassure[MIDDLEGAME][side] +=
+                    piece_attack_weights[piece]*eval->nbr_king_attackers[piece];
+        eval->king_preassure[ENDGAME][side] +=
+                    piece_attack_weights[piece]*eval->nbr_king_attackers[piece];
+        nattackers += eval->nbr_king_attackers[piece];
+    }
+    if (nattackers >= (int)(sizeof(nbr_attackers_weight)/sizeof(int))) {
+        nattackers = (sizeof(nbr_attackers_weight)/sizeof(int)) - 1;
+    }
+    eval->king_preassure[MIDDLEGAME][side] *= nbr_attackers_weight[nattackers];
+    eval->king_preassure[MIDDLEGAME][side] *= KING_ATTACK_SCALE_MG;
+    eval->king_preassure[MIDDLEGAME][side] /= 100;
+    eval->king_preassure[ENDGAME][side] *= nbr_attackers_weight[nattackers];
+    eval->king_preassure[ENDGAME][side] *= KING_ATTACK_SCALE_EG;
+    eval->king_preassure[ENDGAME][side] /= 100;
 }
 
 static void do_eval(struct gamestate *pos, struct eval *eval)
@@ -520,8 +605,8 @@ static void do_eval(struct gamestate *pos, struct eval *eval)
     evaluate_rooks(pos, eval, BLACK);
     evaluate_queens(pos, eval, WHITE);
     evaluate_queens(pos, eval, BLACK);
-    evaluate_king_safety(pos, eval, WHITE);
-    evaluate_king_safety(pos, eval, BLACK);
+    evaluate_king(pos, eval, WHITE);
+    evaluate_king(pos, eval, BLACK);
 
     /*
      * Update the evaluation scores with information from
@@ -611,6 +696,16 @@ void eval_reset(void)
     material_values_eg[BLACK_QUEEN] = QUEEN_MATERIAL_VALUE_EG;
     material_values_eg[WHITE_KING] = 20000;
     material_values_eg[BLACK_KING] = 20000;
+
+    /* Initialize number of king attackers weights */
+    nbr_attackers_weight[0] = 0;
+    nbr_attackers_weight[1] = 0;
+    nbr_attackers_weight[2] = TWO_KING_ATTACKERS_WEIGHT;
+    nbr_attackers_weight[3] = THREE_KING_ATTACKERS_WEIGHT;
+    nbr_attackers_weight[4] = FOUR_KING_ATTACKERS_WEIGHT;
+    nbr_attackers_weight[5] = FIVE_KING_ATTACKERS_WEIGHT;
+    nbr_attackers_weight[6] = SIX_KING_ATTACKERS_WEIGHT;
+    nbr_attackers_weight[7] = MANY_KING_ATTACKERS_WEIGHT;
 }
 
 int eval_evaluate(struct gamestate *pos)
@@ -643,6 +738,7 @@ int eval_evaluate(struct gamestate *pos)
         score[k] += eval.psq[k][WHITE];
         score[k] += eval.pawn_structure[k][WHITE];
         score[k] += eval.king_safety[k][WHITE];
+        score[k] += eval.king_preassure[k][WHITE];
         score[k] += eval.positional[k][WHITE];
         score[k] += eval.mobility[k][WHITE];
 
@@ -651,6 +747,7 @@ int eval_evaluate(struct gamestate *pos)
         score[k] -= eval.psq[k][BLACK];
         score[k] -= eval.pawn_structure[k][BLACK];
         score[k] -= eval.king_safety[k][BLACK];
+        score[k] -= eval.king_preassure[k][BLACK];
         score[k] -= eval.positional[k][BLACK];
         score[k] -= eval.mobility[k][BLACK];
 
@@ -675,6 +772,7 @@ void eval_display(struct gamestate *pos)
     int         psq[NPHASES];
     int         pawn_structure[NPHASES];
     int         king_safety[NPHASES];
+    int         king_preassure[NPHASES];
     int         positional[NPHASES];
     int         mobility[NPHASES];
 
@@ -711,6 +809,9 @@ void eval_display(struct gamestate *pos)
         king_safety[k] = eval.king_safety[k][WHITE];
         king_safety[k] -= eval.king_safety[k][BLACK];
 
+        king_preassure[k] = eval.king_preassure[k][WHITE];
+        king_preassure[k] -= eval.king_preassure[k][BLACK];
+
         positional[k] = eval.positional[k][WHITE];
         positional[k] -= eval.positional[k][BLACK];
 
@@ -722,12 +823,14 @@ void eval_display(struct gamestate *pos)
     for (k=0;k<NPHASES;k++) {
         sum[k][WHITE] = eval.material[k][WHITE] + eval.material_adj[k][WHITE] +
                         eval.psq[k][WHITE] + eval.pawn_structure[k][WHITE] +
-                        eval.king_safety[k][WHITE] + eval.positional[k][WHITE] +
-                        eval.mobility[k][WHITE];
+                        eval.king_safety[k][WHITE] +
+                        eval.king_preassure[k][WHITE] +
+                        eval.positional[k][WHITE] + eval.mobility[k][WHITE];
         sum[k][BLACK] = eval.material[k][BLACK] + eval.material_adj[k][BLACK] +
                         eval.psq[k][BLACK] + eval.pawn_structure[k][BLACK] +
-                        eval.king_safety[k][BLACK] + eval.positional[k][BLACK] +
-                        eval.mobility[k][BLACK];
+                        eval.king_safety[k][BLACK] +
+                        eval.king_preassure[k][BLACK] +
+                        eval.positional[k][BLACK] + eval.mobility[k][BLACK];
         sum_white_pov[k] = sum[k][WHITE] - sum[k][BLACK];
     }
 
@@ -767,6 +870,13 @@ void eval_display(struct gamestate *pos)
            eval.king_safety[ENDGAME][BLACK],
            king_safety[MIDDLEGAME],
            king_safety[ENDGAME]);
+    printf("King preassure      %5d  %5d %5d  %5d %5d   %5d\n",
+           eval.king_preassure[MIDDLEGAME][WHITE],
+           eval.king_preassure[ENDGAME][WHITE],
+           eval.king_preassure[MIDDLEGAME][BLACK],
+           eval.king_preassure[ENDGAME][BLACK],
+           king_preassure[MIDDLEGAME],
+           king_preassure[ENDGAME]);
     printf("Positional themes   %5d  %5d %5d  %5d %5d   %5d\n",
            eval.positional[MIDDLEGAME][WHITE], eval.positional[ENDGAME][WHITE],
            eval.positional[MIDDLEGAME][BLACK], eval.positional[ENDGAME][BLACK],
