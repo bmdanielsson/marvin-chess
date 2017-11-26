@@ -231,12 +231,9 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
 {
     uint64_t            pieces;
     int                 sq;
-    uint64_t            pawns;
-    int                 k;
     int                 file;
     int                 rank;
     int                 opp_side;
-    uint64_t            opp_squares;
     uint64_t            attackspan;
     struct pawntt_item  *item;
 
@@ -245,27 +242,18 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
     pieces = pos->bb_pieces[PAWN+side];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
-        file = FILENR(sq);
         rank = RANKNR(sq);
         attackspan = rear_attackspan[side][sq]|front_attackspan[side][sq];
 
-        /*
-         * Look for isolated pawns. Isolated pawns are pawns
-         * with no friendly pawns on the adjacent files.
-         */
+        /* Look for isolated pawns */
         if ((attackspan&pos->bb_pieces[side+PAWN]) == 0ULL) {
             item->score[MIDDLEGAME][side] += ISOLATED_PAWN_MG;
             item->score[ENDGAME][side] += ISOLATED_PAWN_EG;
         }
 
-
-        /*
-         * Look for passed pawns. Passed pawns are pawns
-         * with no opposing pawns on the same file or on
-         * adjacent files.
-         */
-        opp_squares = (attackspan|file_mask[file])&ranks_ahead_mask[rank][side];
-        if ((opp_squares&pos->bb_pieces[opp_side+PAWN]) == 0ULL) {
+        /* Look for passed pawns */
+        if (ISEMPTY(front_attackspan[side][sq]&pos->bb_pieces[opp_side+PAWN]) &&
+            ISEMPTY(front_span[side][sq]&pos->bb_pieces[opp_side+PAWN])) {
             item->score[MIDDLEGAME][side] +=
                                 passed_pawn_scores_mg[side==WHITE?rank:7-rank];
             item->score[ENDGAME][side] +=
@@ -277,13 +265,9 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
         item->coverage[side] |= bb_pawn_attacks_from(sq, side);
     }
 
-    /*
-     * Look for double pawns. Double pawns is when a
-     * player has two or more pawns on the same file.
-     */
-    for (k=0;k<NFILES;k++) {
-        pawns = pos->bb_pieces[side+PAWN]&file_mask[k];
-        if (BITCOUNT(pawns) >= 2) {
+    /* Look for double pawns */
+    for (file=0;file<NFILES;file++) {
+        if (BITCOUNT(pos->bb_pieces[side+PAWN]&file_mask[file]) >= 2) {
             item->score[MIDDLEGAME][side] += DOUBLE_PAWNS_MG;
             item->score[ENDGAME][side] += DOUBLE_PAWNS_EG;
         }

@@ -41,11 +41,11 @@ uint64_t a1h8_masks[NDIAGONALS];
 
 uint64_t a8h1_masks[NDIAGONALS];
 
-uint64_t ranks_ahead_mask[NRANKS][NSIDES];
-
 uint64_t front_attackspan[NSIDES][NSQUARES];
 
 uint64_t rear_attackspan[NSIDES][NSQUARES];
+
+uint64_t front_span[NSIDES][NSQUARES];
 
 uint64_t king_attack_zone[NSIDES][NSQUARES];
 
@@ -184,16 +184,6 @@ void chess_data_init(void)
             rank_mask[k] |= sq_mask[SQUARE(l, k)];
         }
     }
-    for (k=0;k<NRANKS;k++) {
-        ranks_ahead_mask[k][WHITE] = 0ULL;
-        ranks_ahead_mask[k][BLACK] = 0ULL;
-        for (l=k+1;l<NRANKS;l++) {
-            ranks_ahead_mask[k][WHITE] |= rank_mask[l];
-        }
-        for (l=k-1;l>=0;l--) {
-            ranks_ahead_mask[k][BLACK] |= rank_mask[l];
-        }
-    }
 
     /* Initialize file masks */
     for (k=0;k<NFILES;k++) {
@@ -291,6 +281,23 @@ void chess_data_init(void)
             if (file != FILE_H) {
                 rear_attackspan[BLACK][sq] |= sq_mask[k+1];
             }
+        }
+    }
+
+    /* Initialize the front span masks */
+    for (sq=0;sq<NSQUARES;sq++) {
+        front_span[WHITE][sq] = 0ULL;
+        front_span[BLACK][sq] = 0ULL;
+
+        if ((sq >= 56) || (sq <= 7)) {
+            continue;
+        }
+
+        for (k=sq+8;k<=63;k+=8) {
+            front_span[WHITE][sq] |= sq_mask[k];
+        }
+        for (k=sq-8;k>=0;k-=8) {
+            front_span[BLACK][sq] |= sq_mask[k];
         }
     }
 
