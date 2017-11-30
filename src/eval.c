@@ -100,7 +100,7 @@ static int piece_attack_weights[NPIECES] = {
 };
 
 /* Weights for the number of king attackers */
-static int nbr_attackers_weight[8];
+static int nbr_attackers_weight[6];
 
 /*
  * Calculate a numerical value between 0 and 256 for
@@ -687,9 +687,7 @@ void eval_reset(void)
     nbr_attackers_weight[2] = TWO_KING_ATTACKERS_WEIGHT;
     nbr_attackers_weight[3] = THREE_KING_ATTACKERS_WEIGHT;
     nbr_attackers_weight[4] = FOUR_KING_ATTACKERS_WEIGHT;
-    nbr_attackers_weight[5] = FIVE_KING_ATTACKERS_WEIGHT;
-    nbr_attackers_weight[6] = SIX_KING_ATTACKERS_WEIGHT;
-    nbr_attackers_weight[7] = MANY_KING_ATTACKERS_WEIGHT;
+    nbr_attackers_weight[5] = MANY_KING_ATTACKERS_WEIGHT;
 }
 
 int eval_evaluate(struct gamestate *pos)
