@@ -21,7 +21,6 @@
 #include <string.h>
 #include <math.h>
 #include <sys/stat.h>
-#include <pthread.h>
 #include <unistd.h>
 
 #include "chess.h"
@@ -35,6 +34,7 @@
 #include "tuningparam.h"
 #include "evalparams.h"
 #include "eval.h"
+#include "thread.h"
 
 /* Files that the tuning result is written to */
 #define TUNING_FINAL_RESULT_FILE "tuning.final"
@@ -81,7 +81,9 @@ enum worker_state {
 
 /* Worker thread */
 struct worker {
-    pthread_t           thread;
+    thread_t            thread;
+    event_t             ev_start;
+    event_t             ev_done;
     struct trainingset  *trainingset;
     int                 first_pos;
     int                 last_pos;
@@ -91,15 +93,12 @@ struct worker {
     enum worker_state   state;
 };
 
-/* Mutexes and conditions used for syncronization of workers */
-static pthread_mutex_t worker_start_lock;
-static pthread_mutex_t worker_finished_lock;
-static pthread_cond_t workers_start_cond;
-static pthread_cond_t workers_finished_cond;
-
 /* Workers used for calculating errors */
 struct worker *workers = NULL;
 static int    nworkerthreads = 0;
+
+/* Function declarations */
+static void* calc_texel_error_func(void *data);
 
 static void mark_pv_for_update(void)
 {
@@ -107,6 +106,38 @@ static void mark_pv_for_update(void)
 
     for (k=0;k<nworkerthreads;k++) {
         workers[k].update_pv = true;
+    }
+}
+
+static void init_workers(struct trainingset *trainingset)
+{
+    int iter;
+    int pos_per_thread;
+    int nextpos;
+
+    pos_per_thread = trainingset->size/nworkerthreads;
+    nextpos = 0;
+    for (iter=0;iter<nworkerthreads;iter++) {
+        workers[iter].state = WORKER_IDLE;
+        workers[iter].trainingset = trainingset;
+        workers[iter].first_pos = nextpos;
+        workers[iter].last_pos = workers[iter].first_pos + pos_per_thread - 1;
+        nextpos = workers[iter].last_pos + 1;
+
+        thread_create(&workers[iter].thread, calc_texel_error_func,
+                      &workers[iter]);
+        event_init(&workers[iter].ev_start);
+        event_init(&workers[iter].ev_done);
+    }
+}
+
+static void destroy_workers(void)
+{
+    int iter;
+
+    for (iter=0;iter<nworkerthreads;iter++) {
+        event_destroy(&workers[iter].ev_start);
+        event_destroy(&workers[iter].ev_done);
     }
 }
 
@@ -172,12 +203,7 @@ static void* calc_texel_error_func(void *data)
     /* Worker main loop */
     while (true) {
         /* Wait for signal to start */
-        pthread_mutex_lock(&worker_start_lock);
-        while ((worker->state != WORKER_RUNNING) &&
-               (worker->state != WORKER_STOPPED)) {
-            pthread_cond_wait(&workers_start_cond, &worker_start_lock);
-        }
-        pthread_mutex_unlock(&worker_start_lock);
+        event_wait(&worker->ev_start);
         if (worker->state == WORKER_STOPPED) {
             break;
         }
@@ -212,10 +238,8 @@ static void* calc_texel_error_func(void *data)
         }
 
         /* Signal that this iteration is finished */
-        pthread_mutex_lock(&worker_finished_lock);
         worker->state = WORKER_FINISHED;
-        pthread_cond_signal(&workers_finished_cond);
-        pthread_mutex_unlock(&worker_finished_lock);
+        event_set(&worker->ev_done);
     }
 
     return NULL;
@@ -224,33 +248,19 @@ static void* calc_texel_error_func(void *data)
 static double calc_texel_error(struct trainingset *trainingset, double k)
 {
     int     iter;
-    int     nfinished;
     double  sum;
 
     /* Start all worker threads */
-    pthread_mutex_lock(&worker_start_lock);
     for (iter=0;iter<nworkerthreads;iter++) {
         workers[iter].k = k;
         workers[iter].state = WORKER_RUNNING;
+        event_set(&workers[iter].ev_start);
     }
-    pthread_cond_broadcast(&workers_start_cond);
-    pthread_mutex_unlock(&worker_start_lock);
 
     /* Wait for all workers to finish */
-    pthread_mutex_lock(&worker_finished_lock);
-    nfinished = 0;
-    while (nfinished < nworkerthreads) {
-        nfinished = 0;
-        for (iter=0;iter<nworkerthreads;iter++) {
-            if (workers[iter].state == WORKER_FINISHED) {
-                nfinished++;
-            }
-        }
-        if (nfinished < nworkerthreads) {
-            pthread_cond_wait(&workers_finished_cond, &worker_finished_lock);
-        }
+    for (iter=0;iter<nworkerthreads;iter++) {
+        event_wait(&workers[iter].ev_done);
     }
-    pthread_mutex_unlock(&worker_finished_lock);
 
     /* Summarize the result of all workers and calculate the error */
     sum = 0.0;
@@ -272,7 +282,6 @@ static void local_optimize(struct tuningset *tuningset,
     int     pi;
     int     niterations;
     bool    undo;
-    FILE    *fp;
     char    path[64];
     int     count;
     int     delta;
@@ -358,11 +367,6 @@ static void local_optimize(struct tuningset *tuningset,
         niterations++;
         printf("\rIteration %d complete, error %f\n", niterations, best_e);
         sprintf(path, TUNING_ITERATION_RESULT_FILE, niterations);
-        fp = fopen(path, "w");
-        if (fp != NULL) {
-            tuning_param_write_parameters(fp, tuningset->params, true);
-            fclose(fp);
-        }
     }
 
     printf("Final error: %f\n", best_e);
@@ -571,8 +575,6 @@ void find_k(char *file, int nthreads)
     double              e;
     double              lowest_e;
     int                 iter;
-    int                 pos_per_thread;
-    int                 nextpos;
     int                 niterations;
 
     assert(file != NULL);
@@ -591,26 +593,11 @@ void find_k(char *file, int nthreads)
 
     printf("Found %d training positions\n", trainingset->size);
 
-    /* Initialize syncronization objects */
-    pthread_cond_init(&workers_start_cond, NULL);
-    pthread_cond_init(&workers_finished_cond, NULL);
-    pthread_mutex_init(&worker_start_lock, NULL);
-    pthread_mutex_init(&worker_finished_lock, NULL);
-
     /* Setup worker threads */
-    pos_per_thread = trainingset->size/nthreads;
-    nextpos = 0;
     nworkerthreads = nthreads;
     workers = malloc(sizeof(struct worker)*nworkerthreads);
-    for (iter=0;iter<nworkerthreads;iter++) {
-        workers[iter].state = WORKER_IDLE;
-        workers[iter].trainingset = trainingset;
-        workers[iter].first_pos = nextpos;
-        workers[iter].last_pos = workers[iter].first_pos + pos_per_thread - 1;
-        pthread_create(&workers[iter].thread, NULL, calc_texel_error_func,
-                       &workers[iter]);
-        nextpos = workers[iter].last_pos + 1;
-    }
+    init_workers(trainingset);
+    mark_pv_for_update();
 
     /* Make sure all training positions are covered */
     workers[nworkerthreads-1].last_pos = trainingset->size - 1;
@@ -638,17 +625,15 @@ void find_k(char *file, int nthreads)
     }
 
     /* Stop all worker threads */
-    pthread_mutex_lock(&worker_start_lock);
     for (iter=0;iter<nthreads;iter++) {
         workers[iter].k = k;
         workers[iter].state = WORKER_STOPPED;
+        event_set(&workers[iter].ev_start);
     }
-    pthread_cond_broadcast(&workers_start_cond);
-    pthread_mutex_unlock(&worker_start_lock);
 
     /* Wait for all threads to exit */
     for (iter=0;iter<nthreads;iter++) {
-        pthread_join(workers[iter].thread, NULL);
+        thread_join(&workers[iter].thread);
     }
 
     /* Print result */
@@ -656,10 +641,7 @@ void find_k(char *file, int nthreads)
            best_k, lowest_e, sqrt(lowest_e)*100.0);
 
     /* Clean up */
-    pthread_cond_destroy(&workers_start_cond);
-    pthread_cond_destroy(&workers_finished_cond);
-    pthread_mutex_destroy(&worker_start_lock);
-    pthread_mutex_destroy(&worker_finished_lock);
+    destroy_workers();
     free(workers);
     free_trainingset(trainingset);
     destroy_game_state(pos);
@@ -671,9 +653,6 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     struct tuningset    *tuningset;
     struct trainingset  *trainingset;
     struct gamestate    *pos;
-    int                 pos_per_thread;
-    int                 nextpos;
-    int                 k;
     FILE                *fp;
 
     assert(training_file != NULL);
@@ -703,26 +682,10 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
 
     printf("Found %d training positions\n", trainingset->size);
 
-    /* Initialize syncronization objects */
-    pthread_cond_init(&workers_start_cond, NULL);
-    pthread_cond_init(&workers_finished_cond, NULL);
-    pthread_mutex_init(&worker_start_lock, NULL);
-    pthread_mutex_init(&worker_finished_lock, NULL);
-
     /* Setup worker threads */
-    pos_per_thread = trainingset->size/nthreads;
-    nextpos = 0;
     nworkerthreads = nthreads;
     workers = malloc(sizeof(struct worker)*nthreads);
-    for (k=0;k<nthreads;k++) {
-        workers[k].state = WORKER_IDLE;
-        workers[k].trainingset = trainingset;
-        workers[k].first_pos = nextpos;
-        workers[k].last_pos = workers[k].first_pos + pos_per_thread - 1;
-        pthread_create(&workers[k].thread, NULL, calc_texel_error_func,
-                       &workers[k]);
-        nextpos = workers[k].last_pos + 1;
-    }
+    init_workers(trainingset);
 
     /* Make sure all training positions are covered */
     workers[nthreads-1].last_pos = trainingset->size - 1;
@@ -743,6 +706,8 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     }
 
     /* Clean up */
+    destroy_workers();
+    free(workers);
     free_tuningset(tuningset);
     free_trainingset(trainingset);
     destroy_game_state(pos);

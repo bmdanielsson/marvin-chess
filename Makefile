@@ -87,6 +87,7 @@ SOURCES = src/bitboard.c \
           src/search.c \
           src/see.c \
           src/test.c \
+          src/thread.c \
           src/timectl.c \
           src/uci.c \
           src/utils.c \
@@ -109,6 +110,7 @@ TUNER_SOURCES = src/bitboard.c \
                 src/search.c \
                 src/see.c \
                 src/test.c \
+                src/thread.c \
                 src/timectl.c \
                 src/tuner.c \
                 src/tuningparam.c \
@@ -161,10 +163,5 @@ help :
 marvin : $(OBJECTS)
 	$(CC) $(OBJECTS) $(LDFLAGS) -o marvin
 
-ifeq ($(OS), Windows_NT)
-tuner :
-	@echo "Tuner is not supported on Windows"
-else
 tuner : $(TUNER_OBJECTS)
 	$(CC) $(TUNER_OBJECTS) $(LDFLAGS) $(TUNER_LIBS) -o tuner
-endif
