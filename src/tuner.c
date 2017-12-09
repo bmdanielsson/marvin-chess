@@ -654,12 +654,20 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     struct trainingset  *trainingset;
     struct gamestate    *pos;
     FILE                *fp;
+    time_t              start;
+    time_t              diff;
+    int                 hh;
+    int                 mm;
+    int                 ss;
 
     assert(training_file != NULL);
     assert(parameter_file != NULL);
 
     printf("Tuning parameters in %s based on the training set %s\n",
            parameter_file, training_file);
+
+    /* Remeber when we start tuning */
+    start = get_current_time();
 
     /* Create game state */
     pos = create_game_state(DEFAULT_MAIN_HASH_SIZE);
@@ -690,7 +698,7 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     /* Make sure all training positions are covered */
     workers[nthreads-1].last_pos = trainingset->size - 1;
 
-    printf("Tuning parameters\n");
+    printf("\n");
 
     /* Optimize the tuning set */
     local_optimize(tuningset, trainingset, stepsize);
@@ -704,6 +712,15 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
         tuning_param_write_parameters(fp, tuningset->params, true);
         fclose(fp);
     }
+
+    /* Print timing result */
+    diff = (get_current_time() - start)/1000;
+    hh = diff/3600;
+    diff = diff%3600;
+    mm = diff/60;
+    diff = diff%60;
+    ss = diff;
+    printf("\nTime: %02d:%02d:%02d\n", hh, mm, ss);
 
     /* Clean up */
     destroy_workers();
