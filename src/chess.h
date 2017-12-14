@@ -215,6 +215,12 @@ enum {
 /* The maximum number of possible plies in the search tree */
 #define MAX_PLY MAX_SEARCH_DEPTH+MAX_QUIESCENCE_DEPTH
 
+/*
+ * The material value for pawns. This value is not tuned in order to
+ * make sure there is fix base value for all scores.
+ */
+#define PAWN_BASE_VALUE 100
+
 /* Data structure used to keep track of the principle variation */
 struct pv {
     /* The moves that makes up the principle variation */
@@ -530,6 +536,10 @@ struct gamestate {
     uint32_t qnodes;
     /* The number of entries used in the main transposition table */
     uint32_t tt_used;
+
+#ifdef TRACE
+    struct eval_trace *trace;
+#endif
 };
 
 /* Bitboard mask for each square */

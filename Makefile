@@ -60,6 +60,11 @@ CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-t
 # Extra include directories
 CFLAGS += -Iimport/fathom -Isrc
 
+# Enable evaluation tracing for tuner
+ifeq ($(MAKECMDGOALS), tuner)
+CFLAGS += -DTRACE
+endif
+
 # Common linker options
 LDFLAGS += -lm
 
@@ -112,6 +117,7 @@ TUNER_SOURCES = src/bitboard.c \
                 src/test.c \
                 src/thread.c \
                 src/timectl.c \
+                src/trace.c \
                 src/tuner.c \
                 src/tuningparam.c \
                 src/uci.c \

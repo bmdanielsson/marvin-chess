@@ -26,6 +26,7 @@
 #include "hash.h"
 #include "fen.h"
 #include "utils.h"
+#include "trace.h"
 
 /* Phase valuse for different piece types */
 #define PAWN_PHASE      0
@@ -39,12 +40,6 @@
 #define BISHOP_ATTACK_WEIGHT    1
 #define ROOK_ATTACK_WEIGHT      2
 #define QUEEN_ATTACK_WEIGHT     4
-
-/*
- * The material value for pawns is not tuned in order to make sure there
- * is fix base value for all scores.
- */
-#define PAWN_BASE_VALUE 100
 
 /*
  * Different evaluation components. The first two elements of each array
@@ -100,7 +95,9 @@ static int piece_attack_weights[NPIECES] = {
 };
 
 /* Weights for the number of king attackers */
-static int nbr_attackers_weight[6];
+static int nbr_attackers_weight[6] = {
+    0, 0, 45, 100, 100, 100
+};
 
 /*
  * Calculate a numerical value between 0 and 256 for
@@ -146,76 +143,95 @@ static void evaluate_pawn_shield(struct gamestate *pos,
     const uint64_t rank1[NSIDES] = {rank_mask[RANK_2], rank_mask[RANK_7]};
     const uint64_t rank2[NSIDES] = {rank_mask[RANK_3], rank_mask[RANK_6]};
     uint64_t pawns;
-    uint64_t shield;
+    uint64_t shield1;
+    uint64_t shield2;
     int      score;
 
     pawns = pos->bb_pieces[PAWN+side];
 
     /* Queenside pawn shield */
     score = 0;
-    shield = pawns&file_mask[FILE_A]&rank1[side];
-    if (shield != 0ULL) {
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK1;
-    } else {
-        shield = pawns&file_mask[FILE_A]&rank2[side];
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK2;
+    shield1 = pawns&file_mask[FILE_A]&rank1[side];
+    shield2 = pawns&file_mask[FILE_A]&rank2[side];
+    if (shield1 != 0ULL) {
+        score += PAWN_SHIELD_RANK1;
+        TRACE_TRACK_PAWN_SHIELD(FILE_A, TP_PAWN_SHIELD_RANK1);
+    } else if (shield2 != 0ULL) {
+        score += PAWN_SHIELD_RANK2;
+        TRACE_TRACK_PAWN_SHIELD(FILE_A, TP_PAWN_SHIELD_RANK2);
     }
-    shield = pawns&file_mask[FILE_B]&rank1[side];
-    if (shield != 0ULL) {
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK1;
-    } else {
-        shield = pawns&file_mask[FILE_B]&rank2[side];
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK2;
+    shield1 = pawns&file_mask[FILE_B]&rank1[side];
+    shield2 = pawns&file_mask[FILE_B]&rank2[side];
+    if (shield1 != 0ULL) {
+        score += PAWN_SHIELD_RANK1;
+        TRACE_TRACK_PAWN_SHIELD(FILE_B, TP_PAWN_SHIELD_RANK1);
+    } else if (shield2 != 0ULL) {
+        score += PAWN_SHIELD_RANK2;
+        TRACE_TRACK_PAWN_SHIELD(FILE_B, TP_PAWN_SHIELD_RANK2);
     }
-    shield = pawns&file_mask[FILE_C]&rank1[side];
-    if (shield != 0ULL) {
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK1;
-    } else {
-        shield = pawns&file_mask[FILE_C]&rank2[side];
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK2;
+    shield1 = pawns&file_mask[FILE_C]&rank1[side];
+    shield2 = pawns&file_mask[FILE_C]&rank2[side];
+    if (shield1 != 0ULL) {
+        score += PAWN_SHIELD_RANK1;
+        TRACE_TRACK_PAWN_SHIELD(FILE_C, TP_PAWN_SHIELD_RANK1);
+    } else if (shield2 != 0ULL) {
+        score += PAWN_SHIELD_RANK2;
+        TRACE_TRACK_PAWN_SHIELD(FILE_C, TP_PAWN_SHIELD_RANK2);
     }
     if ((file_mask[FILE_A]&pos->bb_pieces[PAWN+side]) == 0ULL) {
         score += PAWN_SHIELD_HOLE;
+        TRACE_TRACK_PAWN_SHIELD(FILE_A, TP_PAWN_SHIELD_HOLE);
     }
     if ((file_mask[FILE_B]&pos->bb_pieces[PAWN+side]) == 0ULL) {
         score += PAWN_SHIELD_HOLE;
+        TRACE_TRACK_PAWN_SHIELD(FILE_B, TP_PAWN_SHIELD_HOLE);
     }
     if ((file_mask[FILE_C]&pos->bb_pieces[PAWN+side]) == 0ULL) {
         score += PAWN_SHIELD_HOLE;
+        TRACE_TRACK_PAWN_SHIELD(FILE_C, TP_PAWN_SHIELD_HOLE);
     }
     item->pawn_shield[side][QUEENSIDE] = MAX(score, 0);
 
     /* Kingside pawn shield */
     score = 0;
-    shield = pawns&file_mask[FILE_F]&rank1[side];
-    if (shield != 0ULL) {
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK1;
-    } else {
-        shield = pawns&file_mask[FILE_F]&rank2[side];
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK2;
+    shield1 = pawns&file_mask[FILE_F]&rank1[side];
+    shield2 = pawns&file_mask[FILE_F]&rank2[side];
+    if (shield1 != 0ULL) {
+        score += PAWN_SHIELD_RANK1;
+        TRACE_TRACK_PAWN_SHIELD(FILE_F, TP_PAWN_SHIELD_RANK1);
+    } else if (shield2 != 0ULL) {
+        score += PAWN_SHIELD_RANK2;
+        TRACE_TRACK_PAWN_SHIELD(FILE_F, TP_PAWN_SHIELD_RANK2);
     }
-    shield = pawns&file_mask[FILE_G]&rank1[side];
-    if (shield != 0ULL) {
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK1;
-    } else {
-        shield = pawns&file_mask[FILE_G]&rank2[side];
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK2;
+    shield1 = pawns&file_mask[FILE_G]&rank1[side];
+    shield2 = pawns&file_mask[FILE_G]&rank2[side];
+    if (shield1 != 0ULL) {
+        score += PAWN_SHIELD_RANK1;
+        TRACE_TRACK_PAWN_SHIELD(FILE_G, TP_PAWN_SHIELD_RANK1);
+    } else if (shield2 != 0ULL) {
+        score += PAWN_SHIELD_RANK2;
+        TRACE_TRACK_PAWN_SHIELD(FILE_G, TP_PAWN_SHIELD_RANK2);
     }
-    shield = pawns&file_mask[FILE_H]&rank1[side];
-    if (shield != 0ULL) {
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK1;
-    } else {
-        shield = pawns&file_mask[FILE_H]&rank2[side];
-        score += BITCOUNT(shield)*PAWN_SHIELD_RANK2;
+    shield1 = pawns&file_mask[FILE_H]&rank1[side];
+    shield2 = pawns&file_mask[FILE_H]&rank2[side];
+    if (shield1 != 0ULL) {
+        score += PAWN_SHIELD_RANK1;
+        TRACE_TRACK_PAWN_SHIELD(FILE_H, TP_PAWN_SHIELD_RANK1);
+    } else if (shield2 != 0ULL) {
+        score += PAWN_SHIELD_RANK2;
+        TRACE_TRACK_PAWN_SHIELD(FILE_H, TP_PAWN_SHIELD_RANK2);
     }
     if ((file_mask[FILE_F]&pos->bb_pieces[PAWN+side]) == 0ULL) {
         score += PAWN_SHIELD_HOLE;
+        TRACE_TRACK_PAWN_SHIELD(FILE_F, TP_PAWN_SHIELD_HOLE);
     }
     if ((file_mask[FILE_G]&pos->bb_pieces[PAWN+side]) == 0ULL) {
         score += PAWN_SHIELD_HOLE;
+        TRACE_TRACK_PAWN_SHIELD(FILE_G, TP_PAWN_SHIELD_HOLE);
     }
     if ((file_mask[FILE_H]&pos->bb_pieces[PAWN+side]) == 0ULL) {
         score += PAWN_SHIELD_HOLE;
+        TRACE_TRACK_PAWN_SHIELD(FILE_H, TP_PAWN_SHIELD_HOLE);
     }
     item->pawn_shield[side][KINGSIDE] = MAX(score, 0);
 }
@@ -249,6 +265,7 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
         if ((attackspan&pos->bb_pieces[side+PAWN]) == 0ULL) {
             item->score[MIDDLEGAME][side] += ISOLATED_PAWN_MG;
             item->score[ENDGAME][side] += ISOLATED_PAWN_EG;
+            TRACE_M(TP_ISOLATED_PAWN_MG, TP_ISOLATED_PAWN_EG, 1);
         }
 
         /* Look for passed pawns */
@@ -258,6 +275,8 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
                                 passed_pawn_scores_mg[side==WHITE?rank:7-rank];
             item->score[ENDGAME][side] +=
                                 passed_pawn_scores_eg[side==WHITE?rank:7-rank];
+            TRACE_OM(TP_PASSED_PAWN_RANK2_MG, TP_PASSED_PAWN_RANK2_EG,
+                         ((side == WHITE)?rank:7-rank)-1, 1);
             SETBIT(item->passers[side], sq);
         }
 
@@ -270,6 +289,7 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
         if (BITCOUNT(pos->bb_pieces[side+PAWN]&file_mask[file]) >= 2) {
             item->score[MIDDLEGAME][side] += DOUBLE_PAWNS_MG;
             item->score[ENDGAME][side] += DOUBLE_PAWNS_EG;
+            TRACE_M(TP_DOUBLE_PAWNS_MG, TP_DOUBLE_PAWNS_EG, 1);
         }
     }
 
@@ -309,6 +329,8 @@ static void evaluate_knights(struct gamestate *pos, struct eval *eval, int side)
                                                 mobility_table_mg[KNIGHT+side]);
         eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[KNIGHT+side]);
+        TRACE_M(TP_KNIGHT_MOBILITY_MG, TP_KNIGHT_MOBILITY_EG,
+                BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
         if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
@@ -345,6 +367,7 @@ static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
     if (BITCOUNT(pos->bb_pieces[side+BISHOP]) >= 2) {
         eval->material_adj[MIDDLEGAME][side] += BISHOP_PAIR_MG;
         eval->material_adj[ENDGAME][side] += BISHOP_PAIR_EG;
+        TRACE_M(TP_BISHOP_PAIR_MG, TP_BISHOP_PAIR_EG, 1);
     }
 
     /* Calculate mobility */
@@ -363,6 +386,8 @@ static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
                                                 mobility_table_mg[BISHOP+side]);
         eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[BISHOP+side]);
+        TRACE_M(TP_BISHOP_MOBILITY_MG, TP_BISHOP_MOBILITY_EG,
+                BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
         if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
@@ -407,9 +432,11 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
         if ((file_mask[file]&all_pawns) == 0ULL) {
             eval->positional[MIDDLEGAME][side] += ROOK_OPEN_FILE_MG;
             eval->positional[ENDGAME][side] += ROOK_OPEN_FILE_EG;
+            TRACE_M(TP_ROOK_OPEN_FILE_MG, TP_ROOK_OPEN_FILE_EG, 1);
         } else if ((file_mask[file]&pos->bb_pieces[PAWN+side]) == 0ULL) {
             eval->positional[MIDDLEGAME][side] += ROOK_HALF_OPEN_FILE_MG;
             eval->positional[ENDGAME][side] += ROOK_HALF_OPEN_FILE_EG;
+            TRACE_M(TP_ROOK_HALF_OPEN_FILE_MG, TP_ROOK_HALF_OPEN_FILE_EG, 1);
         }
 
         /* 7th rank */
@@ -422,6 +449,7 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
                 (pos->bb_pieces[PAWN+FLIP_COLOR(side)]&rank7[side])) {
                 eval->positional[MIDDLEGAME][side] += ROOK_ON_7TH_MG;
                 eval->positional[ENDGAME][side] += ROOK_ON_7TH_EG;
+                TRACE_M(TP_ROOK_ON_7TH_MG, TP_ROOK_ON_7TH_EG, 1);
             }
         }
 
@@ -431,6 +459,8 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
                                                 mobility_table_mg[ROOK+side]);
         eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[ROOK+side]);
+        TRACE_M(TP_ROOK_MOBILITY_MG, TP_ROOK_MOBILITY_EG,
+                BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
         if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
@@ -470,9 +500,11 @@ static void evaluate_queens(struct gamestate *pos, struct eval *eval, int side)
         if ((file_mask[file]&all_pawns) == 0ULL) {
             eval->positional[MIDDLEGAME][side] += QUEEN_OPEN_FILE_MG;
             eval->positional[ENDGAME][side] += QUEEN_OPEN_FILE_EG;
+            TRACE_M(TP_QUEEN_OPEN_FILE_MG, TP_QUEEN_OPEN_FILE_EG, 1);
         } else if ((file_mask[file]&pos->bb_pieces[PAWN+side]) == 0ULL) {
             eval->positional[MIDDLEGAME][side] += QUEEN_HALF_OPEN_FILE_MG;
             eval->positional[ENDGAME][side] += QUEEN_HALF_OPEN_FILE_EG;
+            TRACE_M(TP_QUEEN_HALF_OPEN_FILE_MG, TP_QUEEN_HALF_OPEN_FILE_EG, 1);
         }
 
         /* Mobility */
@@ -481,6 +513,8 @@ static void evaluate_queens(struct gamestate *pos, struct eval *eval, int side)
                                                 mobility_table_mg[QUEEN+side]);
         eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[QUEEN+side]);
+        TRACE_M(TP_QUEEN_MOBILITY_MG, TP_QUEEN_MOBILITY_EG,
+                BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
         if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
@@ -504,6 +538,7 @@ static void evaluate_king(struct gamestate *pos, struct eval *eval, int side)
     struct pawntt_item  *item;
     int                 piece;
     int                 nattackers;
+    int                 score;
 
     /*
      * If the king has moved to the side then it is good to keep a
@@ -516,16 +551,18 @@ static void evaluate_king(struct gamestate *pos, struct eval *eval, int side)
         if (!((pos->bb_pieces[ROOK+side]&queenside[side]) &&
               (LSB(pos->bb_pieces[ROOK+side]&queenside[side]) <
                LSB(pos->bb_pieces[KING+side])))) {
-                  eval->king_safety[MIDDLEGAME][side] =
+            eval->king_safety[MIDDLEGAME][side] =
                                             item->pawn_shield[side][QUEENSIDE];
-              }
+            TRACE_PAWN_SHIELD(QUEENSIDE);
+        }
     } else if (kingside[side]&pos->bb_pieces[KING+side]) {
         if (!((pos->bb_pieces[ROOK+side]&kingside[side]) &&
               (LSB(pos->bb_pieces[ROOK+side]&kingside[side]) >
                LSB(pos->bb_pieces[KING+side])))) {
-                  eval->king_safety[MIDDLEGAME][side] =
+            eval->king_safety[MIDDLEGAME][side] =
                                             item->pawn_shield[side][KINGSIDE];
-              }
+            TRACE_PAWN_SHIELD(KINGSIDE);
+        }
     }
 
     /*
@@ -536,24 +573,20 @@ static void evaluate_king(struct gamestate *pos, struct eval *eval, int side)
 
     /* Calculate preassure on the enemy king */
     nattackers = 0;
+    score = 0;
     eval->king_preassure[MIDDLEGAME][side] = 0;
     eval->king_preassure[ENDGAME][side] = 0;
     for (piece=KNIGHT+side;piece<NPIECES;piece+=2) {
-        eval->king_preassure[MIDDLEGAME][side] +=
-                    piece_attack_weights[piece]*eval->nbr_king_attackers[piece];
-        eval->king_preassure[ENDGAME][side] +=
-                    piece_attack_weights[piece]*eval->nbr_king_attackers[piece];
+        score += piece_attack_weights[piece]*eval->nbr_king_attackers[piece];
         nattackers += eval->nbr_king_attackers[piece];
     }
     if (nattackers >= (int)(sizeof(nbr_attackers_weight)/sizeof(int))) {
         nattackers = (sizeof(nbr_attackers_weight)/sizeof(int)) - 1;
     }
-    eval->king_preassure[MIDDLEGAME][side] *= nbr_attackers_weight[nattackers];
-    eval->king_preassure[MIDDLEGAME][side] *= KING_ATTACK_SCALE_MG;
-    eval->king_preassure[MIDDLEGAME][side] /= 100;
-    eval->king_preassure[ENDGAME][side] *= nbr_attackers_weight[nattackers];
-    eval->king_preassure[ENDGAME][side] *= KING_ATTACK_SCALE_EG;
-    eval->king_preassure[ENDGAME][side] /= 100;
+    score *= nbr_attackers_weight[nattackers];
+    eval->king_preassure[MIDDLEGAME][side] = (score*KING_ATTACK_SCALE_MG)/100;
+    eval->king_preassure[ENDGAME][side] = (score*KING_ATTACK_SCALE_EG)/100;
+    TRACE_MD(TP_KING_ATTACK_SCALE_MG, TP_KING_ATTACK_SCALE_EG, score, 100);
 }
 
 static void do_eval(struct gamestate *pos, struct eval *eval)
@@ -680,14 +713,6 @@ void eval_reset(void)
     material_values_eg[BLACK_QUEEN] = QUEEN_MATERIAL_VALUE_EG;
     material_values_eg[WHITE_KING] = 20000;
     material_values_eg[BLACK_KING] = 20000;
-
-    /* Initialize number of king attackers weights */
-    nbr_attackers_weight[0] = 0;
-    nbr_attackers_weight[1] = 0;
-    nbr_attackers_weight[2] = TWO_KING_ATTACKERS_WEIGHT;
-    nbr_attackers_weight[3] = THREE_KING_ATTACKERS_WEIGHT;
-    nbr_attackers_weight[4] = FOUR_KING_ATTACKERS_WEIGHT;
-    nbr_attackers_weight[5] = MANY_KING_ATTACKERS_WEIGHT;
 }
 
 int eval_evaluate(struct gamestate *pos)
@@ -890,6 +915,7 @@ int eval_material(struct gamestate *pos, int side, bool endgame)
         } else {
             score += BITCOUNT(pos->bb_pieces[piece])*material_values_eg[piece];
         }
+        TRACE_MATERIAL(piece, endgame, BITCOUNT(pos->bb_pieces[piece]));
     }
 
     return score;
@@ -955,53 +981,38 @@ int eval_psq(struct gamestate *pos, int side, bool endgame)
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         piece = pos->pieces[sq];
+        if (side == BLACK) {
+            sq = MIRROR(sq);
+        }
         switch (piece) {
         case WHITE_PAWN:
+        case BLACK_PAWN:
             score += endgame?PSQ_TABLE_PAWN_EG[sq]:PSQ_TABLE_PAWN_MG[sq];
             break;
-        case BLACK_PAWN:
-            score += endgame?
-                PSQ_TABLE_PAWN_EG[MIRROR(sq)]:PSQ_TABLE_PAWN_MG[MIRROR(sq)];
-            break;
         case WHITE_KNIGHT:
+        case BLACK_KNIGHT:
             score += endgame?PSQ_TABLE_KNIGHT_EG[sq]:PSQ_TABLE_KNIGHT_MG[sq];
             break;
-        case BLACK_KNIGHT:
-            score += endgame?
-                PSQ_TABLE_KNIGHT_EG[MIRROR(sq)]:PSQ_TABLE_KNIGHT_MG[MIRROR(sq)];
-            break;
         case WHITE_BISHOP:
+        case BLACK_BISHOP:
             score += endgame?PSQ_TABLE_BISHOP_EG[sq]:PSQ_TABLE_BISHOP_MG[sq];
             break;
-        case BLACK_BISHOP:
-            score += endgame?
-                PSQ_TABLE_BISHOP_EG[MIRROR(sq)]:PSQ_TABLE_BISHOP_MG[MIRROR(sq)];
-            break;
         case WHITE_ROOK:
+        case BLACK_ROOK:
             score += endgame?PSQ_TABLE_ROOK_EG[sq]:PSQ_TABLE_ROOK_MG[sq];
             break;
-        case BLACK_ROOK:
-            score += endgame?
-                PSQ_TABLE_ROOK_EG[MIRROR(sq)]:PSQ_TABLE_ROOK_MG[MIRROR(sq)];
-            break;
         case WHITE_QUEEN:
+        case BLACK_QUEEN:
             score += endgame?PSQ_TABLE_QUEEN_EG[sq]:PSQ_TABLE_QUEEN_MG[sq];
             break;
-        case BLACK_QUEEN:
-            score += endgame?
-                PSQ_TABLE_QUEEN_EG[MIRROR(sq)]:PSQ_TABLE_QUEEN_MG[MIRROR(sq)];
-            break;
         case WHITE_KING:
+        case BLACK_KING:
             score += endgame?PSQ_TABLE_KING_EG[sq]:PSQ_TABLE_KING_MG[sq];
             break;
-        case BLACK_KING:
-            score += endgame?
-                PSQ_TABLE_KING_EG[MIRROR(sq)]:PSQ_TABLE_KING_MG[MIRROR(sq)];
-            break;
         default:
-                assert(false);
-                break;
+            break;
         }
+        TRACE_PSQ(piece, sq, endgame);
     }
 
     return score;
@@ -1108,3 +1119,56 @@ bool eval_is_material_draw(struct gamestate *pos)
 
     return false;
 }
+
+#ifdef TRACE
+void eval_generate_trace(struct gamestate *pos)
+{
+    struct eval eval;
+
+    assert(valid_board(pos));
+    assert(pos->trace != NULL);
+
+    /* Clear the trace */
+    memset(pos->trace, 0, sizeof(struct eval_trace));
+    memset(&eval, 0, sizeof(struct eval));
+
+    /* Calculate game phase */
+    pos->trace->phase = calculate_game_phase(pos);
+
+    /* If there is insufficiernt mating material there is nothing to do */
+    if (eval_is_material_draw(pos)) {
+        return;
+    }
+
+    /* Trace material evaluation */
+    pos->material[MIDDLEGAME][WHITE] = eval_material(pos, WHITE, false);
+    pos->material[MIDDLEGAME][BLACK] = eval_material(pos, BLACK, false);
+    pos->material[ENDGAME][WHITE] = eval_material(pos, WHITE, true);
+    pos->material[ENDGAME][BLACK] = eval_material(pos, BLACK, true);
+
+    /* Trace psq evaluation */
+    pos->psq[MIDDLEGAME][WHITE] = eval_psq(pos, WHITE, false);
+    pos->psq[MIDDLEGAME][BLACK] = eval_psq(pos, BLACK, false);
+    pos->psq[ENDGAME][WHITE] = eval_psq(pos, WHITE, true);
+    pos->psq[ENDGAME][BLACK] = eval_psq(pos, BLACK, true);
+
+    /* Trace pawn structure evaluation */
+    hash_pawntt_init_item(&eval.pawntt);
+    evaluate_pawn_structure(pos, &eval, WHITE);
+    evaluate_pawn_structure(pos, &eval, BLACK);
+    eval.coverage[WHITE] |= eval.pawntt.coverage[WHITE];
+    eval.coverage[BLACK] |= eval.pawntt.coverage[BLACK];
+
+    /* Trace piece evaluation */
+    evaluate_knights(pos, &eval, WHITE);
+    evaluate_knights(pos, &eval, BLACK);
+    evaluate_bishops(pos, &eval, WHITE);
+    evaluate_bishops(pos, &eval, BLACK);
+    evaluate_rooks(pos, &eval, WHITE);
+    evaluate_rooks(pos, &eval, BLACK);
+    evaluate_queens(pos, &eval, WHITE);
+    evaluate_queens(pos, &eval, BLACK);
+    evaluate_king(pos, &eval, WHITE);
+    evaluate_king(pos, &eval, BLACK);
+}
+#endif

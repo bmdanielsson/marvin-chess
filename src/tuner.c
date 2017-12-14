@@ -35,6 +35,7 @@
 #include "evalparams.h"
 #include "eval.h"
 #include "thread.h"
+#include "trace.h"
 
 /* Files that the tuning result is written to */
 #define TUNING_FINAL_RESULT_FILE "tuning.final"
@@ -51,11 +52,31 @@
 #define K_MAX 2.0
 #define K_STEP 0.001
 
+/* Equation term */
+struct term {
+    int param;
+    int multiplier;
+    int divisor;
+};
+
+/*
+ * Equation describing the evaluation function
+ * for a specific position.
+ */
+struct eval_equation {
+    int         phase;
+    int         base[NPHASES][NSIDES];
+    int         nterms[NPHASES][NSIDES];
+    struct term *terms[NPHASES][NSIDES];
+};
+
 /* Training position */
 struct trainingpos {
-    char    *epd;
-    char    *fen_quiet;
-    double  result;
+    char                 *epd;
+    char                 *fen_quiet;
+    double               result;
+    bool                 has_equation;
+    struct eval_equation equation;
 };
 
 /* Training set */
@@ -85,6 +106,7 @@ struct worker {
     event_t             ev_start;
     event_t             ev_done;
     struct trainingset  *trainingset;
+    struct tuningset    *tuningset;
     int                 first_pos;
     int                 last_pos;
     double              k;
@@ -109,7 +131,8 @@ static void mark_pv_for_update(void)
     }
 }
 
-static void init_workers(struct trainingset *trainingset)
+static void init_workers(struct trainingset *trainingset,
+                         struct tuningset *tuningset)
 {
     int iter;
     int pos_per_thread;
@@ -120,6 +143,7 @@ static void init_workers(struct trainingset *trainingset)
     for (iter=0;iter<nworkerthreads;iter++) {
         workers[iter].state = WORKER_IDLE;
         workers[iter].trainingset = trainingset;
+        workers[iter].tuningset = tuningset;
         workers[iter].first_pos = nextpos;
         workers[iter].last_pos = workers[iter].first_pos + pos_per_thread - 1;
         nextpos = workers[iter].last_pos + 1;
@@ -138,6 +162,158 @@ static void destroy_workers(void)
     for (iter=0;iter<nworkerthreads;iter++) {
         event_destroy(&workers[iter].ev_start);
         event_destroy(&workers[iter].ev_done);
+    }
+}
+
+static struct term* setup_equation_terms(struct eval_trace *trace, int phase,
+                                         int side, int *nterms)
+{
+    struct term *terms;
+    int         count;
+    int         k;
+
+    /* Count the number of terms */
+    count = 0;
+    for (k=0;k<NUM_TUNING_PARAMS;k++) {
+        if (trace->params[k].multiplier[phase][side] > 0) {
+            count++;
+        }
+    }
+
+    /* Allocate terms */
+    terms = malloc(sizeof(struct term)*count);
+
+    /* Setup terms */
+    count = 0;
+    for (k=0;k<NUM_TUNING_PARAMS;k++) {
+        if (trace->params[k].multiplier[phase][side] > 0) {
+            terms[count].param = k;
+            terms[count].multiplier = trace->params[k].multiplier[phase][side];
+            terms[count].divisor = trace->params[k].divisor[phase][side];
+            count++;
+        }
+    }
+    *nterms = count;
+
+    return terms;
+}
+
+static void setup_eval_equation(struct eval_trace *trace,
+                                struct eval_equation *equation)
+{
+    int phase;
+    int side;
+
+    equation->phase = trace->phase;
+    for (phase=0;phase<=1;phase++) {
+        for (side=0;side<=1;side++) {
+            equation->base[phase][side] = trace->base[phase][side];
+            equation->terms[phase][side] = setup_equation_terms(trace, phase,
+                                        side, &equation->nterms[phase][side]);
+        }
+    }
+}
+
+static int summarize_term(struct term *term, struct tuningset *tuningset)
+{
+    int val;
+
+    val = tuningset->params[term->param].current;
+    val *= term->multiplier;
+    if (term->divisor > 0) {
+        val /= term->divisor;
+    }
+
+    return val;
+}
+
+static int summarize_pawn_shield_terms(struct eval_equation *equation,
+                                       struct tuningset *tuningset, int phase,
+                                       int side, int *index)
+{
+    struct term *term;
+    int         val;
+
+    term = &equation->terms[phase][side][*index];
+    val = summarize_term(term, tuningset);
+
+    term = &equation->terms[phase][side][*index+1];
+    if ((term->param == TP_PAWN_SHIELD_RANK2) ||
+        (term->param == TP_PAWN_SHIELD_HOLE)) {
+        (*index)++;
+        val += summarize_term(term, tuningset);
+
+        term = &equation->terms[phase][side][*index+1];
+        if (term->param == TP_PAWN_SHIELD_HOLE) {
+            (*index)++;
+            val += summarize_term(term, tuningset);
+        }
+    }
+
+    return MAX(val, 0);
+}
+
+static int evaluate_equation(struct gamestate *pos, struct tuningset *tuningset,
+                             struct trainingpos  *trainingpos)
+{
+    struct eval_equation *equation;
+    struct term          *term;
+    int                  score[NPHASES][NSIDES];
+    int                  score_mg;
+    int                  score_eg;
+    int                  phase;
+    int                  side;
+    int                  k;
+
+    equation = &trainingpos->equation;
+    for (phase=0;phase<=1;phase++) {
+        for (side=0;side<=1;side++) {
+            score[phase][side] = equation->base[phase][side];
+            for (k=0;k<equation->nterms[phase][side];k++) {
+                term = &equation->terms[phase][side][k];
+                if ((term->param == TP_PAWN_SHIELD_RANK1) ||
+                    (term->param == TP_PAWN_SHIELD_RANK2) ||
+                    (term->param == TP_PAWN_SHIELD_HOLE)) {
+                    score[phase][side] += summarize_pawn_shield_terms(equation,
+                                                                      tuningset,
+                                                                      phase,
+                                                                      side, &k);
+                } else {
+                    score[phase][side] += summarize_term(term, tuningset);
+                }
+            }
+        }
+    }
+
+    score_mg = score[MIDDLEGAME][WHITE] - score[MIDDLEGAME][BLACK];
+    score_eg = score[ENDGAME][WHITE] - score[ENDGAME][BLACK];
+    score_mg = (pos->stm == WHITE)?score_mg:-score_mg;
+    score_eg = (pos->stm == WHITE)?score_eg:-score_eg;
+
+    return ((score_mg*(256-equation->phase)) + (score_eg*equation->phase))/256;
+}
+
+void print_equation(struct eval_equation *equation, int endgame, int side)
+{
+    struct term *term;
+    char *phase;
+    char *player;
+    int  k;
+
+    phase = endgame?"endgame":"middlegame";
+    player = (side == WHITE)?"white":"black";
+
+    printf("%s, %s\n", phase, player);
+    printf("phase: %d\n", equation->phase);
+    printf("base: %d\n", equation->base[endgame][side]);
+    for (k=0;k<equation->nterms[endgame][side];k++) {
+        term = &equation->terms[endgame][side][k];
+        printf("param %d = %d", term->param, term->multiplier);
+        if (term->divisor != 0) {
+            printf("/%d\n", term->divisor);
+        } else {
+            printf("\n");
+        }
     }
 }
 
@@ -217,18 +393,27 @@ static void* calc_texel_error_func(void *data)
         /* Iterate over all training positions assigned to this worker */
         worker->sum = 0.0;
         for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
-            /* Setup position */
-            board_reset(pos);
-            (void)fen_setup_board(pos, trainingset->positions[iter].fen_quiet,
-                                  true);
+            /*
+             * Trace the evaluation function for this position
+             * and create a corresponding equation
+             */
+            if (!trainingset->positions[iter].has_equation) {
+                board_reset(pos);
+                (void)fen_setup_board(pos,
+                                      trainingset->positions[iter].fen_quiet,
+                                      true);
+                pos->trace = malloc(sizeof(struct eval_trace));
+                eval_generate_trace(pos);
+                setup_eval_equation(pos->trace,
+                                    &trainingset->positions[iter].equation);
+                trainingset->positions[iter].has_equation = true;
+                free(pos->trace);
+                pos->trace = NULL;
+            }
 
-            /* Do a quiscence search to get a score for the position */
-            search_reset_data(pos);
-            pos->tc_type = TC_INFINITE;
-            pos->sd = 0;
-            pos->silent = true;
-            pos->use_tablebases = false;
-            score = eval_evaluate(pos);
+            /* Evaluate the equation */
+            score = evaluate_equation(pos, worker->tuningset,
+                                      &trainingset->positions[iter]);
             score = (pos->stm == WHITE)?score:-score;
 
             /* Calculate error */
@@ -282,7 +467,6 @@ static void local_optimize(struct tuningset *tuningset,
     int     pi;
     int     niterations;
     bool    undo;
-    char    path[64];
     int     count;
     int     delta;
 
@@ -366,7 +550,6 @@ static void local_optimize(struct tuningset *tuningset,
         /* Output the result after the current iteration */
         niterations++;
         printf("\rIteration %d complete, error %f\n", niterations, best_e);
-        sprintf(path, TUNING_ITERATION_RESULT_FILE, niterations);
     }
 
     printf("Final error: %f\n", best_e);
@@ -382,6 +565,10 @@ static void free_trainingset(struct trainingset *trainingset)
 
     for (k=0;k<trainingset->size;k++) {
         free(trainingset->positions[k].epd);
+        free(trainingset->positions[k].equation.terms[MIDDLEGAME][WHITE]);
+        free(trainingset->positions[k].equation.terms[MIDDLEGAME][BLACK]);
+        free(trainingset->positions[k].equation.terms[ENDGAME][WHITE]);
+        free(trainingset->positions[k].equation.terms[ENDGAME][BLACK]);
     }
     free(trainingset->positions);
     free(trainingset);
@@ -570,6 +757,7 @@ void find_k(char *file, int nthreads)
 {
     struct gamestate    *pos;
     struct trainingset  *trainingset;
+    struct tuningset    *tuningset;
     double              k;
     double              best_k;
     double              e;
@@ -591,12 +779,18 @@ void find_k(char *file, int nthreads)
         return;
     }
 
+    /* Allocate a tuningset */
+    tuningset = malloc(sizeof(struct tuningset));
+    tuningset->params = tuning_param_create_list();
+    tuningset->size = NUM_TUNING_PARAMS;
+    tuningset->nactive = 0;
+
     printf("Found %d training positions\n", trainingset->size);
 
     /* Setup worker threads */
     nworkerthreads = nthreads;
     workers = malloc(sizeof(struct worker)*nworkerthreads);
-    init_workers(trainingset);
+    init_workers(trainingset, tuningset);
     mark_pv_for_update();
 
     /* Make sure all training positions are covered */
@@ -644,6 +838,7 @@ void find_k(char *file, int nthreads)
     destroy_workers();
     free(workers);
     free_trainingset(trainingset);
+    free_tuningset(tuningset);
     destroy_game_state(pos);
 }
 
@@ -693,7 +888,7 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     /* Setup worker threads */
     nworkerthreads = nthreads;
     workers = malloc(sizeof(struct worker)*nthreads);
-    init_workers(trainingset);
+    init_workers(trainingset, tuningset);
 
     /* Make sure all training positions are covered */
     workers[nthreads-1].last_pos = trainingset->size - 1;
@@ -748,11 +943,77 @@ static void print_parameters(char *output_file)
     fclose(fp);
 }
 
+static void verify_trace(char *training_file)
+{
+    struct trainingset *trainingset;
+    struct tuningset   *tuningset;
+    struct gamestate   *pos;
+    int                k;
+    int                score;
+    int                score2;
+
+    assert(training_file != NULL);
+
+    /* Create game state */
+    pos = create_game_state(DEFAULT_MAIN_HASH_SIZE);
+
+    /* Allocate a tuningset */
+    tuningset = malloc(sizeof(struct tuningset));
+    tuningset->params = tuning_param_create_list();
+    tuningset->size = NUM_TUNING_PARAMS;
+    tuningset->nactive = 0;
+    tuning_param_assign_current(tuningset->params);
+
+    /* Read training set */
+    trainingset = read_trainingset(pos, training_file);
+    if (trainingset == NULL) {
+        printf("Error: failed to read training set\n");
+        return;
+    }
+
+    /* Iterate over all positions */
+    for (k=0;k<trainingset->size;k++) {
+        /* Setup position */
+        board_reset(pos);
+        (void)fen_setup_board(pos, trainingset->positions[k].epd, true);
+
+        /* Evaluate the position */
+        score = eval_evaluate(pos);
+
+        /* Generate a trace for this function */
+        pos->trace = malloc(sizeof(struct eval_trace));
+        eval_generate_trace(pos);
+
+        /* Setup an equation and evaluate it */
+        setup_eval_equation(pos->trace, &trainingset->positions[k].equation);
+        score2 = evaluate_equation(pos, tuningset, &trainingset->positions[k]);
+        free(pos->trace);
+        pos->trace = NULL;
+
+        /* Check that the scores match */
+        if (score != score2) {
+            printf("Wrong score (%d): %d (%d)\n", k, score2, score);
+            printf("%s", trainingset->positions[k].epd);
+            print_equation(&trainingset->positions[k].equation, false, WHITE);
+            print_equation(&trainingset->positions[k].equation, true, WHITE);
+            print_equation(&trainingset->positions[k].equation, false, BLACK);
+            print_equation(&trainingset->positions[k].equation, true, BLACK);
+            printf("\n");
+        }
+    }
+
+    /* Clean up */
+    free_trainingset(trainingset);
+    free_tuningset(tuningset);
+    destroy_game_state(pos);
+}
+
 static void print_usage(void)
 {
-    printf("Usage: %s [options]\n", APP_NAME);
+    printf("Usage: tuner [options]\n");
     printf("Options:\n");
     printf("\t-k <training file>\n\tCalculate the tuning constant K\n\n");
+    printf("\t-v <training file>\n\tVerify evaluation tracing\n\n");
     printf("\t-t <training file> <parameter file>\n\tTune parameters\n\n");
     printf("\t-p <output file>\n\tPrint all tunable parameters\n\n");
     printf("\t-n <nthreads>\n\tThe number of threads to use\n\n");
@@ -858,6 +1119,16 @@ int main(int argc, char *argv[])
                 print_usage();
                 exit(1);
             }
+        } else if (!strcmp(argv[iter], "-v")) {
+            command = 3;
+            iter++;
+            if (iter == argc) {
+                printf("Invalid argument\n");
+                print_usage();
+                exit(1);
+            }
+            training_file = argv[iter];
+
         } else {
             printf("Invalid argument\n");
             print_usage();
@@ -876,6 +1147,9 @@ int main(int argc, char *argv[])
         break;
     case 2:
         print_parameters(output_file);
+        break;
+    case 3:
+        verify_trace(training_file);
         break;
     default:
         print_usage();

@@ -87,4 +87,14 @@ void eval_update_psq_score(struct gamestate *pos, int add, int piece, int sq);
  */
 bool eval_is_material_draw(struct gamestate *pos);
 
+#ifdef TRACE
+/*
+ * Generate a trace for the evaluation function.
+ *
+ * @param pos The position. Before calling this function the trace structure
+ *            must be allocated before calling this function.
+ */
+void eval_generate_trace(struct gamestate *pos);
+#endif
+
 #endif

@@ -330,6 +330,9 @@ void destroy_game_state(struct gamestate *pos)
 {
     assert(pos != NULL);
 
+#ifdef TRACE
+    free(pos->trace);
+#endif
     hash_tt_destroy_table(pos);
     hash_pawntt_destroy_table(pos);
     free(pos);

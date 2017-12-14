@@ -66,76 +66,6 @@
         (ep)[k-start] = params[k].current;      \
     }
 
-/* Identifiers for all tunable parameters */
-enum {
-    TP_DOUBLE_PAWNS_MG,
-    TP_DOUBLE_PAWNS_EG,
-    TP_ISOLATED_PAWN_MG,
-    TP_ISOLATED_PAWN_EG,
-    TP_ROOK_OPEN_FILE_MG,
-    TP_ROOK_OPEN_FILE_EG,
-    TP_ROOK_HALF_OPEN_FILE_MG,
-    TP_ROOK_HALF_OPEN_FILE_EG,
-    TP_QUEEN_OPEN_FILE_MG,
-    TP_QUEEN_OPEN_FILE_EG,
-    TP_QUEEN_HALF_OPEN_FILE_MG,
-    TP_QUEEN_HALF_OPEN_FILE_EG,
-    TP_ROOK_ON_7TH_MG,
-    TP_ROOK_ON_7TH_EG,
-    TP_BISHOP_PAIR_MG,
-    TP_BISHOP_PAIR_EG,
-    TP_PAWN_SHIELD_RANK1,
-    TP_PAWN_SHIELD_RANK2,
-    TP_PAWN_SHIELD_HOLE,
-    TP_PASSED_PAWN_RANK2_MG,
-    TP_PASSED_PAWN_RANK3_MG,
-    TP_PASSED_PAWN_RANK4_MG,
-    TP_PASSED_PAWN_RANK5_MG,
-    TP_PASSED_PAWN_RANK6_MG,
-    TP_PASSED_PAWN_RANK7_MG,
-    TP_PASSED_PAWN_RANK2_EG,
-    TP_PASSED_PAWN_RANK3_EG,
-    TP_PASSED_PAWN_RANK4_EG,
-    TP_PASSED_PAWN_RANK5_EG,
-    TP_PASSED_PAWN_RANK6_EG,
-    TP_PASSED_PAWN_RANK7_EG,
-    TP_KNIGHT_MOBILITY_MG,
-    TP_BISHOP_MOBILITY_MG,
-    TP_ROOK_MOBILITY_MG,
-    TP_QUEEN_MOBILITY_MG,
-    TP_KNIGHT_MOBILITY_EG,
-    TP_BISHOP_MOBILITY_EG,
-    TP_ROOK_MOBILITY_EG,
-    TP_QUEEN_MOBILITY_EG,
-    TP_PSQ_TABLE_PAWN_MG,
-    TP_PSQ_TABLE_KNIGHT_MG,
-    TP_PSQ_TABLE_BISHOP_MG,
-    TP_PSQ_TABLE_ROOK_MG,
-    TP_PSQ_TABLE_QUEEN_MG,
-    TP_PSQ_TABLE_KING_MG,
-    TP_PSQ_TABLE_PAWN_EG,
-    TP_PSQ_TABLE_KNIGHT_EG,
-    TP_PSQ_TABLE_BISHOP_EG,
-    TP_PSQ_TABLE_ROOK_EG,
-    TP_PSQ_TABLE_QUEEN_EG,
-    TP_PSQ_TABLE_KING_EG,
-    TP_KNIGHT_MATERIAL_VALUE_MG,
-    TP_BISHOP_MATERIAL_VALUE_MG,
-    TP_ROOK_MATERIAL_VALUE_MG,
-    TP_QUEEN_MATERIAL_VALUE_MG,
-    TP_KNIGHT_MATERIAL_VALUE_EG,
-    TP_BISHOP_MATERIAL_VALUE_EG,
-    TP_ROOK_MATERIAL_VALUE_EG,
-    TP_QUEEN_MATERIAL_VALUE_EG,
-    TP_KING_ATTACK_SCALE_MG,
-    TP_KING_ATTACK_SCALE_EG,
-    TP_TWO_KING_ATTACKERS_WEIGHT,
-    TP_THREE_KING_ATTACKERS_WEIGHT,
-    TP_FOUR_KING_ATTACKERS_WEIGHT,
-    TP_MANY_KING_ATTACKERS_WEIGHT,
-    NUM_PARAM_DECLARATIONS
-};
-
 /* Definitions for all tunable parameters */
 struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"double_pawns_mg", 0, 0, -150, 0},
@@ -198,11 +128,7 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"rook_material_value_eg", 813, 813, 400, 600},
     {"queen_material_value_eg", 814, 814, 700, 1400},
     {"king_attack_scale_mg", 815, 815, 0, 100},
-    {"king_attack_scale_eg", 816, 816, 0, 100},
-    {"two_king_attackers_weight", 817, 817, 0, 100},
-    {"three_king_attackers_weight", 818, 818, 0, 100},
-    {"four_king_attackers_weight", 819, 819, 0, 100},
-    {"many_king_attackers_weight", 820, 822, 0, 100}
+    {"king_attack_scale_eg", 816, 816, 0, 100}
 };
 
 void tuning_param_assign_current(struct tuning_param *params)
@@ -272,10 +198,6 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN(TP_QUEEN_MATERIAL_VALUE_EG, QUEEN_MATERIAL_VALUE_EG)
     ASSIGN(TP_KING_ATTACK_SCALE_MG, KING_ATTACK_SCALE_MG)
     ASSIGN(TP_KING_ATTACK_SCALE_EG, KING_ATTACK_SCALE_EG)
-    ASSIGN(TP_TWO_KING_ATTACKERS_WEIGHT, TWO_KING_ATTACKERS_WEIGHT)
-    ASSIGN(TP_THREE_KING_ATTACKERS_WEIGHT, THREE_KING_ATTACKERS_WEIGHT)
-    ASSIGN(TP_FOUR_KING_ATTACKERS_WEIGHT, FOUR_KING_ATTACKERS_WEIGHT)
-    ASSIGN(TP_MANY_KING_ATTACKERS_WEIGHT, MANY_KING_ATTACKERS_WEIGHT)
 
     eval_reset();
 }
@@ -350,10 +272,6 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE(TP_QUEEN_MATERIAL_VALUE_EG, QUEEN_MATERIAL_VALUE_EG)
     DEFINE(TP_KING_ATTACK_SCALE_MG, KING_ATTACK_SCALE_MG)
     DEFINE(TP_KING_ATTACK_SCALE_EG, KING_ATTACK_SCALE_EG)
-    DEFINE(TP_TWO_KING_ATTACKERS_WEIGHT, TWO_KING_ATTACKERS_WEIGHT)
-    DEFINE(TP_THREE_KING_ATTACKERS_WEIGHT, THREE_KING_ATTACKERS_WEIGHT)
-    DEFINE(TP_FOUR_KING_ATTACKERS_WEIGHT, FOUR_KING_ATTACKERS_WEIGHT)
-    DEFINE(TP_MANY_KING_ATTACKERS_WEIGHT, MANY_KING_ATTACKERS_WEIGHT)
 
     return params;
 }
@@ -407,4 +325,9 @@ void tuning_param_write_parameters(FILE *fp, struct tuning_param *params,
             fprintf(fp, "}\n");
         }
     }
+}
+
+int tuning_param_index(int decl)
+{
+    return parameter_declarations[decl].start;
 }
