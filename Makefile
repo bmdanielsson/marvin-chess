@@ -65,14 +65,16 @@ ifeq ($(MAKECMDGOALS), tuner)
 CFLAGS += -DTRACE
 endif
 
-# Common linker options
+# Common link options
 LDFLAGS += -lm
+
+# Set link options needed for non-Windows platforms
+ifneq ($(OS), Windows_NT)
+LDFLAGS += -lpthread
+endif
 
 # Compiler
 CC = gcc
-
-# Extra libraries need for tuner
-TUNER_LIBS = -lpthread
 
 # Sources
 SOURCES = src/bitboard.c \
@@ -170,4 +172,4 @@ marvin : $(OBJECTS)
 	$(CC) $(OBJECTS) $(LDFLAGS) -o marvin
 
 tuner : $(TUNER_OBJECTS)
-	$(CC) $(TUNER_OBJECTS) $(LDFLAGS) $(TUNER_LIBS) -o tuner
+	$(CC) $(TUNER_OBJECTS) $(LDFLAGS) -o tuner
