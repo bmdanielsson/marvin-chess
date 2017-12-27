@@ -320,8 +320,9 @@ static void evaluate_knights(struct gamestate *pos, struct eval *eval, int side)
     king_sq = LSB(pos->bb_pieces[KING+opp_side]);
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
-        moves = bb_knight_moves(sq)&(~pos->bb_sides[side]);
+        moves = bb_knight_moves(sq);
         coverage |= moves;
+        moves &= (~pos->bb_sides[side]);
 
         /* Mobility */
         safe_moves = moves&(~eval->pawntt.coverage[FLIP_COLOR(side)]);
@@ -377,8 +378,9 @@ static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
     king_sq = LSB(pos->bb_pieces[KING+opp_side]);
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
-        moves = bb_bishop_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
+        moves = bb_bishop_moves(pos->bb_all, sq);
         coverage |= moves;
+        moves &= (~pos->bb_sides[side]);
 
         /* Mobility */
         safe_moves = moves&(~eval->pawntt.coverage[FLIP_COLOR(side)]);
@@ -425,8 +427,9 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         file = FILENR(sq);
-        moves = bb_rook_moves(pos->bb_all, sq)&(~pos->bb_sides[side]);
+        moves = bb_rook_moves(pos->bb_all, sq);
         coverage |= moves;
+        moves &= (~pos->bb_sides[side]);
 
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
