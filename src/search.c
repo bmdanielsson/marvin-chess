@@ -72,53 +72,62 @@ static int aspiration_window[] = {25, 50, 100, 200, 400, INFINITE_SCORE};
 #define LMP_DEPTH 6
 static int lmp_counts[LMP_DEPTH+1] = {0, 5, 10, 20, 35, 55};
 
-static void update_history_table(struct gamestate *pos, uint32_t move,
+static void update_history_table(struct worker *worker, uint32_t move,
                                  int depth)
 {
-    int side;
-    int from;
-    int to;
+    int             side;
+    int             from;
+    int             to;
+    struct position *pos;
 
     if (ISCAPTURE(move) || ISENPASSANT(move)) {
         return;
     }
 
     /* Update the history table and rescale entries if necessary */
+    pos = &worker->pos;
     from = FROM(move);
     to = TO(move);
-    pos->history_table[pos->stm][from][to] += depth;
-    if (pos->history_table[pos->stm][from][to] > MAX_HISTORY_SCORE) {
+    worker->history_table[pos->stm][from][to] += depth;
+    if (worker->history_table[pos->stm][from][to] > MAX_HISTORY_SCORE) {
         for (side=0;side<NSIDES;side++) {
             for (from=0;from<NSQUARES;from++) {
                 for (to=0;to<NSQUARES;to++) {
-                    pos->history_table[side][from][to] /= 2;
+                    worker->history_table[side][from][to] /= 2;
                 }
             }
         }
     }
 }
 
-static void add_killer_move(struct gamestate *pos, uint32_t move, int see_score)
+static void add_killer_move(struct worker *worker, uint32_t move,
+                            int see_score)
 {
+    struct position *pos;
+
     if ((ISCAPTURE(move) || ISENPASSANT(move)) && (see_score >= 0)) {
         return;
     }
 
-    if (move == pos->killer_table[pos->sply][0]) {
+    pos = &worker->pos;
+    if (move == worker->killer_table[pos->sply][0]) {
         return;
     }
 
-    pos->killer_table[pos->sply][1] = pos->killer_table[pos->sply][0];
-    pos->killer_table[pos->sply][0] = move;
+    worker->killer_table[pos->sply][1] = worker->killer_table[pos->sply][0];
+    worker->killer_table[pos->sply][0] = move;
 }
 
-static bool is_killer_move(struct gamestate *pos, uint32_t move)
+static bool is_killer_move(struct worker *worker, uint32_t move)
 {
-    return (pos->killer_table[pos->sply][0] == move) ||
-            (pos->killer_table[pos->sply][1] == move);
+    struct position *pos;
+
+    pos = &worker->pos;
+    return (worker->killer_table[pos->sply][0] == move) ||
+            (worker->killer_table[pos->sply][1] == move);
 }
 
-static bool is_pawn_push(struct gamestate *pos, uint32_t move)
+static bool is_pawn_push(struct position *pos, uint32_t move)
 {
     int from;
     int to;
@@ -147,10 +156,12 @@ static bool is_tactical_move(uint32_t move)
     return ISCAPTURE(move) || ISENPASSANT(move) || ISPROMOTION(move);
 }
 
-static bool probe_wdl_tables(struct gamestate *pos, int *score)
+static bool probe_wdl_tables(struct worker *worker, int *score)
 {
-    unsigned int res;
+    unsigned int    res;
+    struct position *pos;
 
+    pos = &worker->pos;
     res = tb_probe_wdl(pos->bb_sides[WHITE], pos->bb_sides[BLACK],
                     pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING],
                     pos->bb_pieces[WHITE_QUEEN]|pos->bb_pieces[BLACK_QUEEN],
@@ -172,15 +183,17 @@ static bool probe_wdl_tables(struct gamestate *pos, int *score)
     return true;
 }
 
-static bool probe_dtz_tables(struct gamestate *pos, int *score)
+static bool probe_dtz_tables(struct worker *worker, int *score)
 {
-    unsigned int res;
-    int          wdl;
-    int          promotion;
-    int          flags;
-    int          from;
-    int          to;
+    unsigned int    res;
+    int             wdl;
+    int             promotion;
+    int             flags;
+    int             from;
+    int             to;
+    struct position *pos;
 
+    pos = &worker->pos;
     res = tb_probe_root(pos->bb_sides[WHITE], pos->bb_sides[BLACK],
                     pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING],
                     pos->bb_pieces[WHITE_QUEEN]|pos->bb_pieces[BLACK_QUEEN],
@@ -242,21 +255,24 @@ static bool probe_dtz_tables(struct gamestate *pos, int *score)
             break;
         }
     }
-    pos->root_moves.moves[0] = MOVE(from, to, promotion, flags);
-    pos->root_moves.nmoves++;
+    worker->root_moves.moves[0] = MOVE(from, to, promotion, flags);
+    worker->root_moves.nmoves++;
 
-    assert(board_is_move_pseudo_legal(pos, pos->root_moves.moves[0]));
+    assert(board_is_move_pseudo_legal(pos, worker->root_moves.moves[0]));
 
     return true;
 }
 
-static void update_pv(struct gamestate *pos, uint32_t move)
+static void update_pv(struct worker *worker, uint32_t move)
 {
-    pos->pv_table[pos->sply].moves[0] = move;
-    memcpy(&pos->pv_table[pos->sply].moves[1],
-           &pos->pv_table[pos->sply+1].moves[0],
-           pos->pv_table[pos->sply+1].length*sizeof(uint32_t));
-    pos->pv_table[pos->sply].length = pos->pv_table[pos->sply+1].length + 1;
+    struct position *pos;
+
+    pos = &worker->pos;
+    worker->pv_table[pos->sply].moves[0] = move;
+    memcpy(&worker->pv_table[pos->sply].moves[1],
+           &worker->pv_table[pos->sply+1].moves[0],
+           worker->pv_table[pos->sply+1].length*sizeof(uint32_t));
+    worker->pv_table[pos->sply].length = worker->pv_table[pos->sply+1].length + 1;
 }
 
 static void copy_pv(struct pv *from, struct pv *to)
@@ -269,52 +285,55 @@ static void copy_pv(struct pv *from, struct pv *to)
     }
 }
 
-static bool checkup(struct gamestate *pos)
+static bool checkup(struct worker *worker)
 {
     bool ponderhit;
 
-    assert(!pos->abort);
+    assert(!worker->abort);
 
-    if (!tc_check_time(pos)) {
-        pos->abort = true;
+    if (!tc_check_time(worker)) {
+        worker->abort = true;
         return true;
     }
-    if (engine_check_input(pos, &ponderhit)) {
-        pos->abort = true;
+    if (engine_check_input(worker->state, &ponderhit)) {
+        worker->abort = true;
     }
 	if (ponderhit) {
-		tc_start_clock(pos);
-		tc_allocate_time(pos);
-		pos->pondering = false;
+		tc_start_clock();
+		tc_allocate_time();
+		worker->state->pondering = false;
 	}
 
-    return pos->abort;
+    return worker->abort;
 }
 
-static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
+static int quiescence(struct worker *worker, int depth, int alpha, int beta)
 {
-    int      score;
-    int      see_score;
-    int      best_score;
-    uint32_t move;
-    bool     found_move;
-    bool     in_check;
+    int             score;
+    int             see_score;
+    int             best_score;
+    uint32_t        move;
+    bool            found_move;
+    bool            in_check;
+    struct position *pos;
+
+    pos = &worker->pos;
 
     /* Update search statistics */
     if (depth < 0) {
-        pos->nodes++;
-        pos->qnodes++;
+        worker->nodes++;
+        worker->qnodes++;
     }
 
     /* Check if the time is up or if we have received a new command */
-    if (pos->abort || CHECKUP(pos->nodes)) {
-        if (checkup(pos)) {
+    if (worker->abort || CHECKUP(worker->nodes)) {
+        if (checkup(worker)) {
             return 0;
         }
     }
 
     /* Reset the search tree for this ply */
-    pos->pv_table[pos->sply].length = 0;
+    worker->pv_table[pos->sply].length = 0;
 
     /* Check if we should considered the game as a draw */
     if (board_is_repetition(pos) || (pos->fifty >= 100)) {
@@ -322,7 +341,7 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
     }
 
     /* Evaluate the position */
-    score = eval_evaluate(pos);
+    score = eval_evaluate(worker);
 
     /* If we have reached the maximum depth then we stop */
     if (pos->sply >= MAX_PLY) {
@@ -347,13 +366,13 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
     }
 
     /* Initialize the move selector for this node */
-    select_init_node(pos, depth, true, false);
+    select_init_node(worker, depth, true, false);
     (void)hash_tt_lookup(pos, 0, alpha, beta, &move, &score);
-    select_set_tt_move(pos, move);
+    select_set_tt_move(worker, move);
 
     /* Search all moves */
     found_move = false;
-    while (select_get_quiscence_move(pos, &move, &see_score)) {
+    while (select_get_quiscence_move(worker, &move, &see_score)) {
         /*
          * Don't bother searching captures that
          * lose material according to SEE.
@@ -367,9 +386,9 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
             continue;
         }
         found_move = true;
-        score = -quiescence(pos, depth-1, -beta, -alpha);
+        score = -quiescence(worker, depth-1, -beta, -alpha);
         board_unmake_move(pos);
-        if (pos->abort) {
+        if (worker->abort) {
             return 0;
         }
 
@@ -381,7 +400,7 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
                     break;
                 }
                 alpha = score;
-                update_pv(pos, move);
+                update_pv(worker, move);
             }
         }
     }
@@ -393,53 +412,56 @@ static int quiescence(struct gamestate *pos, int depth, int alpha, int beta)
     return (in_check && !found_move)?-CHECKMATE+pos->sply:best_score;
 }
 
-static int search(struct gamestate *pos, int depth, int alpha, int beta,
+static int search(struct worker *worker, int depth, int alpha, int beta,
                   bool try_null)
 {
-    int      score;
-    int      tb_score;
-    int      see_score;
-    int      best_score;
-    uint32_t move;
-    uint32_t best_move;
-    int      movenumber;
-    bool     found_move;
-    int      reduction;
-    int      futility_pruning;
-    bool     in_check;
-    int      tt_flag;
-    bool     found_pv;
-    bool     pv_node;
-    bool     pawn_push;
-    bool     killer;
-    int      hist;
-    bool     tactical;
+    int             score;
+    int             tb_score;
+    int             see_score;
+    int             best_score;
+    uint32_t        move;
+    uint32_t        best_move;
+    int             movenumber;
+    bool            found_move;
+    int             reduction;
+    int             futility_pruning;
+    bool            in_check;
+    int             tt_flag;
+    bool            found_pv;
+    bool            pv_node;
+    bool            pawn_push;
+    bool            killer;
+    int             hist;
+    bool            tactical;
+    struct position *pos;
+
+    pos = &worker->pos;
 
     /* Set node type */
     pv_node = (beta-alpha) > 1;
 
     /* Update search statistics */
-    pos->nodes++;
+    worker->nodes++;
 
     /* Check if we have reached the full depth of the search */
     if (depth <= 0) {
-        return quiescence(pos, 0, alpha, beta);
+        return quiescence(worker, 0, alpha, beta);
     }
 
     /* Check if the time is up or if we have received a new command */
-    if (pos->abort || CHECKUP(pos->nodes)) {
-        if (checkup(pos)) {
+    if (worker->abort || CHECKUP(worker->nodes)) {
+        if (checkup(worker)) {
             return 0;
         }
     }
 
     /* Check if the selective depth should be updated */
-    if (pos->sply > pos->seldepth) {
-        pos->seldepth = pos->sply;
+    if (pos->sply > worker->seldepth) {
+        worker->seldepth = pos->sply;
     }
 
     /* Reset the search tree for this ply */
-    pos->pv_table[pos->sply].length = 0;
+    worker->pv_table[pos->sply].length = 0;
 
     /*
      * Check if the game should be considered a draw. A position is
@@ -453,7 +475,7 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     }
 
     /* Initialize the move selector for this node */
-    select_init_node(pos, depth, false, false);
+    select_init_node(worker, depth, false, false);
 
     /*
      * Search one ply deeper if in check to
@@ -474,11 +496,12 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     if (hash_tt_lookup(pos, depth, alpha, beta, &move, &score)) {
         return score;
     }
-    select_set_tt_move(pos, move);
+    select_set_tt_move(worker, move);
 
     /* Probe tablebases */
-    if (pos->probe_wdl && (BITCOUNT(pos->bb_all) <= pos->tb_men)) {
-        if (probe_wdl_tables(pos, &tb_score)) {
+    if (worker->state->probe_wdl &&
+        (BITCOUNT(pos->bb_all) <= (int)TB_LARGEST)) {
+        if (probe_wdl_tables(worker, &tb_score)) {
             return tb_score;
         }
     }
@@ -487,7 +510,7 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
      * Evaluate the position in order to get a score
      * to use for pruning decisions.
      */
-    score = eval_evaluate(pos);
+    score = eval_evaluate(worker);
 
     /* Reverse futility pruning */
     if ((depth <= FUTILITY_DEPTH) &&
@@ -509,7 +532,7 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
         (depth <= RAZORING_DEPTH) &&
         ((score+razoring_margin[depth-1]) <= alpha)) {
         if (depth == 1) {
-            return quiescence(pos, 0, alpha, beta);
+            return quiescence(worker, 0, alpha, beta);
         }
         depth--;
     }
@@ -526,9 +549,9 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
         board_has_non_pawn(pos, pos->stm)) {
         reduction = NULLMOVE_BASE_REDUCTION + depth/NULLMOVE_DIVISOR;
         board_make_null_move(pos);
-        score = -search(pos, depth-reduction-1, -beta, -beta+1, false);
+        score = -search(worker, depth-reduction-1, -beta, -beta+1, false);
         board_unmake_null_move(pos);
-        if (pos->abort) {
+        if (worker->abort) {
             return 0;
         }
         if (score >= beta) {
@@ -560,10 +583,10 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     movenumber = 0;
     found_move = false;
     found_pv = false;
-    while (select_get_move(pos, &move, &see_score)) {
+    while (select_get_move(worker, &move, &see_score)) {
         pawn_push = is_pawn_push(pos, move);
-        killer = is_killer_move(pos, move);
-        hist = pos->history_table[pos->stm][FROM(move)][TO(move)];
+        killer = is_killer_move(worker, move);
+        hist = worker->history_table[pos->stm][FROM(move)][TO(move)];
         if (!board_make_move(pos, move)) {
             continue;
         }
@@ -618,14 +641,14 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
              * Perform a full search until a pv move is found. Usually
              * this is the first move.
              */
-            score = -search(pos, depth-1, -beta, -alpha, true);
+            score = -search(worker, depth-1, -beta, -alpha, true);
         } else {
             /* Perform a reduced depth search with a zero window */
-            score = -search(pos, depth-reduction-1, -alpha-1, -alpha, true);
+            score = -search(worker, depth-reduction-1, -alpha-1, -alpha, true);
 
             /* Re-search with full depth if the move improved alpha */
-            if ((score > alpha) && (reduction > 0) && !pos->abort) {
-                score = -search(pos, depth-1, -alpha-1, -alpha, true);
+            if ((score > alpha) && (reduction > 0) && !worker->abort) {
+                score = -search(worker, depth-1, -alpha-1, -alpha, true);
             }
 
             /*
@@ -633,12 +656,12 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
              * improved. If this is not a pv node then the full window
              * is actually a null window so there is no need to re-search.
              */
-            if (pv_node && (score > alpha) && !pos->abort) {
-                score = -search(pos, depth-1, -beta, -alpha, true);
+            if (pv_node && (score > alpha) && !worker->abort) {
+                score = -search(worker, depth-1, -beta, -alpha, true);
             }
         }
         board_unmake_move(pos);
-        if (pos->abort) {
+        if (worker->abort) {
             return 0;
         }
 
@@ -660,7 +683,7 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
                  * search this position further.
                  */
                 if (score >= beta) {
-                    add_killer_move(pos, move, see_score);
+                    add_killer_move(worker, move, see_score);
                     tt_flag = TT_BETA;
                     break;
                 }
@@ -671,8 +694,8 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
                  */
                 tt_flag = TT_EXACT;
                 alpha = score;
-                update_pv(pos, move);
-                update_history_table(pos, move, depth);
+                update_pv(worker, move);
+                update_history_table(worker, move, depth);
             }
         }
     }
@@ -696,45 +719,48 @@ static int search(struct gamestate *pos, int depth, int alpha, int beta,
     return best_score;
 }
 
-static int search_root(struct gamestate *pos, int depth, int alpha, int beta)
+static int search_root(struct worker *worker, int depth, int alpha, int beta)
 {
-    int      score;
-    int      see_score;
-    int      best_score;
-    uint32_t move;
-    uint32_t best_move;
-    int      tt_flag;
+    int             score;
+    int             see_score;
+    int             best_score;
+    uint32_t        move;
+    uint32_t        best_move;
+    int             tt_flag;
+    struct position *pos;
+
+    pos = &worker->pos;
 
     /* Reset the search tree for this ply */
-    pos->pv_table[0].length = 0;
+    worker->pv_table[0].length = 0;
 
     /*
      * Initialize the move selector for this node. Also
      * initialize the best move found to the PV move.
      */
-    select_init_node(pos, depth, false, true);
+    select_init_node(worker, depth, false, true);
     (void)hash_tt_lookup(pos, depth, alpha, beta, &move, &score);
-    select_set_tt_move(pos, move);
+    select_set_tt_move(worker, move);
     best_move = move;
-    pos->best_move = move;
-	pos->ponder_move = NOMOVE;
+    worker->best_move = move;
+	worker->ponder_move = NOMOVE;
 
     /* Update score for root moves */
-    select_update_root_move_scores(pos);
+    select_update_root_move_scores(worker);
 
     /* Search all moves */
     tt_flag = TT_ALPHA;
     best_score = -INFINITE_SCORE;
-    pos->currmovenumber = 0;
-    while (select_get_root_move(pos, &move, &see_score)) {
+    worker->currmovenumber = 0;
+    while (select_get_root_move(worker, &move, &see_score)) {
         /* Recursivly search the move */
         (void)board_make_move(pos, move);
-        pos->currmovenumber++;
-        pos->currmove = move;
-        engine_send_move_info(pos);
-        score = -search(pos, depth-1, -beta, -alpha, true);
+        worker->currmovenumber++;
+        worker->currmove = move;
+        engine_send_move_info(worker->state);
+        score = -search(worker, depth-1, -beta, -alpha, true);
         board_unmake_move(pos);
-        if (pos->abort) {
+        if (worker->abort) {
             return 0;
         }
 
@@ -753,7 +779,7 @@ static int search_root(struct gamestate *pos, int depth, int alpha, int beta)
                  * save some time.
                  */
                 if (score >= beta) {
-                    add_killer_move(pos, move, see_score);
+                    add_killer_move(worker, move, see_score);
                     tt_flag = TT_BETA;
                     break;
                 }
@@ -765,19 +791,19 @@ static int search_root(struct gamestate *pos, int depth, int alpha, int beta)
                  */
                 tt_flag = TT_EXACT;
                 alpha = score;
-                update_pv(pos, move);
-                engine_send_pv_info(pos, score);
-                update_history_table(pos, move, depth);
+                update_pv(worker, move);
+                engine_send_pv_info(worker->state, score);
+                update_history_table(worker, move, depth);
 
                 /*
                  * Update the best move from the search and the ponder move.
                  * The moves are only updated when the score is inside the
-                 * aspiration window since it's only then the score can be
-                 * trusted.
+                 * aspiration window since it's only then that the score can
+                 * be trusted.
                  */
-                pos->best_move = move;
-                pos->ponder_move = (pos->pv_table[0].length > 1)?
-                                            pos->pv_table[0].moves[1]:NOMOVE;
+                worker->best_move = move;
+                worker->ponder_move = (worker->pv_table[0].length > 1)?
+                                            worker->pv_table[0].moves[1]:NOMOVE;
             }
         }
     }
@@ -788,40 +814,41 @@ static int search_root(struct gamestate *pos, int depth, int alpha, int beta)
     return best_score;
 }
 
-void search_reset_data(struct gamestate *pos)
+void search_reset_data(struct gamestate *state)
 {
     int k;
     int l;
     int m;
 
-    pos->root_moves.nmoves = 0;
+    state->worker.root_moves.nmoves = 0;
 
-    pos->exit_on_mate = true;
-    pos->silent = false;
+    state->exit_on_mate = true;
+    state->silent = false;
 
-    pos->sd = MAX_SEARCH_DEPTH;
-    pos->nodes = 0;
-    pos->qnodes = 0;
-    pos->depth = 0;
-    pos->seldepth = 0;
-    pos->currmovenumber = 0;
-    pos->currmove = 0;
+    state->sd = MAX_SEARCH_DEPTH;
+    state->worker.nodes = 0;
+    state->worker.qnodes = 0;
+    state->worker.depth = 0;
+    state->worker.seldepth = 0;
+    state->worker.currmovenumber = 0;
+    state->worker.currmove = 0;
 
     for (k=0;k<MAX_PLY;k++) {
-        pos->killer_table[k][0] = NOMOVE;
-        pos->killer_table[k][1] = NOMOVE;
+        state->worker.killer_table[k][0] = NOMOVE;
+        state->worker.killer_table[k][1] = NOMOVE;
     }
 
     for (k=0;k<NSIDES;k++) {
         for (l=0;l<NSQUARES;l++) {
             for (m=0;m<NSQUARES;m++) {
-                pos->history_table[k][l][m] = 0;
+                state->worker.history_table[k][l][m] = 0;
             }
         }
     }
 }
 
-uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
+uint32_t search_find_best_move(struct gamestate *state, bool pondering,
+                               bool use_book, bool use_tablebases,
                                uint32_t *ponder_move)
 {
     int       score;
@@ -835,7 +862,7 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
 	bool      ponderhit;
 	bool      analysis;
 
-    assert(valid_board(pos));
+    assert(valid_position(&state->worker.pos));
     assert(ponder_move != NULL);
 
 	/* Initialize ponder move */
@@ -845,15 +872,15 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
 	 * Try to guess if the search is part of a
 	 * game or if it is for analysis.
 	 */
-	analysis = (pos->tc_type == TC_INFINITE) || (pos->root_moves.nmoves > 0);
+	analysis = tc_is_infinite() || (state->worker.root_moves.nmoves > 0);
 
     /* Try to find a move in the opening book */
-    if (pos->use_own_book && pos->in_book) {
-        best_move = polybook_probe(pos);
+    if (use_book && state->in_book) {
+        best_move = polybook_probe(&state->worker.pos);
         if (best_move != NOMOVE) {
             return best_move;
         }
-        pos->in_book = false;
+        state->in_book = false;
     }
 
 	/*
@@ -862,56 +889,59 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
 	 * command is received.
 	 */
 	if (!pondering) {
-		tc_start_clock(pos);
-		tc_allocate_time(pos);
+		tc_start_clock();
+		tc_allocate_time();
 	}
 
     /* Prepare for search */
-    pos->probe_wdl = pos->use_tablebases;
-    pos->root_in_tb = false;
-    pos->root_tb_score = 0;
-    pos->pondering = pondering;
-    pos->ponder_move = NOMOVE;
-    pos->sply = 0;
-    pos->abort = false;
-    pos->resolving_root_fail = false;
-    hash_tt_age_table(pos);
+    state->probe_wdl = use_tablebases;
+    state->root_in_tb = false;
+    state->root_tb_score = 0;
+    state->pondering = pondering;
+    state->worker.ponder_move = NOMOVE;
+    state->worker.pos.sply = 0;
+    state->worker.abort = false;
+    state->worker.resolving_root_fail = false;
+    hash_tt_age_table();
 
     /* Probe tablebases for the root position */
-    if (pos->use_tablebases && (BITCOUNT(pos->bb_all) <= pos->tb_men)) {
-        pos->root_in_tb = probe_dtz_tables(pos, &pos->root_tb_score);
-        pos->probe_wdl = !pos->root_in_tb;
+    if (use_tablebases &&
+        (BITCOUNT(state->worker.pos.bb_all) <= (int)TB_LARGEST)) {
+        state->root_in_tb = probe_dtz_tables(&state->worker,
+                                             &state->root_tb_score);
+        state->probe_wdl = !state->root_in_tb;
     }
 
     /* If no root moves are specified then search all moves */
-    if (pos->root_moves.nmoves == 0) {
-        gen_legal_moves(pos, &pos->root_moves);
-        assert(pos->root_moves.nmoves > 0);
+    if (state->worker.root_moves.nmoves == 0) {
+        gen_legal_moves(&state->worker.pos, &state->worker.root_moves);
+        assert(state->worker.root_moves.nmoves > 0);
     }
-    best_move = pos->root_moves.moves[0];
+    best_move = state->worker.root_moves.moves[0];
 
     /* Main iterative deepening loop */
-    while (tc_new_iteration(pos) && (depth <= pos->sd)) {
+    while (tc_new_iteration(&state->worker) && (depth <= state->sd)) {
         /*
          * If there is only one legal move then there is no
          * need to do a search. Instead save the time for later.
          */
-        if (pos->root_moves.nmoves == 1 && !pos->pondering && !analysis &&
-            !pos->root_in_tb) {
-            return pos->root_moves.moves[0];
+        if (state->worker.root_moves.nmoves == 1 &&
+            !state->pondering && !analysis &&
+            !state->root_in_tb) {
+            return state->worker.root_moves.moves[0];
         }
 
 		/* Search */
-        pos->depth = depth;
+        state->worker.depth = depth;
         alpha = MAX(alpha, -INFINITE_SCORE);
         beta = MIN(beta, INFINITE_SCORE);
-        score = search_root(pos, depth, alpha, beta);
+        score = search_root(&state->worker, depth, alpha, beta);
 
         /* Check if the search was interrupted for some reason */
-        if (pos->abort) {
-            assert(pos->best_move != NOMOVE);
-			best_move = pos->best_move;
-			*ponder_move = pos->ponder_move;
+        if (state->worker.abort) {
+            assert(state->worker.best_move != NOMOVE);
+			best_move = state->worker.best_move;
+			*ponder_move = state->worker.ponder_move;
             break;
         }
 
@@ -922,25 +952,25 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
         if (score <= alpha) {
             awindex++;
             alpha = score - aspiration_window[awindex];
-            pos->resolving_root_fail = true;
+            state->worker.resolving_root_fail = true;
             continue;
         }
         if (score >= beta) {
             bwindex++;
             beta = score + aspiration_window[bwindex];
-            pos->resolving_root_fail = true;
+            state->worker.resolving_root_fail = true;
             continue;
         }
-        pos->resolving_root_fail = false;
-        best_move = pos->best_move;
-		*ponder_move = pos->ponder_move;
+        state->worker.resolving_root_fail = false;
+        best_move = state->worker.best_move;
+		*ponder_move = state->worker.ponder_move;
 
         /*
          * Check if the score indicates a known win in
          * which case there is no point in searching any
          * further.
          */
-        if (pos->exit_on_mate && !pos->pondering) {
+        if (state->exit_on_mate && !state->pondering) {
             if ((score > KNOWN_WIN) || (score < (-KNOWN_WIN))) {
                 break;
             }
@@ -951,8 +981,8 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
          * from having an aspiration window for the first few
          * iterations so an infinite window is used to start with.
          */
-        copy_pv(&pos->pv_table[0], &pv);
-        hash_tt_insert_pv(pos, &pv);
+        copy_pv(&state->worker.pv_table[0], &pv);
+        hash_tt_insert_pv(&state->worker.pos, &pv);
         depth++;
         awindex = 0;
         bwindex = 0;
@@ -971,13 +1001,13 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
      * command is received so that the bestmove command is not sent too
      * early.
      */
-	while (pos->pondering && !pos->abort) {
+	while (state->pondering && !state->worker.abort) {
 		sleep_ms(100);
-		if (engine_check_input(pos, &ponderhit)) {
-			pos->abort = true;
+		if (engine_check_input(state, &ponderhit)) {
+			state->worker.abort = true;
 		}
 		if (ponderhit) {
-			pos->pondering = false;
+			state->pondering = false;
 		}
 	}
 
@@ -985,17 +1015,18 @@ uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
     return best_move;
 }
 
-int search_get_quiscence_score(struct gamestate *pos)
+int search_get_quiscence_score(struct gamestate *state)
 {
-    assert(valid_board(pos));
+    assert(valid_position(&state->worker.pos));
 
-    search_reset_data(pos);
-    pos->pondering = false;
-    pos->ponder_move = NOMOVE;
-    pos->sply = 0;
-    pos->abort = false;
-    pos->resolving_root_fail = false;
+    tc_configure_time_control(TC_INFINITE, 0, 0, 0);
+    search_reset_data(state);
+    state->pondering = false;
+    state->worker.ponder_move = NOMOVE;
+    state->worker.pos.sply = 0;
+    state->worker.abort = false;
+    state->worker.resolving_root_fail = false;
+    state->probe_wdl = false;
 
-    tc_configure_time_control(pos, TC_INFINITE, 0, 0, 0);
-    return quiescence(pos, 0, -INFINITE_SCORE, INFINITE_SCORE);
+    return quiescence(&state->worker, 0, -INFINITE_SCORE, INFINITE_SCORE);
 }

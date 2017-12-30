@@ -46,28 +46,31 @@
 /*
  * Reset the search data to prepare for a new search.
  *
- * @param pos The board structure.
+ * @param state The board structure.
  */
-void search_reset_data(struct gamestate *pos);
+void search_reset_data(struct gamestate *state);
 
 /*
  * Searches the current position to find the best move.
  *
- * @param pos The chess board structure.
+ * @param state The chess board structure.
  * @param pondering Flag indicating if this is a ponder search
  *                  or a regular search.
+ * @param use_book Flag indicating if the opening book should be used.
+ * @param use_tablebases Flag indicating if tablebases should be used.
  * @param ponder_move Location to store a potential ponder move at.
  * @return Returns the best move for this position.
  */
-uint32_t search_find_best_move(struct gamestate *pos, bool pondering,
+uint32_t search_find_best_move(struct gamestate *state, bool pondering,
+                               bool use_book, bool use_tablebases,
                                uint32_t *ponder_move);
 
 /*
  * Get a quiscence score for the current position.
  *
- * @param pos The chess board structure.
+ * @param state The chess board structure.
  * @return Returns the score.
  */
-int search_get_quiscence_score(struct gamestate *pos);
+int search_get_quiscence_score(struct gamestate *state);
 
 #endif

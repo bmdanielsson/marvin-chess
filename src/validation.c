@@ -25,7 +25,7 @@
 #include "eval.h"
 #include "debug.h"
 
-bool valid_board(struct gamestate *pos)
+bool valid_position(struct position *pos)
 {
     uint64_t white;
     uint64_t black;
@@ -173,7 +173,7 @@ bool valid_move(uint32_t move)
     return true;
 }
 
-bool valid_gen_quiscenece_moves(struct gamestate *pos, bool checks,
+bool valid_gen_quiscenece_moves(struct position *pos, bool checks,
                                 struct movelist *list)
 {
     struct movelist list2;
@@ -227,7 +227,7 @@ bool valid_gen_quiscenece_moves(struct gamestate *pos, bool checks,
     return nmoves == nmoves2;
 }
 
-bool valid_scores(struct gamestate *pos)
+bool valid_scores(struct position *pos)
 {
     return
         pos->material[MIDDLEGAME][WHITE] == eval_material(pos, WHITE, false) &&

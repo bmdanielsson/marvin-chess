@@ -26,6 +26,7 @@
 #include "hash.h"
 #include "board.h"
 #include "bitboard.h"
+#include "engine.h"
 
 uint64_t sq_mask[NSQUARES];
 
@@ -75,7 +76,7 @@ int sq2diag_a8h1[NSQUARES] = {
     7, 8, 9, 10, 11, 12, 13, 14
 };
 
-int mirror_table[64];
+int mirror_table[NSQUARES];
 
 int sq_color[NSQUARES] = {
     BLACK, WHITE, BLACK, WHITE, BLACK, WHITE, BLACK, WHITE,
@@ -87,8 +88,6 @@ int sq_color[NSQUARES] = {
     BLACK, WHITE, BLACK, WHITE, BLACK, WHITE, BLACK, WHITE,
     WHITE, BLACK, WHITE, BLACK, WHITE, BLACK, WHITE, BLACK
 };
-
-char syzygy_path[1024] = {'\0'};
 
 static void init_king_attack_zones(void)
 {
@@ -305,47 +304,40 @@ void chess_data_init(void)
     init_king_attack_zones();
 }
 
-struct gamestate* create_game_state(int hash_size)
+struct gamestate* create_game_state(void)
 {
-    struct gamestate *pos;
+    struct gamestate *state;
 
-    pos = malloc(sizeof(struct gamestate));
-    if (pos == NULL) {
+    state = malloc(sizeof(struct gamestate));
+    if (state == NULL) {
         return NULL;
     }
-    memset(pos, 0, sizeof(struct gamestate));
-    hash_tt_create_table(pos, hash_size);
-    hash_pawntt_create_table(pos, PAWN_HASH_SIZE);
-    if ((pos->tt_table == NULL) || (pos->pawntt_table == NULL)) {
-        destroy_game_state(pos);
-        return NULL;
-    }
-    board_reset(pos);
-    board_start_position(pos);
+    memset(state, 0, sizeof(struct gamestate));
+    state->worker.state = state;
+    state->worker.pos.state = state;
+    state->worker.pos.worker = &state->worker;
+    hash_tt_create_table(engine_default_hash_size);
+    hash_pawntt_create_table(&state->worker, PAWN_HASH_SIZE);
+    board_reset(&state->worker.pos);
+    board_start_position(&state->worker.pos);
 
-    return pos;
+    return state;
 }
 
-void destroy_game_state(struct gamestate *pos)
+void destroy_game_state(struct gamestate *state)
 {
-    assert(pos != NULL);
+    assert(state != NULL);
 
-#ifdef TRACE
-    free(pos->trace);
-#endif
-    hash_tt_destroy_table(pos);
-    hash_pawntt_destroy_table(pos);
-    free(pos);
+    hash_tt_destroy_table();
+    hash_pawntt_destroy_table(&state->worker);
+    free(state);
 }
 
-void reset_game_state(struct gamestate *pos)
+void reset_game_state(struct gamestate *state)
 {
-    board_start_position(pos);
-    hash_tt_clear_table(pos);
-    hash_pawntt_clear_table(pos);
-    if (pos->use_own_book) {
-        pos->in_book = true;
-    }
+    board_start_position(&state->worker.pos);
+    hash_tt_clear_table();
+    hash_pawntt_clear_table(&state->worker);
 }
 
 void move2str(uint32_t move, char *str)
@@ -394,7 +386,7 @@ void move2str(uint32_t move, char *str)
     }
 }
 
-uint32_t str2move(char *str, struct gamestate *pos)
+uint32_t str2move(char *str, struct position *pos)
 {
     uint32_t        move;
     struct movelist list;
@@ -404,7 +396,7 @@ uint32_t str2move(char *str, struct gamestate *pos)
     int             k;
 
     assert(str != NULL);
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 
     /* Make sure that the string is at least 4 characters long */
     if (strlen(str) < 4) {

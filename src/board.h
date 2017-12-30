@@ -27,14 +27,14 @@
  *
  * @param pos The chess position.
  */
-void board_reset(struct gamestate *pos);
+void board_reset(struct position *pos);
 
 /*
  * Initialize a board structure to the chess starting posuition.
  *
  * @param pos The chess position.
  */
-void board_start_position(struct gamestate *pos);
+void board_start_position(struct position *pos);
 
 /*
  * Initialize a board structure to the chess position in FEN notation.
@@ -43,7 +43,7 @@ void board_start_position(struct gamestate *pos);
  * @param fenstr Chess position in FEN notation.
  * @return Returns true if the position was sucessfully setup, false otherwise.
  */
-bool board_setup_from_fen(struct gamestate *pos, char *fenstr);
+bool board_setup_from_fen(struct position *pos, char *fenstr);
 
 /*
  * Tests if a player is in check.
@@ -52,7 +52,7 @@ bool board_setup_from_fen(struct gamestate *pos, char *fenstr);
  * @param side The player to test.
  * @return Returns true if the player is in check.
  */
-bool board_in_check(struct gamestate *pos, int side);
+bool board_in_check(struct position *pos, int side);
 
 /*
  * Make a move.
@@ -63,28 +63,28 @@ bool board_in_check(struct gamestate *pos, int side);
  *        true otherwise. If the move was illegal the it is automatically
  *        undone.
  */
-bool board_make_move(struct gamestate *pos, uint32_t move);
+bool board_make_move(struct position *pos, uint32_t move);
 
 /*
  * Undo the last move.
  *
  * @param pos The chess board.
  */
-void board_unmake_move(struct gamestate *pos);
+void board_unmake_move(struct position *pos);
 
 /*
  * Make a null-move.
  *
  * @param pos The chess board.
  */
-void board_make_null_move(struct gamestate *pos);
+void board_make_null_move(struct position *pos);
 
 /*
  * Undo a null move.
  *
  * @param pos The chess board.
  */
-void board_unmake_null_move(struct gamestate *pos);
+void board_unmake_null_move(struct position *pos);
 
 /*
  * Check if the current board position is a repeat of a previous position.
@@ -92,7 +92,7 @@ void board_unmake_null_move(struct gamestate *pos);
  * @param pos The chess board.
  * @return Returns true if this position is a repeat.
  */
-bool board_is_repetition(struct gamestate *pos);
+bool board_is_repetition(struct position *pos);
 
 /*
  * Check if a specific player has a non-pawn, non-king piece.
@@ -100,7 +100,7 @@ bool board_is_repetition(struct gamestate *pos);
  * @param pos The chess board.
  * @param side The side to check.
  */
-bool board_has_non_pawn(struct gamestate *pos, int side);
+bool board_has_non_pawn(struct position *pos, int side);
 
 /*
  * Check if a move is at least pseudo-legal in a given position. Pseudo-legal
@@ -109,6 +109,6 @@ bool board_has_non_pawn(struct gamestate *pos, int side);
  * @param pos The chess board.
  * @param move The move to check.
  */
-bool board_is_move_pseudo_legal(struct gamestate *pos, uint32_t move);
+bool board_is_move_pseudo_legal(struct position *pos, uint32_t move);
 
 #endif

@@ -25,42 +25,42 @@
 /*
  * Handle an Xboard command.
  *
- * @param pos The game state object.
+ * @param state The game state object.
  * @param cmd The command to handle.
  * @param stop Flag set if the engine should stop after this command.
  * @return Returns true if the command was handled, false otherwise.
  */
-bool xboard_handle_command(struct gamestate *pos, char *cmd, bool *stop);
+bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop);
 
 /*
  * Function called during search to check if input has arrived.
  *
- * @param pos The game state object.
+ * @param state The game state object.
  * @param ponderhit Location to store if a ponderhit command was received.
  * @return Returns true if the current search should be stopped.
  */
-bool xboard_check_input(struct gamestate *pos, bool *ponderhit);
+bool xboard_check_input(struct gamestate *state, bool *ponderhit);
 
 /*
  * Send information about the principle variation.
  *
- * @param pos The board structure.
+ * @param state The board structure.
  * @param score The PV score.
  */
-void xboard_send_pv_info(struct gamestate *pos, int score);
+void xboard_send_pv_info(struct gamestate *state, int score);
 
 /*
  * Send information about the move currently being searched.
  *
- * @param pos The board structure.
+ * @param state The board structure.
  */
-void xboard_send_move_info(struct gamestate *pos);
+void xboard_send_move_info(struct gamestate *state);
 
 /*
  * Send statistics for a completed search.
  *
- * @param pos The board structure.
+ * @param state The board structure.
  */
-void xboard_send_search_stats(struct gamestate *pos);
+void xboard_send_search_stats(struct gamestate *state);
 
 #endif

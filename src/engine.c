@@ -31,12 +31,18 @@
 #include "eval.h"
 #include "utils.h"
 #include "chess.h"
+#include "timectl.h"
 
 /* Size of the receive buffer */
 #define RX_BUFFER_SIZE 4096
 
 /* Size of the transmit buffer */
 #define TX_BUFFER_SIZE 4096
+
+/* Global engine variables */
+enum protocol engine_protocol = PROTOCOL_UNSPECIFIED;
+char engine_syzygy_path[1024] = {'\0'};
+int engine_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
 
 /* Buffer used for receiving commands */
 static char rx_buffer[RX_BUFFER_SIZE];
@@ -63,25 +69,25 @@ static void cmd_bench(void)
  * Custom command
  * Syntax: browse
  */
-static void cmd_browse(struct gamestate *pos)
+static void cmd_browse(struct gamestate *state)
 {
-    dbg_browse_transposition_table(pos);
+    dbg_browse_transposition_table(&state->worker.pos);
 }
 
 /*
  * Custom command
  * Syntax: display
  */
-static void cmd_display(struct gamestate *pos)
+static void cmd_display(struct gamestate *state)
 {
-    dbg_print_board(pos);
+    dbg_print_board(&state->worker.pos);
 }
 
 /*
  * Custom command
  * Syntax: divide <depth>
  */
-static void cmd_divide(char *cmd, struct gamestate *pos)
+static void cmd_divide(char *cmd, struct gamestate *state)
 {
     int  depth;
     char *iter;
@@ -96,16 +102,16 @@ static void cmd_divide(char *cmd, struct gamestate *pos)
         return;
     }
 
-    test_run_divide(pos, depth);
+    test_run_divide(&state->worker.pos, depth);
 }
 
 /*
  * Custom command
  * Syntax: eval
  */
-static void cmd_eval(struct gamestate *pos)
+static void cmd_eval(struct gamestate *state)
 {
-    eval_display(pos);
+    eval_display(&state->worker);
 }
 
 /*
@@ -142,7 +148,7 @@ static void cmd_info(void)
  * Custom command
  * Syntax: perft <depth>
  */
-static void cmd_perft(char *cmd, struct gamestate *pos)
+static void cmd_perft(char *cmd, struct gamestate *state)
 {
     int  depth;
     char *iter;
@@ -157,10 +163,10 @@ static void cmd_perft(char *cmd, struct gamestate *pos)
         return;
     }
 
-    test_run_perft(pos, depth);
+    test_run_perft(&state->worker.pos, depth);
 }
 
-void engine_loop(struct gamestate *pos)
+void engine_loop(struct gamestate *state)
 {
     char *cmd;
     bool stop = false;
@@ -185,27 +191,27 @@ void engine_loop(struct gamestate *pos)
         if (!strncmp(cmd, "bench", 5)) {
             cmd_bench();
         } else if (!strncmp(cmd, "browse", 6)) {
-            cmd_browse(pos);
+            cmd_browse(state);
         } else if (!strncmp(cmd, "display", 7)) {
-            cmd_display(pos);
+            cmd_display(state);
         } else if (!strncmp(cmd, "divide", 6)) {
-            cmd_divide(cmd, pos);
+            cmd_divide(cmd, state);
         } else if (!strncmp(cmd, "eval", 4)) {
-            cmd_eval(pos);
+            cmd_eval(state);
         } else if (!strncmp(cmd, "info", 4)) {
             cmd_info();
         } else if (!strncmp(cmd, "perft", 5)) {
-            cmd_perft(cmd, pos);
+            cmd_perft(cmd, state);
         } else {
             handled = false;
         }
 
         /* Protocol commands */
         if (!handled) {
-            handled = uci_handle_command(pos, cmd, &stop);
+            handled = uci_handle_command(state, cmd, &stop);
         }
         if (!handled) {
-            handled = xboard_handle_command(pos, cmd, &stop);
+            handled = xboard_handle_command(state, cmd, &stop);
         }
         if (!handled) {
             LOG_INFO1("Unknown command: %s\n", cmd);
@@ -265,7 +271,7 @@ void engine_clear_pending_command(void)
     pending_cmd_buffer[0] = '\0';
 }
 
-bool engine_check_input(struct gamestate *pos, bool *ponderhit)
+bool engine_check_input(struct gamestate *state, bool *ponderhit)
 {
     *ponderhit = false;
 
@@ -273,49 +279,47 @@ bool engine_check_input(struct gamestate *pos, bool *ponderhit)
         return false;
     }
 
-    if (pos->protocol == PROTOCOL_UCI) {
+    if (engine_protocol == PROTOCOL_UCI) {
         return uci_check_input(ponderhit);
     } else {
-        return xboard_check_input(pos, ponderhit);
+        return xboard_check_input(state, ponderhit);
     }
 
     return false;
 }
 
-void engine_send_pv_info(struct gamestate *pos, int score)
+void engine_send_pv_info(struct gamestate *state, int score)
 {
-    char   movestr[6];
-    char   buffer[1024];
-    time_t now;
-    int    msec;
-    int    k;
-    int    nlines;
+    char movestr[6];
+    char buffer[1024];
+    int  msec;
+    int  k;
+    int  nlines;
 
-    if (pos->silent) {
+    if (state->silent) {
         return;
     }
 
-    if (pos->protocol == PROTOCOL_UCI) {
-        return uci_send_pv_info(pos, score);
-    } else if (pos->protocol == PROTOCOL_XBOARD) {
-        return xboard_send_pv_info(pos, score);
+    if (engine_protocol == PROTOCOL_UCI) {
+        return uci_send_pv_info(state, score);
+    } else if (engine_protocol == PROTOCOL_XBOARD) {
+        return xboard_send_pv_info(state, score);
     }
 
     /* Get the currently searched time */
-    now = get_current_time();
-    msec = (int)(now - pos->search_start);
+    msec = (int)tc_elapsed_time();
 
     printf("=> depth: %d, score: %d, time: %d, nodes: %d\n",
-           pos->depth, score, msec, pos->nodes);
+           state->worker.depth, score, msec, state->worker.nodes);
     buffer[0] = '\0';
     nlines = 1;
     strcat(buffer, "  ");
-    for (k=0;k<pos->pv_table[0].length;k++) {
+    for (k=0;k<state->worker.pv_table[0].length;k++) {
         strcat(buffer, " ");
-        move2str(pos->pv_table[0].moves[k], movestr);
+        move2str(state->worker.pv_table[0].moves[k], movestr);
         strcat(buffer, movestr);
         if (((int)strlen(buffer) > (nlines*70)) &&
-            ((k+1) < pos->pv_table[0].length)) {
+            ((k+1) < state->worker.pv_table[0].length)) {
             strcat(buffer, "\n  ");
             nlines++;
         }
@@ -323,13 +327,13 @@ void engine_send_pv_info(struct gamestate *pos, int score)
     printf("%s\n", buffer);
 }
 
-void engine_send_move_info(struct gamestate *pos)
+void engine_send_move_info(struct gamestate *state)
 {
-    if (pos->silent) {
+    if (state->silent) {
         return;
     }
 
-    if (pos->protocol == PROTOCOL_UCI) {
-        uci_send_move_info(pos);
+    if (engine_protocol == PROTOCOL_UCI) {
+        uci_send_move_info(state);
     }
 }

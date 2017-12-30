@@ -52,7 +52,7 @@ enum {
 #define BASE_SCORE_NORMAL       2*BASE_SCORE_DELTA
 #define BASE_SCORE_BAD_CAPS     BASE_SCORE_DELTA
 
-static int calculate_see_score(struct gamestate *pos, uint32_t move)
+static int calculate_see_score(struct position *pos, uint32_t move)
 {
     /*
      * En passant captures can never loose material (from the
@@ -70,14 +70,16 @@ static int calculate_see_score(struct gamestate *pos, uint32_t move)
     return 0;
 }
 
-static void assign_root_score(struct gamestate *pos, struct moveselect *ms,
+static void assign_root_score(struct worker *worker, struct moveselect *ms,
                               int idx)
 {
     int             from;
     int             to;
     uint32_t        move;
     struct moveinfo *info;
+    struct position *pos;
 
+    pos = &worker->pos;
     info = &ms->moveinfo[idx];
     move = info->move;
     from = FROM(move);
@@ -91,19 +93,19 @@ static void assign_root_score(struct gamestate *pos, struct moveselect *ms,
         info->score = BASE_SCORE_TT;
     } else if ((ISCAPTURE(move) || ISENPASSANT(move)) && (info->see >= 0)) {
         info->score = info->see + BASE_SCORE_GOOD_CAPS;
-    } else if (move == pos->killer_table[pos->sply][0]) {
+    } else if (move == worker->killer_table[pos->sply][0]) {
         info->score = BASE_SCORE_KILLER1;
-    } else if (move == pos->killer_table[pos->sply][1]) {
+    } else if (move == worker->killer_table[pos->sply][1]) {
         info->score = BASE_SCORE_KILLER2;
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
         info->score =
-                    pos->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
+                    worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
     } else {
         info->score = info->see + BASE_SCORE_BAD_CAPS;
     }
 }
 
-static void assign_score(struct gamestate *pos, struct moveselect *ms,
+static void assign_score(struct worker *worker, struct moveselect *ms,
                          struct movelist *list, int iter)
 {
     int             from;
@@ -111,6 +113,9 @@ static void assign_score(struct gamestate *pos, struct moveselect *ms,
     int             see;
     uint32_t        move;
     struct moveinfo *info;
+    struct position *pos;
+
+    pos = &worker->pos;
 
     /*
      * Moves in the transposition table and killer moves are
@@ -118,8 +123,8 @@ static void assign_score(struct gamestate *pos, struct moveselect *ms,
      */
     move = list->moves[iter];
     if ((move == ms->ttmove) ||
-        (move == pos->killer_table[pos->sply][0]) ||
-        (move == pos->killer_table[pos->sply][1])) {
+        (move == worker->killer_table[pos->sply][0]) ||
+        (move == worker->killer_table[pos->sply][1])) {
         return;
     }
 
@@ -153,19 +158,23 @@ static void assign_score(struct gamestate *pos, struct moveselect *ms,
         info->score = info->see + BASE_SCORE_GOOD_CAPS;
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
         info->score =
-                    pos->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
+                worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
     } else {
         info->score = info->see + BASE_SCORE_BAD_CAPS;
     }
 }
 
-static void assign_quiscence_score(struct gamestate *pos, struct moveselect *ms,
-                                   struct movelist *list, int iter)
+static void assign_quiscence_score(struct worker *worker,
+                                   struct moveselect *ms, struct movelist *list,
+                                   int iter)
 {
     int             from;
     int             to;
     uint32_t        move;
     struct moveinfo *info;
+    struct position *pos;
+
+    pos = &worker->pos;
 
     /*
      * Copy the move to the move info list. The move from
@@ -190,13 +199,13 @@ static void assign_quiscence_score(struct gamestate *pos, struct moveselect *ms,
         info->score = BASE_SCORE_TT;
     } else if ((ISCAPTURE(move) || ISENPASSANT(move)) && (info->see >= 0)) {
         info->score = info->see + BASE_SCORE_GOOD_CAPS;
-    } else if (move == pos->killer_table[pos->sply][0]) {
+    } else if (move == worker->killer_table[pos->sply][0]) {
         info->score = BASE_SCORE_KILLER1;
-    } else if (move == pos->killer_table[pos->sply][1]) {
+    } else if (move == worker->killer_table[pos->sply][1]) {
         info->score = BASE_SCORE_KILLER2;
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
         info->score =
-        pos->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
+                worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
     } else {
         info->score = info->see + BASE_SCORE_BAD_CAPS;
     }
@@ -244,15 +253,15 @@ static uint32_t select_move(struct moveselect *ms, int *see_score)
     return ms->moveinfo[start].move;
 }
 
-void select_init_node(struct gamestate *pos, int depth, bool qnode, bool root)
+void select_init_node(struct worker *worker, int depth, bool qnode, bool root)
 {
     struct moveselect *ms;
     uint32_t          move;
     int               k;
+    struct position *pos;
 
-    assert(valid_board(pos));
-
-    ms = &pos->ppms[pos->sply];
+    pos = &worker->pos;
+    ms = &worker->ppms[pos->sply];
     ms->phase = !qnode?PHASE_TT:PHASE_GEN_QUISCENCE;
     ms->depth = depth;
     ms->qnode = qnode;
@@ -269,9 +278,9 @@ void select_init_node(struct gamestate *pos, int depth, bool qnode, bool root)
      * so it should be setup only during the first iteration.
      */
     if (root && (depth == 1)) {
-        ms->nmoves = pos->root_moves.nmoves;
-        for (k=0;k<pos->root_moves.nmoves;k++) {
-            move = pos->root_moves.moves[k];
+        ms->nmoves = worker->root_moves.nmoves;
+        for (k=0;k<worker->root_moves.nmoves;k++) {
+            move = worker->root_moves.moves[k];
             ms->moveinfo[k].move = move;
             ms->moveinfo[k].score = 0;
             ms->moveinfo[k].see = calculate_see_score(pos, move);
@@ -279,13 +288,14 @@ void select_init_node(struct gamestate *pos, int depth, bool qnode, bool root)
     }
 }
 
-void select_set_tt_move(struct gamestate *pos, uint32_t move)
+void select_set_tt_move(struct worker *worker, uint32_t move)
 {
     struct moveselect *ms;
+    struct position *pos;
 
-    assert(valid_board(pos));
+    pos = &worker->pos;
 
-    ms = &pos->ppms[pos->sply];
+    ms = &worker->ppms[pos->sply];
     if ((move == NOMOVE) || !board_is_move_pseudo_legal(pos, move)) {
         return;
     }
@@ -293,34 +303,34 @@ void select_set_tt_move(struct gamestate *pos, uint32_t move)
     ms->ttmove = move;
 }
 
-bool select_get_root_move(struct gamestate *pos, uint32_t *move,
+bool select_get_root_move(struct worker *worker, uint32_t *move,
                           int *see_score)
 {
     struct moveselect *ms;
 
-    assert(valid_board(pos));
     assert(move != NULL);
-    assert(pos->sply == 0);
+    assert(worker->pos.sply == 0);
 
     /* Select the next move to search */
-    ms = &pos->ppms[0];
+    ms = &worker->ppms[0];
     *move = select_move(ms, see_score);
     ms->idx++;
     return *move != NOMOVE;
 }
 
-bool select_get_move(struct gamestate *pos, uint32_t *move, int *see_score)
+bool select_get_move(struct worker *worker, uint32_t *move, int *see_score)
 {
     struct moveselect *ms;
     struct movelist   list;
     uint32_t          killer;
     int               k;
+    struct position *pos;
 
-    assert(valid_board(pos));
     assert(move != NULL);
-    assert(pos->sply > 0);
+    assert(worker->pos.sply > 0);
 
-    ms = &pos->ppms[pos->sply];
+    pos = &worker->pos;
+    ms = &worker->ppms[pos->sply];
     assert(!ms->root);
 
     switch (ms->phase) {
@@ -339,7 +349,7 @@ bool select_get_move(struct gamestate *pos, uint32_t *move, int *see_score)
         list.nmoves = 0;
         gen_capture_moves(pos, &list);
         for (k=0;k<list.nmoves;k++) {
-            assign_score(pos, ms, &list, k);
+            assign_score(worker, ms, &list, k);
         }
         ms->phase++;
         ms->idx = 0;
@@ -352,7 +362,7 @@ bool select_get_move(struct gamestate *pos, uint32_t *move, int *see_score)
         /* Fall through */
     case PHASE_KILLER1:
         ms->phase++;
-        killer = pos->killer_table[pos->sply][0];
+        killer = worker->killer_table[pos->sply][0];
         if ((killer != NOMOVE) && (killer != ms->ttmove) &&
             board_is_move_pseudo_legal(pos, killer)) {
             if (see_score != NULL) {
@@ -364,9 +374,9 @@ bool select_get_move(struct gamestate *pos, uint32_t *move, int *see_score)
         /* Fall through */
     case PHASE_KILLER2:
         ms->phase++;
-        killer = pos->killer_table[pos->sply][1];
+        killer = worker->killer_table[pos->sply][1];
         if ((killer != NOMOVE) && (killer != ms->ttmove) &&
-            (killer != pos->killer_table[pos->sply][0]) &&
+            (killer != worker->killer_table[pos->sply][0]) &&
             board_is_move_pseudo_legal(pos, killer)) {
             if (see_score != NULL) {
                 *see_score = calculate_see_score(pos, killer);
@@ -381,7 +391,7 @@ bool select_get_move(struct gamestate *pos, uint32_t *move, int *see_score)
         gen_promotion_moves(pos, &list);
         gen_normal_moves(pos, &list);
         for (k=0;k<list.nmoves;k++) {
-            assign_score(pos, ms, &list, k);
+            assign_score(worker, ms, &list, k);
         }
         ms->phase++;
         /* Fall through */
@@ -416,17 +426,18 @@ bool select_get_move(struct gamestate *pos, uint32_t *move, int *see_score)
     return *move != NOMOVE;
 }
 
-bool select_get_quiscence_move(struct gamestate *pos, uint32_t *move,
+bool select_get_quiscence_move(struct worker *worker, uint32_t *move,
                                int *see_score)
 {
     struct moveselect *ms;
     struct movelist   list;
     int               k;
+    struct position   *pos;
 
-    assert(valid_board(pos));
     assert(move != NULL);
 
-    ms = &pos->ppms[pos->sply];
+    pos = &worker->pos;
+    ms = &worker->ppms[pos->sply];
     assert(!ms->root);
 
     switch (ms->phase) {
@@ -434,7 +445,7 @@ bool select_get_quiscence_move(struct gamestate *pos, uint32_t *move,
         /* Generate quiscence moves for this position */
         gen_quiscence_moves(pos, &list, false);
         for (k=0;k<list.nmoves;k++) {
-            assign_quiscence_score(pos, ms, &list, k);
+            assign_quiscence_score(worker, ms, &list, k);
         }
         ms->phase++;
         ms->idx = 0;
@@ -457,17 +468,16 @@ bool select_get_quiscence_move(struct gamestate *pos, uint32_t *move,
     return *move != NOMOVE;
 }
 
-void select_update_root_move_scores(struct gamestate *pos)
+void select_update_root_move_scores(struct worker *worker)
 {
     struct moveselect *ms;
     int               k;
 
-    assert(valid_board(pos));
-    assert(pos->sply == 0);
+    assert(worker->pos.sply == 0);
 
-    ms = &pos->ppms[0];
+    ms = &worker->ppms[0];
     for (k=0;k<ms->nmoves;k++) {
-        assign_root_score(pos, ms, k);
+        assign_root_score(worker, ms, k);
     }
 }
 

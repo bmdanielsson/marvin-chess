@@ -44,7 +44,7 @@ static int castling_permission_masks[NSQUARES] = {
      7, 15, 15, 15,  3, 15, 15, 11
 };
 
-static void add_piece(struct gamestate *pos, int piece, int square)
+static void add_piece(struct position *pos, int piece, int square)
 {
     SETBIT(pos->bb_pieces[piece], square);
     SETBIT(pos->bb_sides[COLOR(piece)], square);
@@ -54,7 +54,7 @@ static void add_piece(struct gamestate *pos, int piece, int square)
     eval_update_psq_score(pos, true, piece, square);
 }
 
-static void remove_piece(struct gamestate *pos, int piece, int square)
+static void remove_piece(struct position *pos, int piece, int square)
 {
     CLEARBIT(pos->bb_pieces[piece], square);
     CLEARBIT(pos->bb_sides[COLOR(piece)], square);
@@ -64,13 +64,13 @@ static void remove_piece(struct gamestate *pos, int piece, int square)
     eval_update_psq_score(pos, false, piece, square);
 }
 
-static void move_piece(struct gamestate *pos, int piece, int from, int to)
+static void move_piece(struct position *pos, int piece, int from, int to)
 {
     remove_piece(pos, piece, from);
     add_piece(pos, piece, to);
 }
 
-static struct unmake* push_history(struct gamestate *pos)
+static struct unmake* push_history(struct position *pos)
 {
     struct unmake *elem;
 
@@ -83,7 +83,7 @@ static struct unmake* push_history(struct gamestate *pos)
     return elem;
 }
 
-static struct unmake* pop_history(struct gamestate *pos)
+static struct unmake* pop_history(struct position *pos)
 {
     assert(pos->ply > 0);
 
@@ -95,7 +95,7 @@ static struct unmake* pop_history(struct gamestate *pos)
     return &pos->history[pos->ply];
 }
 
-void board_reset(struct gamestate *pos)
+void board_reset(struct position *pos)
 {
     int k;
 
@@ -123,34 +123,34 @@ void board_reset(struct gamestate *pos)
     pos->fifty = 0;
 }
 
-void board_start_position(struct gamestate *pos)
+void board_start_position(struct position *pos)
 {
     assert(pos != NULL);
 
     (void)board_setup_from_fen(pos, FEN_STARTPOS);
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 }
 
-bool board_setup_from_fen(struct gamestate *pos, char *fenstr)
+bool board_setup_from_fen(struct position *pos, char *fenstr)
 {
     assert(pos != NULL);
     assert(fenstr != NULL);
 
     board_reset(pos);
-    return fen_setup_board(pos, fenstr, false) && valid_board(pos);
+    return fen_setup_board(pos, fenstr, false) && valid_position(pos);
 }
 
 
-bool board_in_check(struct gamestate *pos, int side)
+bool board_in_check(struct position *pos, int side)
 {
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_side(side));
 
     return bb_is_attacked(pos, LSB(pos->bb_pieces[KING+side]),
                           FLIP_COLOR(side));
 }
 
-bool board_make_move(struct gamestate *pos, uint32_t move)
+bool board_make_move(struct position *pos, uint32_t move)
 {
     struct unmake *elem;
     int           capture;
@@ -160,7 +160,7 @@ bool board_make_move(struct gamestate *pos, uint32_t move)
     int           promotion;
     int           ep;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_move(move));
     assert(pos->ply < MAX_MOVES);
 
@@ -257,7 +257,9 @@ bool board_make_move(struct gamestate *pos, uint32_t move)
     pos->key = key_update_side(pos->key, pos->stm);
 
     /* Prefetch hash table entries */
-    hash_prefetch(pos);
+    if (pos->state != NULL) {
+        hash_prefetch(pos->worker);
+    }
 
     /*
      * If the king was left in check then the move
@@ -270,13 +272,13 @@ bool board_make_move(struct gamestate *pos, uint32_t move)
 
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_scores(pos));
 
     return true;
 }
 
-void board_unmake_move(struct gamestate *pos)
+void board_unmake_move(struct position *pos)
 {
     struct unmake *elem;
     uint32_t      move;
@@ -286,7 +288,7 @@ void board_unmake_move(struct gamestate *pos)
     int           color;
     int           move_color;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 
     /* Pop the top element from the history stack */
     elem = pop_history(pos);
@@ -344,15 +346,15 @@ void board_unmake_move(struct gamestate *pos)
 
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_scores(pos));
 }
 
-void board_make_null_move(struct gamestate *pos)
+void board_make_null_move(struct position *pos)
 {
     struct unmake *elem;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(!board_in_check(pos, pos->stm));
 
     /* Update the history */
@@ -376,18 +378,20 @@ void board_make_null_move(struct gamestate *pos)
     pos->key = key_update_side(pos->key, pos->stm);
 
     /* Prefetch hash table entries */
-    hash_prefetch(pos);
+    if (pos->state != NULL) {
+        hash_prefetch(pos->worker);
+    }
 
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 }
 
-void board_unmake_null_move(struct gamestate *pos)
+void board_unmake_null_move(struct position *pos)
 {
     struct unmake *elem;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(ISNULLMOVE(pos->history[pos->ply-1].move));
 
     /* Pop the top element from the history stack */
@@ -406,14 +410,14 @@ void board_unmake_null_move(struct gamestate *pos)
 
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 }
 
-bool board_is_repetition(struct gamestate *pos)
+bool board_is_repetition(struct position *pos)
 {
     int idx;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 
     /*
      * Pawn moves and captures are irreversible and so there is no need to
@@ -435,16 +439,16 @@ bool board_is_repetition(struct gamestate *pos)
     return false;
 }
 
-bool board_has_non_pawn(struct gamestate *pos, int side)
+bool board_has_non_pawn(struct position *pos, int side)
 {
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_side(side));
 
     return (pos->bb_pieces[KNIGHT+side]|pos->bb_pieces[BISHOP+side]|
                 pos->bb_pieces[ROOK+side]|pos->bb_pieces[QUEEN+side]) != 0ULL;
 }
 
-bool board_is_move_pseudo_legal(struct gamestate *pos, uint32_t move)
+bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
 {
     uint64_t    bb;
     int         from;
@@ -454,7 +458,7 @@ bool board_is_move_pseudo_legal(struct gamestate *pos, uint32_t move)
     int         sq;
     int         victim;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_move(move));
     assert(move != NOMOVE);
 

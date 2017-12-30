@@ -35,7 +35,7 @@ static FILE *logfp = NULL;
 /* The log level */
 static int log_level = 0;
 
-static bool browse_display_move(struct gamestate *pos, uint32_t move, int id,
+static bool browse_display_move(struct position *pos, uint32_t move, int id,
                                 bool pv, int current_score)
 {
     struct tt_item *item;
@@ -84,7 +84,7 @@ static bool browse_display_move(struct gamestate *pos, uint32_t move, int id,
     return true;
 }
 
-static void browse_display_position(struct gamestate *pos,
+static void browse_display_position(struct position *pos,
                                     struct movelist *list, bool *leafnodes)
 {
     struct tt_item  *item;
@@ -129,14 +129,22 @@ static void browse_display_position(struct gamestate *pos,
     printf("\n");
 }
 
-void dbg_log_init(int level)
+void dbg_set_log_level(int level)
 {
     char name[256];
 
     assert(logfp == NULL);
 
+    /* Set the log level */
+    log_level = level;
+
+    /* Check if a logfile has already been created */
+    if (logfp != NULL) {
+        return;
+    }
+
     /* Don't create a log file if the log level is 0 */
-    if (level == 0) {
+    if (log_level == 0) {
         return;
     }
 
@@ -161,9 +169,6 @@ void dbg_log_init(int level)
     if (logfp != NULL) {
         setbuf(logfp, NULL);
     }
-
-    /* Set the log level */
-    log_level = level;
 }
 
 void dbg_log_close(void)
@@ -189,7 +194,7 @@ void dbg_log_info(int level, char *fmt, ...)
     va_end(ap);
 }
 
-void dbg_print_board(struct gamestate *pos)
+void dbg_print_board(struct position *pos)
 {
     char fenstr[FEN_MAX_LENGTH];
     int  rank;
@@ -277,7 +282,7 @@ void dbg_print_pv(struct pv *pv)
     printf("\n");
 }
 
-void dbg_browse_transposition_table(struct gamestate *pos)
+void dbg_browse_transposition_table(struct position *pos)
 {
     bool            stop;
     int             depth;

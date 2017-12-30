@@ -35,7 +35,7 @@ extern int see_material[NPIECES];
  * @param move The move to evaluate.
  * @return The calculated score.
  */
-int see_calculate_score(struct gamestate *pos, uint32_t move);
+int see_calculate_score(struct position *pos, uint32_t move);
 
 #endif
 

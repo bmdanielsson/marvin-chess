@@ -142,23 +142,23 @@ uint64_t bb_king_moves(int from);
 /*
  * Get all attacks to a specific square.
  *
- * @param pos The state structure.
+ * @param pos The current position.
  * @param occ Bitboard of all occupied squares.
  * @param to The square to get attacks to.
  * @param side The side to get attacks for.
  * @return Bitboard of all attacks.
  */
-uint64_t bb_attacks_to(struct gamestate *pos, uint64_t occ, int to, int side);
+uint64_t bb_attacks_to(struct position *pos, uint64_t occ, int to, int side);
 
 /*
  * Tests if the given square is attacked.
  *
- * @param pos The state structure.
+ * @param pos The current position.
  * @param square The square under consideration.
  * @param side The side of the attacker.
  * @return Returns true if the given square is attacked.
  */
-bool bb_is_attacked(struct gamestate *pos, int square, int side);
+bool bb_is_attacked(struct position *pos, int square, int side);
 
 /*
  * Generate a bitboard of all possible slider moves from a given square

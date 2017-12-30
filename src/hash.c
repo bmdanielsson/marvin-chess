@@ -35,6 +35,12 @@
                 (k) == ((((uint64_t)(i)->key_high)<<32)|(uint64_t)(i)->key_low)
 #define KEY_IS_ZERO(i) ((i)->key_low == 0ULL) && ((i)->key_high == 0ULL)
 
+/* Main transposition table */
+static struct tt_bucket *transposition_table = NULL;
+static int tt_size = 0;
+static uint32_t tt_used = 0;
+static uint8_t tt_date = 0;
+
 static int largest_power_of_2(int size, int item_size)
 {
     int largest;
@@ -50,29 +56,29 @@ static int largest_power_of_2(int size, int item_size)
     return largest;
 }
 
-static void allocate_tt(struct gamestate *pos, int size)
+static void allocate_tt(int size)
 {
-    pos->tt_size = largest_power_of_2(size, sizeof(struct tt_bucket));
-    pos->tt_table = aligned_malloc(CACHE_LINE_SIZE,
-                                   pos->tt_size*sizeof(struct tt_bucket));
-    if (pos->tt_table == NULL) {
-        pos->tt_size = largest_power_of_2(MIN_MAIN_HASH_SIZE,
-                                          sizeof(struct tt_bucket));
-        pos->tt_table = aligned_malloc(CACHE_LINE_SIZE,
-                                       pos->tt_size*sizeof(struct tt_bucket));
+    tt_size = largest_power_of_2(size, sizeof(struct tt_bucket));
+    transposition_table = aligned_malloc(CACHE_LINE_SIZE,
+                                         tt_size*sizeof(struct tt_bucket));
+    if (transposition_table == NULL) {
+        tt_size = largest_power_of_2(MIN_MAIN_HASH_SIZE,
+                                     sizeof(struct tt_bucket));
+        transposition_table = aligned_malloc(CACHE_LINE_SIZE,
+                                             tt_size*sizeof(struct tt_bucket));
     }
-    assert(pos->tt_table != NULL);
+    assert(transposition_table != NULL);
 }
 
-static void allocate_pawntt(struct gamestate *pos, int size)
+static void allocate_pawntt(struct worker *worker, int size)
 {
-    pos->pawntt_size = largest_power_of_2(size, sizeof(struct pawntt_item));
-    pos->pawntt_table = aligned_malloc(CACHE_LINE_SIZE,
-                                   pos->pawntt_size*sizeof(struct pawntt_item));
-    assert(pos->pawntt_table != NULL);
+    worker->pawntt_size = largest_power_of_2(size, sizeof(struct pawntt_item));
+    worker->pawntt = aligned_malloc(CACHE_LINE_SIZE,
+                                worker->pawntt_size*sizeof(struct pawntt_item));
+    assert(worker->pawntt != NULL);
 }
 
-static bool check_tt_cutoff(struct gamestate *pos, struct tt_item *item,
+static bool check_tt_cutoff(struct position *pos, struct tt_item *item,
                             int depth, int alpha, int beta, int *score)
 {
     int  adj_score;
@@ -114,43 +120,44 @@ static bool check_tt_cutoff(struct gamestate *pos, struct tt_item *item,
     return cutoff;
 }
 
-void hash_tt_create_table(struct gamestate *pos, int size)
+void hash_tt_create_table(int size)
 {
     assert((size >= MIN_MAIN_HASH_SIZE) && (size <= MAX_MAIN_HASH_SIZE));
 
-    hash_tt_destroy_table(pos);
+    hash_tt_destroy_table();
 
-    allocate_tt(pos, size);
-    hash_tt_clear_table(pos);
+    allocate_tt(size);
+    hash_tt_clear_table();
 }
 
-void hash_tt_destroy_table(struct gamestate *pos)
+void hash_tt_destroy_table(void)
 {
-    aligned_free(pos->tt_table);
-    pos->tt_table = NULL;
-    pos->tt_size = 0;
-    pos->date = 0;
-    pos->tt_used = 0;
+    aligned_free(transposition_table);
+    transposition_table = NULL;
+    tt_size = 0;
+    tt_used = 0;
+    tt_date = 0;
 }
 
-void hash_tt_clear_table(struct gamestate *pos)
+void hash_tt_clear_table(void)
 {
-    assert(pos != NULL);
-    assert(pos->tt_table != NULL);
+    assert(transposition_table != NULL);
 
-    memset(pos->tt_table, 0, pos->tt_size*sizeof(struct tt_bucket));
-    pos->tt_used = 0;
+    memset(transposition_table, 0, tt_size*sizeof(struct tt_bucket));
+    tt_used = 0;
 }
 
-void hash_tt_age_table(struct gamestate *pos)
+void hash_tt_age_table(void)
 {
-    assert(pos != NULL);
-    assert(pos->tt_table != NULL);
-
-    pos->date++;
+    tt_date++;
 }
 
-void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
+double hash_tt_usage(void)
+{
+    return ((double)(tt_used)/(double)(tt_size*TT_BUCKET_SIZE))*100.0;
+}
+
+void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
                    int type)
 {
     uint32_t         idx;
@@ -162,11 +169,11 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
     int              k;
     uint8_t          age;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_move(move));
     assert((score > -INFINITE_SCORE) && (score < INFINITE_SCORE));
 
-    if (pos->tt_table == NULL) {
+    if (transposition_table == NULL) {
         return;
     }
 
@@ -199,8 +206,8 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
     }
 
     /* Find the correct bucket */
-    idx = (uint32_t)(pos->key&(pos->tt_size-1));
-    bucket = &pos->tt_table[idx];
+    idx = (uint32_t)(pos->key&(tt_size-1));
+    bucket = &transposition_table[idx];
 
     /*
      * Iterate over all items and find the best
@@ -227,7 +234,7 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
                 } else {
                     return;
                 }
-            } else if ((depth >= item->depth) || (pos->date != item->date)) {
+            } else if ((depth >= item->depth) || (tt_date != item->date)) {
                 worst_item = item;
                 break;
             }
@@ -247,7 +254,7 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
          * prefer searches to a higher depth and to prefer
          * newer searches before older ones.
          */
-        age = pos->date - item->date;
+        age = tt_date - item->date;
         item_score = (256 - age - 1) + item->depth*256;
 
         /* Remeber the item with the worst score */
@@ -260,7 +267,7 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
 
     /* Replace the worst item */
     if (KEY_IS_ZERO(worst_item)) {
-        pos->tt_used++;
+        tt_used++;
     }
     worst_item->key_high = KEY_HIGH(pos->key);
     worst_item->key_low = KEY_LOW(pos->key);
@@ -268,10 +275,10 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
     worst_item->score = score;
     worst_item->depth = depth;
     worst_item->type = type;
-    worst_item->date = pos->date;
+    worst_item->date = tt_date;
 }
 
-bool hash_tt_lookup(struct gamestate *pos, int depth, int alpha, int beta,
+bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
                     uint32_t *move, int *score)
 {
     uint32_t         idx;
@@ -280,19 +287,19 @@ bool hash_tt_lookup(struct gamestate *pos, int depth, int alpha, int beta,
     bool             cutoff;
     int              k;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(move != NULL);
     assert(score != NULL);
 
-    if (pos->tt_table == NULL) {
+    if (transposition_table == NULL) {
         *move = NOMOVE;
         *score = 0;
         return false;
     }
 
     /* Find the correct bucket */
-    idx = (uint32_t)(pos->key&(pos->tt_size-1));
-    bucket = &pos->tt_table[idx];
+    idx = (uint32_t)(pos->key&(tt_size-1));
+    bucket = &transposition_table[idx];
 
     /*
      * Find the first item, if any, that have
@@ -315,21 +322,21 @@ bool hash_tt_lookup(struct gamestate *pos, int depth, int alpha, int beta,
     return cutoff;
 }
 
-struct tt_item* hash_tt_lookup_raw(struct gamestate *pos)
+struct tt_item* hash_tt_lookup_raw(struct position *pos)
 {
     uint32_t         idx;
     struct tt_bucket *bucket;
     struct tt_item   *item;
     int              k;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 
-    if (pos->tt_table == NULL) {
+    if (transposition_table == NULL) {
         return NULL;
     }
 
-    idx = (uint32_t)(pos->key&(pos->tt_size-1));
-    bucket = &pos->tt_table[idx];
+    idx = (uint32_t)(pos->key&(tt_size-1));
+    bucket = &transposition_table[idx];
     for (k=0;k<TT_BUCKET_SIZE;k++) {
         item = &bucket->items[k];
         if (KEY_EQUALS(pos->key, item)) {
@@ -340,14 +347,14 @@ struct tt_item* hash_tt_lookup_raw(struct gamestate *pos)
     return NULL;
 }
 
-void hash_tt_insert_pv(struct gamestate *pos, struct pv *pv)
+void hash_tt_insert_pv(struct position *pos, struct pv *pv)
 {
     int      k;
     uint32_t move;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 
-    if (pos->tt_table == NULL) {
+    if (transposition_table == NULL) {
         return;
     }
 
@@ -362,29 +369,29 @@ void hash_tt_insert_pv(struct gamestate *pos, struct pv *pv)
     }
 }
 
-void hash_pawntt_create_table(struct gamestate *pos, int size)
+void hash_pawntt_create_table(struct worker *worker, int size)
 {
     assert(size >= 0);
 
-    hash_pawntt_destroy_table(pos);
+    hash_pawntt_destroy_table(worker);
 
-    allocate_pawntt(pos, size);
-    hash_pawntt_clear_table(pos);
+    allocate_pawntt(worker, size);
+    hash_pawntt_clear_table(worker);
 }
 
-void hash_pawntt_destroy_table(struct gamestate *pos)
+void hash_pawntt_destroy_table(struct worker *worker)
 {
-    aligned_free(pos->pawntt_table);
-    pos->pawntt_table = NULL;
-    pos->pawntt_size = 0;
+    aligned_free(worker->pawntt);
+    worker->pawntt = NULL;
+    worker->pawntt_size = 0;
 }
 
-void hash_pawntt_clear_table(struct gamestate *pos)
+void hash_pawntt_clear_table(struct worker *worker)
 {
-    assert(pos != NULL);
-    assert(pos->pawntt_table != NULL);
+    assert(worker != NULL);
+    assert(worker->pawntt != NULL);
 
-    memset(pos->pawntt_table, 0, pos->pawntt_size*sizeof(struct pawntt_item));
+    memset(worker->pawntt, 0, worker->pawntt_size*sizeof(struct pawntt_item));
 }
 
 void hash_pawntt_init_item(struct pawntt_item *item)
@@ -395,37 +402,43 @@ void hash_pawntt_init_item(struct pawntt_item *item)
     item->used = true;
 }
 
-void hash_pawntt_store(struct gamestate *pos, struct pawntt_item *item)
+void hash_pawntt_store(struct worker *worker, struct pawntt_item *item)
 {
-    uint32_t idx;
+    struct position *pos;
+    uint32_t        idx;
 
-    assert(valid_board(pos));
+    assert(valid_position(&worker->pos));
     assert(item != NULL);
 
-    if (pos->pawntt_table == NULL) {
+    pos = &worker->pos;
+
+    if (worker->pawntt == NULL) {
         return;
     }
 
     /* Find the correct position in the table */
-    idx = (uint32_t)(pos->pawnkey&(pos->pawntt_size-1));
+    idx = (uint32_t)(pos->pawnkey&(worker->pawntt_size-1));
 
     /*
      * Insert the item in the table. An always-replace strategy
      * is used in case the position is already taken.
      */
-    pos->pawntt_table[idx] = *item;
-    pos->pawntt_table[idx].pawnkey = pos->pawnkey;
+    worker->pawntt[idx] = *item;
+    worker->pawntt[idx].pawnkey = pos->pawnkey;
 }
 
-bool hash_pawntt_lookup(struct gamestate *pos, struct pawntt_item *item)
+bool hash_pawntt_lookup(struct worker *worker, struct pawntt_item *item)
 {
-    uint32_t idx;
-    bool     found;
+    struct position *pos;
+    uint32_t        idx;
+    bool            found;
 
-    assert(valid_board(pos));
+    assert(valid_position(&worker->pos));
     assert(item != NULL);
 
-    if (pos->pawntt_table == NULL) {
+    pos = &worker->pos;
+
+    if (worker->pawntt == NULL) {
         return false;
     }
 
@@ -434,17 +447,17 @@ bool hash_pawntt_lookup(struct gamestate *pos, struct pawntt_item *item)
      * if it contains an item for this position.
      */
     found = false;
-    idx = (uint32_t)(pos->pawnkey&(pos->pawntt_size-1));
-    if (pos->pawntt_table[idx].pawnkey == pos->pawnkey) {
+    idx = (uint32_t)(pos->pawnkey&(worker->pawntt_size-1));
+    if (worker->pawntt[idx].pawnkey == pos->pawnkey) {
         found = true;
-        *item = pos->pawntt_table[idx];
+        *item = worker->pawntt[idx];
     }
 
     return found && item->used;
 }
 
-void hash_prefetch(struct gamestate *pos)
+void hash_prefetch(struct worker *worker)
 {
-    PREFETCH_ADDRESS(&pos->tt_table[pos->key&(pos->tt_size-1)]);
-    PREFETCH_ADDRESS(&pos->pawntt_table[pos->pawnkey&(pos->pawntt_size-1)]);
+    PREFETCH_ADDRESS(&transposition_table[worker->pos.key&(tt_size-1)]);
+    PREFETCH_ADDRESS(&worker->pawntt[worker->pos.pawnkey&(worker->pawntt_size-1)]);
 }

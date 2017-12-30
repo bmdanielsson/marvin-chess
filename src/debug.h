@@ -28,11 +28,11 @@
 #define LOG_INFO2(...) dbg_log_info(2, __VA_ARGS__)
 
 /*
- * Initialize the logging functionality.
+ * Set the log level.
  *
  * @param level The log level.
  */
-void dbg_log_init(int level);
+void dbg_set_log_level(int level);
 
 /* Close the log file */
 void dbg_log_close(void);
@@ -50,7 +50,7 @@ void dbg_log_info(int level, char *fmt, ...);
  *
  * @param pos The position to print.
  */
-void dbg_print_board(struct gamestate *pos);
+void dbg_print_board(struct position *pos);
 
 /*
  * Print a bitboard.
@@ -85,6 +85,6 @@ void dbg_print_pv(struct pv *pv);
  *
  * @param pos The board structure.
  */
-void dbg_browse_transposition_table(struct gamestate *pos);
+void dbg_browse_transposition_table(struct position *pos);
 
 #endif

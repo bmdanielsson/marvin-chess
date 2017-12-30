@@ -22,12 +22,24 @@
 
 #include "chess.h"
 
+/* Enum for different chess protocols */
+enum protocol {
+    PROTOCOL_UNSPECIFIED,
+    PROTOCOL_UCI,
+    PROTOCOL_XBOARD
+};
+
+/* Global engine variables */
+extern enum protocol engine_protocol;
+extern char engine_syzygy_path[1024];
+extern int engine_default_hash_size;
+
 /*
  * The main engine loop.
  *
- * @param pos The game state object.
+ * @param state The game state object.
  */
-void engine_loop(struct gamestate *pos);
+void engine_loop(struct gamestate *state);
 
 /*
  * Read a new command.
@@ -63,25 +75,25 @@ void engine_clear_pending_command(void);
 /*
  * Function called during search to check if input has arrived.
  *
- * @param pos The board structure.
+ * @param state The board structure.
  * @param ponderhit Location to store if a ponderhit command was received.
  * @return Returns true if the current search should be stopped.
  */
-bool engine_check_input(struct gamestate *pos, bool *ponderhit);
+bool engine_check_input(struct gamestate *state, bool *ponderhit);
 
 /*
  * Send information about the principle variation.
  *
- * @param pos The board structure.
+ * @param state The board structure.
  * @param score The PV score.
  */
-void engine_send_pv_info(struct gamestate *pos, int score);
+void engine_send_pv_info(struct gamestate *state, int score);
 
 /*
  * Send information about the move currently being searched.
  *
- * @param pos The board structure.
+ * @param state The board structure.
  */
-void engine_send_move_info(struct gamestate *pos);
+void engine_send_move_info(struct gamestate *state);
 
 #endif

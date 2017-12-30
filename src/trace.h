@@ -49,15 +49,17 @@ struct eval_trace {
 };
 
 #define TRACE_TRACK_PAWN_SHIELD(f, t) \
-                            trace_track_pawn_shield(pos->trace, side, (f), (t))
-#define TRACE_PAWN_SHIELD(c) trace_pawn_shield(pos->trace, side, (c))
-#define TRACE_MATERIAL(p, e, c) trace_material(pos->trace, side, (p), (e), (c));
-#define TRACE_PSQ(p, s, e) trace_psq(pos->trace, side, (p), (s), (e))
-#define TRACE_M(t1, t2, m) trace_param(pos->trace, side, (t1), (t2), 0, (m), 0)
+                    trace_track_pawn_shield(eval->trace, side, (f), (t))
+#define TRACE_PAWN_SHIELD(c) trace_pawn_shield(eval->trace, side, (c))
+#define TRACE_MATERIAL(p, e, c) \
+                    trace_material(eval->trace, side, (p), (e), (c));
+#define TRACE_PSQ(p, s, e) trace_psq(eval->trace, side, (p), (s), (e))
+#define TRACE_M(t1, t2, m) \
+                    trace_param(eval->trace, side, (t1), (t2), 0, (m), 0)
 #define TRACE_MD(t1, t2, m, d) \
-                        trace_param(pos->trace, side, (t1), (t2), 0, (m), (d))
+                   trace_param(eval->trace, side, (t1), (t2), 0, (m), (d))
 #define TRACE_OM(t1, t2, o, m) \
-                        trace_param(pos->trace, side, (t1), (t2), (o), (m), 0)
+                   trace_param(eval->trace, side, (t1), (t2), (o), (m), 0)
 
 /*
  * Track a pawn shield structure.

@@ -32,22 +32,45 @@
 /* Safety margin to avoid loosing on time (in ms) */
 #define SAFETY_MARGIN 50
 
-void tc_configure_time_control(struct gamestate *pos, enum timectl_type type,
-                               int time, int inc, int movestogo)
-{
-    assert(pos != NULL);
+/* The time control type to use for the search */
+static enum timectl_type time_control_type = TC_INFINITE;
 
-    pos->tc_type = type;
-    pos->time_left = time;
-    pos->increment = inc;
-    pos->movestogo = movestogo;
-    pos->soft_time_limit = 0;
-    pos->hard_time_limit = 0;
+/* The time increment (in milliseconds) */
+static int time_control_increment = 0;
+
+/* The number of moves to the next time control */
+static int time_control_movestogo = 0;
+
+/* The time when the current search was started */
+static time_t search_start = 0;
+
+/* The number of milliseconds left on the clock */
+static int search_time_left = 0;
+
+/*
+ * Limit on how long the engine is allowed to search. In
+ * some special circumstances it can be ok to exceed
+ * this limit.
+ */
+static time_t soft_time_limit = 0;
+
+/* A hard time limit that may not be exceeded */
+static time_t hard_time_limit = 0;
+
+void tc_configure_time_control(enum timectl_type type, int time, int inc,
+                               int movestogo)
+{
+    time_control_type = type;
+    search_time_left = time;
+    time_control_increment = inc;
+    time_control_movestogo = movestogo;
+    soft_time_limit = 0;
+    hard_time_limit = 0;
 }
 
-bool tc_is_flexible(struct gamestate *pos)
+bool tc_is_flexible(void)
 {
-    switch (pos->tc_type) {
+    switch (time_control_type) {
     case TC_SUDDEN_DEATH:
     case TC_FISCHER:
     case TC_TOURNAMENT:
@@ -57,26 +80,29 @@ bool tc_is_flexible(struct gamestate *pos)
     }
 }
 
-void tc_start_clock(struct gamestate *pos)
+bool tc_is_infinite(void)
 {
-    assert(pos != NULL);
-
-    pos->search_start = get_current_time();
+    return time_control_type == TC_INFINITE;
 }
 
-void tc_allocate_time(struct gamestate *pos)
+void tc_start_clock(void)
+{
+    search_start = get_current_time();
+}
+
+void tc_allocate_time(void)
 {
     time_t allocated = 0;
     time_t time_with_safety;
     time_t time_left;
 
-    if (pos->time_left > SAFETY_MARGIN) {
-        time_with_safety = pos->time_left - SAFETY_MARGIN;
+    if (search_time_left > SAFETY_MARGIN) {
+        time_with_safety = search_time_left - SAFETY_MARGIN;
     } else {
         time_with_safety = 0;
     }
 
-    switch (pos->tc_type) {
+    switch (time_control_type) {
     case TC_SUDDEN_DEATH:
         /*
          * An assumption is made that there are always a constant
@@ -84,7 +110,8 @@ void tc_allocate_time(struct gamestate *pos)
          * engine spend more time in the beginning and play faster
          * and faster as the game progresses.
          */
-        allocated = MIN(pos->time_left/MOVES_TO_TIME_CONTROL, time_with_safety);
+        allocated = MIN(search_time_left/MOVES_TO_TIME_CONTROL,
+                        time_with_safety);
         break;
     case TC_FISCHER:
         /*
@@ -94,13 +121,15 @@ void tc_allocate_time(struct gamestate *pos)
          * making a move the increment for the previous move have already
          * been added to the clock it has to be subtracted first.
          */
-        assert(pos->time_left >= pos->increment);
-        time_left = pos->time_left - pos->increment;
-        allocated = CLAMP(time_left/MOVES_TO_TIME_CONTROL+pos->increment, 0,
-                          time_with_safety);
+        assert(search_time_left >= time_control_increment);
+        time_left = search_time_left - time_control_increment;
+        allocated =
+                CLAMP(time_left/MOVES_TO_TIME_CONTROL+time_control_increment, 0,
+                      time_with_safety);
         break;
     case TC_TOURNAMENT:
-        allocated = MIN(pos->time_left/pos->movestogo, time_with_safety);
+        allocated = MIN(search_time_left/time_control_movestogo,
+                        time_with_safety);
         break;
     case TC_FIXED_TIME:
         /* No reason not to use all the time */
@@ -115,28 +144,37 @@ void tc_allocate_time(struct gamestate *pos)
     }
     assert(allocated >= 0);
 
-    pos->soft_time_limit = pos->search_start + allocated;
-    if (tc_is_flexible(pos)) {
+    soft_time_limit = search_start + allocated;
+    if (tc_is_flexible()) {
         /*
          * For flexible time controls we also set a hard time limit
          * that can be used to allocate extra time when needed. Specifically
          * we allow five times the normally allocated time up to at
          * most 80% of the remaining time to be used.
          */
-        allocated = MIN(5*allocated, pos->time_left*0.8);
+        allocated = MIN(5*allocated, search_time_left*0.8);
         allocated = CLAMP(allocated, 0, time_with_safety);
-        pos->hard_time_limit = MAX(pos->search_start+allocated,
-                                   pos->soft_time_limit);
+        hard_time_limit = MAX(search_start+allocated, soft_time_limit);
     } else {
-        pos->hard_time_limit = pos->soft_time_limit;
+        hard_time_limit = soft_time_limit;
     }
 }
 
-bool tc_check_time(struct gamestate *pos)
+time_t tc_elapsed_time(void)
 {
-    assert(pos != NULL);
+    return get_current_time() - search_start;
+}
 
-    if (pos->pondering || (pos->tc_type == TC_INFINITE)) {
+void tc_update_time(int time)
+{
+    search_time_left = time;
+}
+
+bool tc_check_time(struct worker *worker)
+{
+    assert(worker != NULL);
+
+    if (worker->state->pondering || (time_control_type == TC_INFINITE)) {
         return true;
     }
 
@@ -144,15 +182,15 @@ bool tc_check_time(struct gamestate *pos)
      * When resolving a fail-low we allow the search to exceed the soft
      * limit in the hope that the iteration can be finished.
      */
-    if (pos->resolving_root_fail) {
-        return get_current_time() < pos->hard_time_limit;
+    if (worker->resolving_root_fail) {
+        return get_current_time() < hard_time_limit;
     } else {
-        return get_current_time() < pos->soft_time_limit;
+        return get_current_time() < soft_time_limit;
     }
 }
 
-bool tc_new_iteration(struct gamestate *pos)
+bool tc_new_iteration(struct worker *worker)
 {
-    return pos->pondering || (pos->tc_type == TC_INFINITE) ||
-           (get_current_time() < pos->soft_time_limit);
+    return worker->state->pondering || (time_control_type == TC_INFINITE) ||
+           (get_current_time() < soft_time_limit);
 }

@@ -76,7 +76,7 @@ static int char2piece(char piece)
     }
 }
 
-bool fen_setup_board(struct gamestate *pos, char *fenstr, bool epd)
+bool fen_setup_board(struct position *pos, char *fenstr, bool epd)
 {
     int  rank;
     int  file;
@@ -240,7 +240,7 @@ bool fen_setup_board(struct gamestate *pos, char *fenstr, bool epd)
     return true;
 }
 
-void fen_build_string(struct gamestate *pos, char *fenstr)
+void fen_build_string(struct position *pos, char *fenstr)
 {
     char *iter;
     int  empty_count;
@@ -248,7 +248,7 @@ void fen_build_string(struct gamestate *pos, char *fenstr)
     int  file;
     int  sq;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 
     /* Clear the string */
     memset(fenstr, 0, FEN_MAX_LENGTH);

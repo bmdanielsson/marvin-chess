@@ -214,7 +214,7 @@ static const unsigned long long magic_bishop_mask[NSQUARES]=
     0x0020100804020000ULL, 0x0040201008040200ULL
 };
 
-/* 
+/*
  * Database of rook moves. The second dimensions is the number
  * of possible occupancy combinations for a rook on a given square.
  */
@@ -665,11 +665,11 @@ uint64_t bb_king_moves(int from)
     return king_moves_table[from];
 }
 
-uint64_t bb_attacks_to(struct gamestate *pos, uint64_t occ, int to, int side)
+uint64_t bb_attacks_to(struct position *pos, uint64_t occ, int to, int side)
 {
     uint64_t attacks;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_square(to));
     assert(valid_side(side));
 
@@ -685,9 +685,9 @@ uint64_t bb_attacks_to(struct gamestate *pos, uint64_t occ, int to, int side)
     return attacks;
 }
 
-bool bb_is_attacked(struct gamestate *pos, int square, int side)
+bool bb_is_attacked(struct position *pos, int square, int side)
 {
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_square(square));
     assert(valid_side(side));
 

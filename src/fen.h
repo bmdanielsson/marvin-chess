@@ -37,7 +37,7 @@
  * @param epd Indicates that the parsing should stop after the en-passant field.
  * @return Returns true if the position was sucessfully setup, false otherwise.
  */
-bool fen_setup_board(struct gamestate *pos, char *fenstr, bool epd);
+bool fen_setup_board(struct position *pos, char *fenstr, bool epd);
 
 /*
  * Builds a FEN string for the current position.
@@ -46,6 +46,6 @@ bool fen_setup_board(struct gamestate *pos, char *fenstr, bool epd);
  * @param fenstr Location to store the generated string at. It must have room
  *               for at least FEN_MAX_LENGTH characters.
  */
-void fen_build_string(struct gamestate *pos, char *fenstr);
+void fen_build_string(struct position *pos, char *fenstr);
 
 #endif

@@ -28,7 +28,7 @@
  * @param pos The chess position.
  * @return Returns true if the position is valid.
  */
-bool valid_board(struct gamestate *pos);
+bool valid_position(struct position *pos);
 
 /*
  * Check if the square is valid.
@@ -70,7 +70,7 @@ bool valid_move(uint32_t move);
  * @param list List of generated moves.
  * @return Returns true if the correct number of captures were generated.
  */
-bool valid_gen_quiscenece_moves(struct gamestate *pos, bool checks,
+bool valid_gen_quiscenece_moves(struct position *pos, bool checks,
                                 struct movelist *list);
 
 /*
@@ -79,6 +79,6 @@ bool valid_gen_quiscenece_moves(struct gamestate *pos, bool checks,
  * @param pos The chess position.
  * @return Returns true if the scores are correct.
  */
-bool valid_scores(struct gamestate *pos);
+bool valid_scores(struct position *pos);
 
 #endif

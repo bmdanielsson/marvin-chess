@@ -101,7 +101,7 @@ enum worker_state {
 };
 
 /* Worker thread */
-struct worker {
+struct tuning_worker {
     thread_t            thread;
     event_t             ev_start;
     event_t             ev_done;
@@ -116,7 +116,7 @@ struct worker {
 };
 
 /* Workers used for calculating errors */
-struct worker *workers = NULL;
+struct tuning_worker *workers = NULL;
 static int    nworkerthreads = 0;
 
 /* Function declarations */
@@ -253,7 +253,7 @@ static int summarize_pawn_shield_terms(struct eval_equation *equation,
     return MAX(val, 0);
 }
 
-static int evaluate_equation(struct gamestate *pos, struct tuningset *tuningset,
+static int evaluate_equation(struct position *pos, struct tuningset *tuningset,
                              struct trainingpos  *trainingpos)
 {
     struct eval_equation *equation;
@@ -317,7 +317,8 @@ void print_equation(struct eval_equation *equation, int endgame, int side)
     }
 }
 
-static void find_quiet_trainingset(struct gamestate *pos, struct worker *worker)
+static void find_quiet_trainingset(struct gamestate *state,
+                                   struct tuning_worker *worker)
 {
     int                iter;
     struct pv          *pv;
@@ -329,23 +330,21 @@ static void find_quiet_trainingset(struct gamestate *pos, struct worker *worker)
     trainingset = worker->trainingset;
     for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
         /* Setup position */
-        board_reset(pos);
-        (void)fen_setup_board(pos, trainingset->positions[iter].epd, true);
+        board_reset(&state->worker.pos);
+        (void)fen_setup_board(&state->worker.pos, trainingset->positions[iter].epd, true);
 
         /* Do a quiscence search to get the pv */
-        search_reset_data(pos);
-        pos->tc_type = TC_INFINITE;
-        pos->sd = 0;
-        pos->silent = true;
-        pos->use_tablebases = false;
-        (void)search_get_quiscence_score(pos);
+        search_reset_data(state);
+        state->sd = 0;
+        state->silent = true;
+        (void)search_get_quiscence_score(state);
 
         /* Find the position at the end of the pv */
-        pv = &pos->pv_table[0];
+        pv = &state->worker.pv_table[0];
         for (k=0;k<pv->length;k++) {
-           board_make_move(pos, pv->moves[k]);
+           board_make_move(&state->worker.pos, pv->moves[k]);
         }
-        fen_build_string(pos, fenstr);
+        fen_build_string(&state->worker.pos, fenstr);
         free(trainingset->positions[iter].fen_quiet);
         trainingset->positions[iter].fen_quiet = strdup(fenstr);
     }
@@ -361,19 +360,20 @@ static double calc_texel_sigmoid(int score, double k)
 
 static void* calc_texel_error_func(void *data)
 {
-    struct worker       *worker;
-    struct gamestate    *pos;
-    struct trainingset  *trainingset;
-    int                 iter;
-    int                 score;
-    double              sigmoid;
-    double              result;
+    struct tuning_worker *worker;
+    struct gamestate     *state;
+    struct trainingset   *trainingset;
+    int                  iter;
+    int                  score;
+    double               sigmoid;
+    double               result;
+    struct eval_trace    *trace;
 
     /* Initialize worker */
-    worker = (struct worker*)data;
-    pos = create_game_state(DEFAULT_MAIN_HASH_SIZE);
-    hash_tt_destroy_table(pos);
-    hash_pawntt_destroy_table(pos);
+    worker = (struct tuning_worker*)data;
+    state = create_game_state();
+    hash_tt_destroy_table();
+    hash_pawntt_destroy_table(&state->worker);
     trainingset = worker->trainingset;
 
     /* Worker main loop */
@@ -386,7 +386,7 @@ static void* calc_texel_error_func(void *data)
 
         /* Check if the pv should be updated */
         if (worker->update_pv) {
-            find_quiet_trainingset(pos, worker);
+            find_quiet_trainingset(state, worker);
             worker->update_pv = false;
         }
 
@@ -398,23 +398,23 @@ static void* calc_texel_error_func(void *data)
              * and create a corresponding equation
              */
             if (!trainingset->positions[iter].has_equation) {
-                board_reset(pos);
-                (void)fen_setup_board(pos,
+                board_reset(&state->worker.pos);
+                (void)fen_setup_board(&state->worker.pos,
                                       trainingset->positions[iter].fen_quiet,
                                       true);
-                pos->trace = malloc(sizeof(struct eval_trace));
-                eval_generate_trace(pos);
-                setup_eval_equation(pos->trace,
+                trace = malloc(sizeof(struct eval_trace));
+                eval_generate_trace(&state->worker.pos, trace);
+                setup_eval_equation(trace,
                                     &trainingset->positions[iter].equation);
                 trainingset->positions[iter].has_equation = true;
-                free(pos->trace);
-                pos->trace = NULL;
+                free(trace);
+                trace = NULL;
             }
 
             /* Evaluate the equation */
-            score = evaluate_equation(pos, worker->tuningset,
+            score = evaluate_equation(&state->worker.pos, worker->tuningset,
                                       &trainingset->positions[iter]);
-            score = (pos->stm == WHITE)?score:-score;
+            score = (state->worker.pos.stm == WHITE)?score:-score;
 
             /* Calculate error */
             sigmoid = calc_texel_sigmoid(score, worker->k);
@@ -574,7 +574,7 @@ static void free_trainingset(struct trainingset *trainingset)
     free(trainingset);
 }
 
-static struct trainingset* read_trainingset(struct gamestate *pos, char *file)
+static struct trainingset* read_trainingset(struct gamestate *state, char *file)
 {
     struct             stat sb;
     struct trainingset *trainingset;
@@ -627,8 +627,8 @@ static struct trainingset* read_trainingset(struct gamestate *pos, char *file)
         }
 
         /* Verify that the position is legal */
-        board_reset(pos);
-        if (!fen_setup_board(pos, buffer, true)) {
+        board_reset(&state->worker.pos);
+        if (!fen_setup_board(&state->worker.pos, buffer, true)) {
             str = fgets(buffer, sizeof(buffer), fp);
             continue;
         }
@@ -770,7 +770,7 @@ void find_k(char *file, int nthreads)
     printf("Finding K based on %s\n", file);
 
     /* Create game state */
-    pos = create_game_state(DEFAULT_MAIN_HASH_SIZE);
+    pos = create_game_state();
 
     /* Read training set */
     trainingset = read_trainingset(pos, file);
@@ -789,7 +789,7 @@ void find_k(char *file, int nthreads)
 
     /* Setup worker threads */
     nworkerthreads = nthreads;
-    workers = malloc(sizeof(struct worker)*nworkerthreads);
+    workers = malloc(sizeof(struct tuning_worker)*nworkerthreads);
     init_workers(trainingset, tuningset);
     mark_pv_for_update();
 
@@ -865,7 +865,7 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     start = get_current_time();
 
     /* Create game state */
-    pos = create_game_state(DEFAULT_MAIN_HASH_SIZE);
+    pos = create_game_state();
 
     /* Read tuning set */
     tuningset = read_tuningset(parameter_file);
@@ -887,7 +887,7 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
 
     /* Setup worker threads */
     nworkerthreads = nthreads;
-    workers = malloc(sizeof(struct worker)*nthreads);
+    workers = malloc(sizeof(struct tuning_worker)*nthreads);
     init_workers(trainingset, tuningset);
 
     /* Make sure all training positions are covered */
@@ -947,15 +947,16 @@ static void verify_trace(char *training_file)
 {
     struct trainingset *trainingset;
     struct tuningset   *tuningset;
-    struct gamestate   *pos;
+    struct gamestate   *state;
     int                k;
     int                score;
     int                score2;
+    struct eval_trace  *trace;
 
     assert(training_file != NULL);
 
     /* Create game state */
-    pos = create_game_state(DEFAULT_MAIN_HASH_SIZE);
+    state = create_game_state();
 
     /* Allocate a tuningset */
     tuningset = malloc(sizeof(struct tuningset));
@@ -965,7 +966,7 @@ static void verify_trace(char *training_file)
     tuning_param_assign_current(tuningset->params);
 
     /* Read training set */
-    trainingset = read_trainingset(pos, training_file);
+    trainingset = read_trainingset(state, training_file);
     if (trainingset == NULL) {
         printf("Error: failed to read training set\n");
         return;
@@ -974,21 +975,23 @@ static void verify_trace(char *training_file)
     /* Iterate over all positions */
     for (k=0;k<trainingset->size;k++) {
         /* Setup position */
-        board_reset(pos);
-        (void)fen_setup_board(pos, trainingset->positions[k].epd, true);
+        board_reset(&state->worker.pos);
+        (void)fen_setup_board(&state->worker.pos, trainingset->positions[k].epd,
+                              true);
 
         /* Evaluate the position */
-        score = eval_evaluate(pos);
+        score = eval_evaluate(&state->worker);
 
         /* Generate a trace for this function */
-        pos->trace = malloc(sizeof(struct eval_trace));
-        eval_generate_trace(pos);
+        trace = malloc(sizeof(struct eval_trace));
+        eval_generate_trace(&state->worker.pos, trace);
 
         /* Setup an equation and evaluate it */
-        setup_eval_equation(pos->trace, &trainingset->positions[k].equation);
-        score2 = evaluate_equation(pos, tuningset, &trainingset->positions[k]);
-        free(pos->trace);
-        pos->trace = NULL;
+        setup_eval_equation(trace, &trainingset->positions[k].equation);
+        score2 = evaluate_equation(&state->worker.pos, tuningset,
+                                   &trainingset->positions[k]);
+        free(trace);
+        trace = NULL;
 
         /* Check that the scores match */
         if (score != score2) {
@@ -1005,7 +1008,7 @@ static void verify_trace(char *training_file)
     /* Clean up */
     free_trainingset(trainingset);
     free_tuningset(tuningset);
-    destroy_game_state(pos);
+    destroy_game_state(state);
 }
 
 static void print_usage(void)
@@ -1040,7 +1043,6 @@ int main(int argc, char *argv[])
     srand((unsigned int)time(NULL));
 
     /* Initialize components */
-    dbg_log_init(0);
     chess_data_init();
     bb_init();
     eval_reset();

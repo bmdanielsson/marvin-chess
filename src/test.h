@@ -30,7 +30,7 @@
  * @param pos The position to run perft for.
  * @param depth The depth to run perft to.
  */
-void test_run_perft(struct gamestate *pos, int depth);
+void test_run_perft(struct position *pos, int depth);
 
 /*
  * Run divide on a specific position. Divide is a variant of perft that counts
@@ -44,7 +44,7 @@ void test_run_perft(struct gamestate *pos, int depth);
  * @param pos The position to run divide for.
  * @param depth The depth to run divide to.
  */
-void test_run_divide(struct gamestate *pos, int depth);
+void test_run_divide(struct position *pos, int depth);
 
 /* Run a benchmark to check evaluate the performance of the engine */
 void test_run_benchmark(void);

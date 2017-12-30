@@ -38,10 +38,6 @@
 #define CFG_MAX_LINE_LENGTH 1024
 
 /* Configration values */
-static int cfg_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
-static int cfg_log_level = 0;
-static int cfg_syzygy_nmen = 0;
-
 static void cleanup(void)
 {
     dbg_log_close();
@@ -65,18 +61,16 @@ static void read_config_file(void)
 	while (line != NULL) {
 	    if (sscanf(line, "HASH_SIZE=%d", &int_val) == 1) {
 		    if (int_val > MAX_MAIN_HASH_SIZE) {
-	            cfg_default_hash_size = MAX_MAIN_HASH_SIZE;
+	            engine_default_hash_size = MAX_MAIN_HASH_SIZE;
             } else if (int_val < MIN_MAIN_HASH_SIZE) {
-			    cfg_default_hash_size = MIN_MAIN_HASH_SIZE;
+			    engine_default_hash_size = MIN_MAIN_HASH_SIZE;
             } else {
-			    cfg_default_hash_size = int_val;
+			    engine_default_hash_size = int_val;
             }
         } else if (sscanf(line, "LOG_LEVEL=%d", &int_val) == 1) {
-            cfg_log_level = int_val;
-        } else if (sscanf(line, "SYZYGY_PATH=%s", syzygy_path) == 1) {
-            if (tb_init(syzygy_path) && (TB_LARGEST > 0)) {
-                cfg_syzygy_nmen = TB_LARGEST;
-            }
+            dbg_set_log_level(int_val);
+        } else if (sscanf(line, "SYZYGY_PATH=%s", engine_syzygy_path) == 1) {
+            tb_init(engine_syzygy_path);
         }
 
         /* Next line */
@@ -105,7 +99,6 @@ int main(int argc, char *argv[])
     read_config_file();
 
     /* Initialize components */
-    dbg_log_init(cfg_log_level);
     chess_data_init();
     bb_init();
     eval_reset();
@@ -118,13 +111,10 @@ int main(int argc, char *argv[])
     }
 
     /* Create game state */
-    pos = create_game_state(cfg_default_hash_size);
+    pos = create_game_state();
     if (pos == NULL) {
         return 1;
     }
-    pos->default_hash_size = cfg_default_hash_size;
-    pos->use_tablebases = cfg_syzygy_nmen > 0;
-    pos->tb_men = cfg_syzygy_nmen;
 
     /* Enter the main engine loop */
     engine_loop(pos);

@@ -33,31 +33,31 @@ enum {
 /*
  * Create the main transposition table.
  *
- * @param pos The board structure.
  * @param size The amount of memory to use for the table (in MB).
  */
-void hash_tt_create_table(struct gamestate *pos, int size);
+void hash_tt_create_table(int size);
 
 /*
  * Destroy the main transposition table.
- *
- * @param pos The board structure.
  */
-void hash_tt_destroy_table(struct gamestate *pos);
+void hash_tt_destroy_table(void);
 
 /*
  * Clear the main transposition table.
- *
- * @param pos The board structure.
  */
-void hash_tt_clear_table(struct gamestate *pos);
+void hash_tt_clear_table(void);
 
 /*
  * Increase the age of the main transposition table.
- *
- * @param pos The board structure.
  */
-void hash_tt_age_table(struct gamestate *pos);
+void hash_tt_age_table(void);
+
+/*
+ * Get the transposition table usage.
+ *
+ * @return Returns how many percent of the transposition table that is used.
+ */
+double hash_tt_usage(void);
 
 /*
  * Store a new position in the main transposition table.
@@ -68,7 +68,7 @@ void hash_tt_age_table(struct gamestate *pos);
  * @param score The score for the position.
  * @param type The type of the score.
  */
-void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
+void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
                    int type);
 
 /*
@@ -82,7 +82,7 @@ void hash_tt_store(struct gamestate *pos, uint32_t move, int depth, int score,
  * @param score Location to store the score at.
  * @return Returns true if the entry is good enough to trigger a cutoff.
  */
-bool hash_tt_lookup(struct gamestate *pos, int depth, int alpha, int beta,
+bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
                     uint32_t *move, int *score);
 
 /*
@@ -92,7 +92,7 @@ bool hash_tt_lookup(struct gamestate *pos, int depth, int alpha, int beta,
  * @return Returns a pointer to the transposition table item or NULL if
  *         the position was not found.
  */
-struct tt_item* hash_tt_lookup_raw(struct gamestate *pos);
+struct tt_item* hash_tt_lookup_raw(struct position *pos);
 
 /*
  * Make sure that the PV is present in the main transposition table.
@@ -100,29 +100,29 @@ struct tt_item* hash_tt_lookup_raw(struct gamestate *pos);
  * @param pos The board structure.
  * @param pv The PV to insert.
  */
-void hash_tt_insert_pv(struct gamestate *pos, struct pv *pv);
+void hash_tt_insert_pv(struct position *pos, struct pv *pv);
 
 /*
  * Create the pawn transposition table.
  *
- * @param pos The board structure.
+ * @param worker The worker.
  * @param size The amount of memory to use for the table (in MB).
  */
-void hash_pawntt_create_table(struct gamestate *pos, int size);
+void hash_pawntt_create_table(struct worker *worker, int size);
 
 /*
  * Destroy the pawn transposition table.
  *
- * @param pos The board structure.
+ * @param worker The worker.
  */
-void hash_pawntt_destroy_table(struct gamestate *pos);
+void hash_pawntt_destroy_table(struct worker *worker);
 
 /*
  * Clear the pawn transposition table.
  *
- * @param pos The board structure.
+ * @param worker The worker.
  */
-void hash_pawntt_clear_table(struct gamestate *pos);
+void hash_pawntt_clear_table(struct worker *worker);
 
 /*
  * Initialize an item to store in the pawn transposition table.
@@ -134,26 +134,26 @@ void hash_pawntt_init_item(struct pawntt_item *item);
 /*
  * Store a new position in the pawn transposition table.
  *
- * @param pos The board structure.
+ * @param worker The worker.
  * @param item The item to store. Note that the pawn key field is ignored,
  *             the key in the board structure is always used.
  */
-void hash_pawntt_store(struct gamestate *pos, struct pawntt_item *item);
+void hash_pawntt_store(struct worker *worker, struct pawntt_item *item);
 
 /*
  * Lookup the current position in the pawn transposition table.
  *
- * @param pos The board structure.
+ * @param worker The worker.
  * @param item Location where the found item is stored.
  * @return Returns true if the position was found, false otherwise.
  */
-bool hash_pawntt_lookup(struct gamestate *pos, struct pawntt_item *item);
+bool hash_pawntt_lookup(struct worker *worker, struct pawntt_item *item);
 
 /*
  * Prefetch hash table entries for a specific position.
  *
- * @param pos The position.
+ * @param worker The worker.
  */
-void hash_prefetch(struct gamestate *pos);
+void hash_prefetch(struct worker *worker);
 
 #endif

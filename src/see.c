@@ -38,7 +38,7 @@ int see_material[NPIECES] = {
     20000   /* Black king */
 };
 
-static uint64_t find_xray_attackers(struct gamestate *pos, uint64_t occ,
+static uint64_t find_xray_attackers(struct position *pos, uint64_t occ,
                                     int target, uint64_t attacker)
 {
     int      sq;
@@ -93,7 +93,7 @@ static uint64_t find_xray_attackers(struct gamestate *pos, uint64_t occ,
     return attackers;
 }
 
-static uint64_t find_next_attacker(struct gamestate *pos, uint64_t attackers,
+static uint64_t find_next_attacker(struct position *pos, uint64_t attackers,
                                    int side, int *piece)
 {
     uint64_t bb;
@@ -112,7 +112,7 @@ static uint64_t find_next_attacker(struct gamestate *pos, uint64_t attackers,
  * chessprogramming wiki:
  * https://chessprogramming.wikispaces.com/SEE+-+The+Swap+Algorithm
  */
-int see_calculate_score(struct gamestate *pos, uint32_t move)
+int see_calculate_score(struct position *pos, uint32_t move)
 {
     int      score[32];
     int      depth;
@@ -124,7 +124,7 @@ int see_calculate_score(struct gamestate *pos, uint32_t move)
     uint64_t attacker;
     uint64_t occ;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_move(move));
     assert(ISCAPTURE(move));
     assert(!ISENPASSANT(move));

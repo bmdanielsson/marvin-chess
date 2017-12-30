@@ -40,7 +40,7 @@ static void add_move(struct movelist *list, int from, int to, int promotion,
     list->nmoves++;
 }
 
-static void gen_en_passant_moves(struct gamestate *pos, struct movelist *list)
+static void gen_en_passant_moves(struct position *pos, struct movelist *list)
 {
     uint64_t pieces;
     int      pawn_pos;
@@ -76,7 +76,7 @@ static void gen_en_passant_moves(struct gamestate *pos, struct movelist *list)
     }
 }
 
-static void gen_kingside_castling_moves(struct gamestate *pos,
+static void gen_kingside_castling_moves(struct position *pos,
                                         struct movelist *list)
 {
     /*
@@ -109,7 +109,7 @@ static void gen_kingside_castling_moves(struct gamestate *pos,
     }
 }
 
-static void gen_queenside_castling_moves(struct gamestate *pos,
+static void gen_queenside_castling_moves(struct position *pos,
                                          struct movelist *list)
 {
     /*
@@ -144,7 +144,7 @@ static void gen_queenside_castling_moves(struct gamestate *pos,
     }
 }
 
-static void add_pawn_moves(struct gamestate *pos, struct movelist *list,
+static void add_pawn_moves(struct position *pos, struct movelist *list,
                            int from, uint64_t moves, uint8_t promotion)
 {
     uint64_t opp;
@@ -179,7 +179,7 @@ static void add_pawn_moves(struct gamestate *pos, struct movelist *list,
     }
 }
 
-static void add_moves(struct gamestate *pos, struct movelist *list, int from,
+static void add_moves(struct position *pos, struct movelist *list, int from,
                       uint64_t moves)
 {
     uint64_t opp;
@@ -198,14 +198,14 @@ static void add_moves(struct gamestate *pos, struct movelist *list, int from,
     }
 }
 
-static void gen_captures(struct gamestate *pos, struct movelist *list)
+static void gen_captures(struct position *pos, struct movelist *list)
 {
     int      sq;
     int      piece;
     uint64_t moves;
     uint64_t pieces;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(list != NULL);
 
     pieces = pos->bb_sides[pos->stm];
@@ -262,7 +262,7 @@ static void gen_captures(struct gamestate *pos, struct movelist *list)
     gen_en_passant_moves(pos, list);
 }
 
-static void gen_promotions(struct gamestate *pos, struct movelist *list,
+static void gen_promotions(struct position *pos, struct movelist *list,
                            bool capture, bool underpromote)
 {
     uint64_t pieces;
@@ -270,7 +270,7 @@ static void gen_promotions(struct gamestate *pos, struct movelist *list,
     int      from;
     uint8_t  promotion;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(list != NULL);
 
     promotion = PROMOTE_QUEEN;
@@ -300,7 +300,7 @@ static void gen_promotions(struct gamestate *pos, struct movelist *list,
  * moves that gives check are excluded. The same goes for
  * queen promotions.
  */
-static void gen_direct_checks(struct gamestate *pos, struct movelist *list)
+static void gen_direct_checks(struct position *pos, struct movelist *list)
 {
     int      kingsq;
     int      from;
@@ -428,7 +428,7 @@ static void gen_direct_checks(struct gamestate *pos, struct movelist *list)
  * moves that finds a discovered check are excluded. The same
  * goes for queen promotions.
  */
-static void gen_discovered_checks(struct gamestate *pos, struct movelist *list)
+static void gen_discovered_checks(struct position *pos, struct movelist *list)
 {
     uint64_t pieces;
     uint64_t ray;
@@ -572,7 +572,7 @@ static void gen_discovered_checks(struct gamestate *pos, struct movelist *list)
     }
 }
 
-static void gen_check_evasions(struct gamestate *pos, struct movelist *list)
+static void gen_check_evasions(struct position *pos, struct movelist *list)
 {
     int      kingsq;
     int      to;
@@ -725,20 +725,20 @@ static void gen_check_evasions(struct gamestate *pos, struct movelist *list)
     }
 }
 
-static void gen_checks(struct gamestate *pos, struct movelist *list)
+static void gen_checks(struct position *pos, struct movelist *list)
 {
     gen_direct_checks(pos, list);
     gen_discovered_checks(pos, list);
 }
 
-void gen_moves(struct gamestate *pos, struct movelist *list)
+void gen_moves(struct position *pos, struct movelist *list)
 {
     int      sq;
     int      piece;
     uint64_t moves;
     uint64_t pieces;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(list != NULL);
 
     list->nmoves = 0;
@@ -806,14 +806,14 @@ void gen_moves(struct gamestate *pos, struct movelist *list)
     gen_queenside_castling_moves(pos, list);
 }
 
-void gen_legal_moves(struct gamestate *pos, struct movelist *list)
+void gen_legal_moves(struct position *pos, struct movelist *list)
 {
     struct movelist temp_list;
     int             k;
     int             count;
     uint32_t        move;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(list != NULL);
 
     list->nmoves = 0;
@@ -829,10 +829,10 @@ void gen_legal_moves(struct gamestate *pos, struct movelist *list)
     }
 }
 
-void gen_quiscence_moves(struct gamestate *pos, struct movelist *list,
+void gen_quiscence_moves(struct position *pos, struct movelist *list,
                          bool checks)
 {
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(list != NULL);
 
     list->nmoves = 0;
@@ -852,14 +852,14 @@ void gen_quiscence_moves(struct gamestate *pos, struct movelist *list,
     assert(valid_gen_quiscenece_moves(pos, checks, list));
 }
 
-void gen_normal_moves(struct gamestate *pos, struct movelist *list)
+void gen_normal_moves(struct position *pos, struct movelist *list)
 {
     int      sq;
     int      piece;
     uint64_t moves;
     uint64_t pieces;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(list != NULL);
 
     pieces = pos->bb_sides[pos->stm];
@@ -916,17 +916,17 @@ void gen_normal_moves(struct gamestate *pos, struct movelist *list)
     gen_queenside_castling_moves(pos, list);
 }
 
-void gen_capture_moves(struct gamestate *pos, struct movelist *list)
+void gen_capture_moves(struct position *pos, struct movelist *list)
 {
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(list != NULL);
 
     gen_captures(pos, list);
 }
 
-void gen_promotion_moves(struct gamestate *pos, struct movelist *list)
+void gen_promotion_moves(struct position *pos, struct movelist *list)
 {
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(list != NULL);
 
     gen_promotions(pos, list, false, true);

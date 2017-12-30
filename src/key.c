@@ -464,12 +464,12 @@ static uint64_t castle_values[16] = {
     17026459123590339232ULL, 15031333701544438364ULL
 };
 
-uint64_t key_generate(struct gamestate *pos)
+uint64_t key_generate(struct position *pos)
 {
     uint64_t key;
     int      k;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 
     /* Add pieces */
     key = 0ULL;
@@ -494,13 +494,13 @@ uint64_t key_generate(struct gamestate *pos)
     return key;
 }
 
-uint64_t key_generate_pawnkey(struct gamestate *pos)
+uint64_t key_generate_pawnkey(struct position *pos)
 {
     uint64_t pawns;
     uint64_t key;
     int      sq;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 
     key = 0ULL;
     pawns = pos->bb_pieces[WHITE_PAWN];

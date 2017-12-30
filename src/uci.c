@@ -35,7 +35,12 @@
 #include "validation.h"
 #include "tbprobe.h"
 
-static void uci_cmd_go(char *cmd, struct gamestate *pos)
+/* Different UCI modes */
+static bool ponder_mode = false;
+static bool own_book_mode = true;
+static bool tablebase_mode = false;
+
+static void uci_cmd_go(char *cmd, struct gamestate *state)
 {
     char     *iter;
     int      movetime = 0;
@@ -56,7 +61,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *pos)
     uint32_t ponder_move = NOMOVE;
 
     /* Prepare for the search */
-    search_reset_data(pos);
+    search_reset_data(state);
 
     /*
      * Extract parameters. If an invalid parameter is
@@ -119,9 +124,9 @@ static void uci_cmd_go(char *cmd, struct gamestate *pos)
                 return;
             }
             if ((depth >= MAX_SEARCH_DEPTH) || (depth <= 0)) {
-                pos->sd = MAX_SEARCH_DEPTH;
+                state->sd = MAX_SEARCH_DEPTH;
             } else {
-                pos->sd = depth;
+                state->sd = depth;
             }
             iter = strchr(iter, ' ');
             iter = skip_whitespace(iter);
@@ -143,12 +148,12 @@ static void uci_cmd_go(char *cmd, struct gamestate *pos)
             if (temp != NULL) {
                 *temp = '\0';
             }
-            move = str2move(iter, pos);
+            move = str2move(iter, &state->worker.pos);
             if (move != NOMOVE) {
-                if (board_make_move(pos, move)) {
-                    board_unmake_move(pos);
-                    pos->root_moves.moves[pos->root_moves.nmoves] = move;
-                    pos->root_moves.nmoves++;
+                if (board_make_move(&state->worker.pos, move)) {
+                    board_unmake_move(&state->worker.pos);
+                    state->worker.root_moves.moves[state->worker.root_moves.nmoves] = move;
+                    state->worker.root_moves.nmoves++;
                 }
             }
             if (temp != NULL) {
@@ -160,35 +165,37 @@ static void uci_cmd_go(char *cmd, struct gamestate *pos)
 
     /* Set the correct time control */
     if (infinite) {
-        tc_configure_time_control(pos, TC_INFINITE, 0, 0, 0);
-        pos->exit_on_mate = false;
-        pos->in_book = false;
+        tc_configure_time_control(TC_INFINITE, 0, 0, 0);
+        state->exit_on_mate = false;
+        state->in_book = false;
     } else if (movetime > 0) {
-        tc_configure_time_control(pos, TC_FIXED_TIME, movetime, 0, 0);
-    } else if ((winc > 0) && (pos->stm == WHITE)) {
-        tc_configure_time_control(pos, TC_FISCHER, wtime, winc, 0);
-    } else if ((binc > 0) && (pos->stm == BLACK)) {
-        tc_configure_time_control(pos, TC_FISCHER, btime, binc, 0);
-    } else if ((movestogo > 0) && (pos->stm == WHITE)) {
-        tc_configure_time_control(pos, TC_TOURNAMENT, wtime, 0, movestogo);
-    } else if ((movestogo > 0) && (pos->stm == BLACK)) {
-        tc_configure_time_control(pos, TC_TOURNAMENT, btime, 0, movestogo);
-    } else if ((pos->stm == WHITE) && (wtime > 0)) {
-        tc_configure_time_control(pos, TC_SUDDEN_DEATH, wtime, 0, 0);
-    } else if ((pos->stm == BLACK) && (btime > 0)) {
-        tc_configure_time_control(pos, TC_SUDDEN_DEATH, btime, 0, 0);
+        tc_configure_time_control(TC_FIXED_TIME, movetime, 0, 0);
+    } else if ((winc > 0) && (state->worker.pos.stm == WHITE)) {
+        tc_configure_time_control(TC_FISCHER, wtime, winc, 0);
+    } else if ((binc > 0) && (state->worker.pos.stm == BLACK)) {
+        tc_configure_time_control(TC_FISCHER, btime, binc, 0);
+    } else if ((movestogo > 0) && (state->worker.pos.stm == WHITE)) {
+        tc_configure_time_control(TC_TOURNAMENT, wtime, 0, movestogo);
+    } else if ((movestogo > 0) && (state->worker.pos.stm == BLACK)) {
+        tc_configure_time_control(TC_TOURNAMENT, btime, 0, movestogo);
+    } else if ((state->worker.pos.stm == WHITE) && (wtime > 0)) {
+        tc_configure_time_control(TC_SUDDEN_DEATH, wtime, 0, 0);
+    } else if ((state->worker.pos.stm == BLACK) && (btime > 0)) {
+        tc_configure_time_control(TC_SUDDEN_DEATH, btime, 0, 0);
     } else {
-        tc_configure_time_control(pos, TC_INFINITE, 0, 0, 0);
-        pos->exit_on_mate = false;
-        pos->in_book = false;
+        tc_configure_time_control(TC_INFINITE, 0, 0, 0);
+        state->exit_on_mate = false;
+        state->in_book = false;
     }
 
     /* Search the position for a move */
-    best_move = search_find_best_move(pos, ponder && pos->ponder, &ponder_move);
+    best_move = search_find_best_move(state, ponder && ponder_mode,
+                                      own_book_mode, tablebase_mode,
+                                      &ponder_move);
 
     /* Send the best move */
     move2str(best_move, best_movestr);
-    if (pos->ponder && (ponder_move != NOMOVE)) {
+    if (ponder_mode && (ponder_move != NOMOVE)) {
         move2str(ponder_move, ponder_movestr);
         engine_write_command("bestmove %s ponder %s", best_movestr,
                              ponder_movestr);
@@ -202,7 +209,7 @@ static void uci_cmd_isready(void)
     engine_write_command("readyok");
 }
 
-static void uci_cmd_position(char *cmd, struct gamestate *pos)
+static void uci_cmd_position(char *cmd, struct gamestate *state)
 {
     char     *iter;
     char     *moves;
@@ -213,7 +220,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *pos)
     iter = strchr(cmd, ' ');
     if (iter == NULL) {
         /* Invalid command, set start position and return */
-        board_start_position(pos);
+        board_start_position(&state->worker.pos);
         return;
     }
     iter = skip_whitespace(iter);
@@ -223,7 +230,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *pos)
 
     /* Check if the parameter is fen or startpos */
     if (!strncmp(iter, "startpos", 8)) {
-        board_start_position(pos);
+        board_start_position(&state->worker.pos);
     } else if (!strncmp(iter, "fen", 3)) {
         /* Find beginning of FEN string */
         iter += strlen("fen");
@@ -235,9 +242,9 @@ static void uci_cmd_position(char *cmd, struct gamestate *pos)
         }
 
         /* Setup the position */
-        if (!board_setup_from_fen(pos, iter)) {
+        if (!board_setup_from_fen(&state->worker.pos, iter)) {
             /* Failed to setup position */
-            board_start_position(pos);
+            board_start_position(&state->worker.pos);
             return;
         }
 
@@ -247,7 +254,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *pos)
         }
     } else {
         /* Invalid command, set start position and return */
-        board_start_position(pos);
+        board_start_position(&state->worker.pos);
         return;
     }
 
@@ -264,8 +271,8 @@ static void uci_cmd_position(char *cmd, struct gamestate *pos)
         /* Play all moves on the internal board */
         while (iter != NULL) {
             movestr = skip_whitespace(iter);
-            move = str2move(movestr, pos);
-            if (!board_make_move(pos, move)) {
+            move = str2move(movestr, &state->worker.pos);
+            if (!board_make_move(&state->worker.pos, move)) {
                 /* Illegal move */
                 return;
             }
@@ -274,7 +281,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *pos)
     }
 }
 
-static void uci_cmd_setoption(char *cmd, struct gamestate *pos)
+static void uci_cmd_setoption(char *cmd, struct gamestate *state)
 {
     char *iter;
     int size;
@@ -297,80 +304,77 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *pos)
                 } else if (size < MIN_MAIN_HASH_SIZE) {
                     size = MIN_MAIN_HASH_SIZE;
                 }
-                hash_tt_create_table(pos, size);
+                hash_tt_create_table(size);
             }
         } else if (!strncmp(iter, "Clear Hash", 10)) {
-            hash_tt_clear_table(pos);
-            hash_pawntt_clear_table(pos);
+            hash_tt_clear_table();
         } else if (!strncmp(iter, "OwnBook", 7)) {
             iter = strstr(iter, "value");
             iter += strlen("value");
             iter = skip_whitespace(iter);
             if (!strncmp(iter, "false", 5)) {
-                pos->use_own_book = false;
-                pos->in_book = false;
+                own_book_mode = false;
+                state->in_book = false;
             } else if (!strncmp(iter, "true", 4)) {
-                pos->use_own_book = true;
-                pos->in_book = true;
+                own_book_mode = true;
+                state->in_book = true;
             }
         } else if (!strncmp(iter, "Ponder", 6)) {
             iter = strstr(iter, "value");
             iter += strlen("value");
             iter = skip_whitespace(iter);
             if (!strncmp(iter, "false", 5)) {
-                pos->ponder = false;
+                ponder_mode = false;
             } else if (!strncmp(iter, "true", 4)) {
-                pos->ponder = true;
+                ponder_mode = true;
             }
-        } else if (!strncmp(iter, "SyzygyPath", 10) && !pos->use_tablebases) {
+        } else if (!strncmp(iter, "SyzygyPath", 10) && !tablebase_mode) {
             iter = strstr(iter, "value");
             iter += strlen("value");
             iter = skip_whitespace(iter);
 
-            strncpy(syzygy_path, iter, sizeof(syzygy_path));
-            if (tb_init(syzygy_path) && (TB_LARGEST > 0)) {
-                pos->tb_men = TB_LARGEST;
-                pos->use_tablebases = pos->tb_men > 0;
-            }
+            strncpy(engine_syzygy_path, iter, sizeof(engine_syzygy_path));
+            tb_init(engine_syzygy_path);
+            tablebase_mode = TB_LARGEST > 0;
         }
 
         iter = strstr(iter, "name");
     }
 }
 
-static void uci_cmd_uci(struct gamestate *pos)
+static void uci_cmd_uci(struct gamestate *state)
 {
-    pos->protocol = PROTOCOL_UCI;
-    pos->silent = false;
-    pos->use_own_book = true;
-    pos->in_book = true;
-    pos->ponder = false;
+    engine_protocol = PROTOCOL_UCI;
+
+    tablebase_mode = TB_LARGEST > 0;
+
+    state->silent = false;
+    state->in_book = true;
 
     engine_write_command("id name %s %s", APP_NAME, APP_VERSION);
     engine_write_command("id author %s", APP_AUTHOR);
     engine_write_command("option name Hash type spin default %d min %d max %d",
-                         pos->default_hash_size, MIN_MAIN_HASH_SIZE,
+                         engine_default_hash_size, MIN_MAIN_HASH_SIZE,
                          MAX_MAIN_HASH_SIZE);
     engine_write_command("option name Clear Hash type button");
     engine_write_command("option name OwnBook type check default true");
     engine_write_command("option name Ponder type check default false");
     engine_write_command("option name SyzygyPath type string default %s",
-                         syzygy_path[0] != '\0'?syzygy_path:"<empty>");
+                         engine_syzygy_path[0] != '\0'?
+                                                engine_syzygy_path:"<empty>");
     engine_write_command("uciok");
 }
 
-static void uci_cmd_ucinewgame(struct gamestate *pos)
+static void uci_cmd_ucinewgame(struct gamestate *state)
 {
-    hash_tt_clear_table(pos);
-    hash_pawntt_clear_table(pos);
-    if (pos->use_own_book) {
-        pos->in_book = true;
+    hash_tt_clear_table();
+    if (own_book_mode) {
+        state->in_book = true;
     }
 }
 
-bool uci_handle_command(struct gamestate *pos, char *cmd, bool *stop)
+bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop)
 {
-    assert(valid_board(pos));
     assert(cmd != NULL);
     assert(stop != NULL);
 
@@ -380,26 +384,26 @@ bool uci_handle_command(struct gamestate *pos, char *cmd, bool *stop)
         /* Ignore */
     } else if (!strncmp(cmd, "go", 2)) {
         /* Both UCI and Xboard protocol has a go command */
-        if (pos->protocol == PROTOCOL_UCI) {
-            uci_cmd_go(cmd, pos);
+        if (engine_protocol == PROTOCOL_UCI) {
+            uci_cmd_go(cmd, state);
         } else {
             return false;
         }
     } else if (!strncmp(cmd, "isready", 7)) {
         uci_cmd_isready();
     } else if (!strncmp(cmd, "position", 8)) {
-        uci_cmd_position(cmd, pos);
+        uci_cmd_position(cmd, state);
     } else if (!strncmp(cmd, "setoption", 9)) {
-        uci_cmd_setoption(cmd, pos);
+        uci_cmd_setoption(cmd, state);
 	} else if (!strncmp(cmd, "stop", 4)) {
 		/* Ignore */
     } else if (!strncmp(cmd, "uci", 3) && (strlen(cmd) == 3)) {
-        uci_cmd_uci(pos);
+        uci_cmd_uci(state);
     } else if (!strncmp(cmd, "ucinewgame", 10) && (strlen(cmd) == 10)) {
-        uci_cmd_ucinewgame(pos);
+        uci_cmd_ucinewgame(state);
     } else if (!strncmp(cmd, "quit", 4)) {
         /* Both UCI and Xboard protocol has a quit command */
-        if (pos->protocol == PROTOCOL_UCI) {
+        if (engine_protocol == PROTOCOL_UCI) {
             *stop = true;
         } else {
             return false;
@@ -439,35 +443,32 @@ bool uci_check_input(bool *ponderhit)
     return stop;
 }
 
-void uci_send_pv_info(struct gamestate *pos, int score)
+void uci_send_pv_info(struct gamestate *state, int score)
 {
-    char   movestr[6];
-    char   buffer[1024];
-    time_t now;
-    int    msec;
-    int    nps;
-    int    k;
-
-    assert(valid_board(pos));
+    char movestr[6];
+    char buffer[1024];
+    int  msec;
+    int  nps;
+    int  k;
 
     /* Get the currently searched time */
-    now = get_current_time();
-    msec = (int)(now - pos->search_start);
-    nps = (msec > 0)?(pos->nodes/msec)*1000:0;
+    msec = (int)tc_elapsed_time();
+    nps = (msec > 0)?(state->worker.nodes/msec)*1000:0;
 
     /* Adjust score in case the root position was found in tablebases */
-    if (pos->root_in_tb) {
+    if (state->root_in_tb) {
         score = ((score > FORCED_MATE) || (score < (-FORCED_MATE)))?
-                                                    score:pos->root_tb_score;
+                                                    score:state->root_tb_score;
     }
 
     /* Build command */
     sprintf(buffer, "info depth %d seldepth %d nodes %d time %d nps %d "
             "score cp %d pv",
-            pos->depth, pos->seldepth, pos->nodes, msec, nps, score);
-    for (k=0;k<pos->pv_table[0].length;k++) {
+            state->worker.depth, state->worker.seldepth, state->worker.nodes,
+            msec, nps, score);
+    for (k=0;k<state->worker.pv_table[0].length;k++) {
         strcat(buffer, " ");
-        move2str(pos->pv_table[0].moves[k], movestr);
+        move2str(state->worker.pv_table[0].moves[k], movestr);
         strcat(buffer, movestr);
     }
 
@@ -475,29 +476,26 @@ void uci_send_pv_info(struct gamestate *pos, int score)
     engine_write_command(buffer);
 }
 
-void uci_send_move_info(struct gamestate *pos)
+void uci_send_move_info(struct gamestate *state)
 {
     char   movestr[6];
-    time_t now;
     int    msec;
-    int    size;
-
-    assert(valid_board(pos));
+    double usage;
 
     /* Get the currently searched time */
-    now = get_current_time();
-    msec = (int)(now - pos->search_start);
+    msec = (int)tc_elapsed_time();
     if (msec < 1000) {
         /* Wait 1s before starting to send info to avoid traffic */
         return;
     }
 
     /* Send command */
-    size = pos->tt_size*TT_BUCKET_SIZE;
-    move2str(pos->currmove, movestr);
+    usage = hash_tt_usage();
+    move2str(state->worker.currmove, movestr);
     engine_write_command("info depth %d seldepth %d nodes %d time %d nps %d "
                          "currmove %s currmovenumber %d hashfull %d",
-                         pos->depth, pos->seldepth,  pos->nodes, msec,
-                         (pos->nodes/msec)*1000, movestr, pos->currmovenumber,
-                         (int)(((float)pos->tt_used/(float)(size))*100*10));
+                         state->worker.depth, state->worker.seldepth,
+                         state->worker.nodes, msec,
+                         (state->worker.nodes/msec)*1000, movestr,
+                         state->worker.currmovenumber, (int)(usage*10.0));
 }

@@ -39,7 +39,7 @@ void polybook_close(void);
  * @param pos The current position.
  * @return Returns the move to play.
  */
-uint32_t polybook_probe(struct gamestate *pos);
+uint32_t polybook_probe(struct position *pos);
 
 /*
  * Get a list of all book entries for the current position.
@@ -49,6 +49,6 @@ uint32_t polybook_probe(struct gamestate *pos);
  * @return Returns a list of book moves. The returned list should be
  *         freed by the caller.
  */
-struct book_entry* polybook_get_entries(struct gamestate *pos, int *nentries);
+struct book_entry* polybook_get_entries(struct position *pos, int *nentries);
 
 #endif

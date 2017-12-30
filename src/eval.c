@@ -26,7 +26,6 @@
 #include "hash.h"
 #include "fen.h"
 #include "utils.h"
-#include "trace.h"
 
 /* Phase valuse for different piece types */
 #define PAWN_PHASE      0
@@ -61,6 +60,10 @@ struct eval {
     int king_preassure[NPHASES][NSIDES];
     int positional[NPHASES][NSIDES];
     int mobility[NPHASES][NSIDES];
+
+#ifdef TRACE
+    struct eval_trace *trace;
+#endif
 };
 
 /*
@@ -104,7 +107,7 @@ static int nbr_attackers_weight[6] = {
  * the current phase of the game. The formula is taken from
  * https://chessprogramming.wikispaces.com/Tapered+Eval
  */
-static int calculate_game_phase(struct gamestate *pos)
+static int calculate_game_phase(struct position *pos)
 {
     int total_phase;
     int phase;
@@ -137,16 +140,18 @@ static int calculate_tapered_eval(int phase, int score_mg, int score_eg)
     return ((score_mg*(256 - phase)) + (score_eg*phase))/256;
 }
 
-static void evaluate_pawn_shield(struct gamestate *pos,
-                                 struct pawntt_item *item, int side)
+static void evaluate_pawn_shield(struct position *pos, struct eval *eval,
+                                 int side)
 {
-    const uint64_t rank1[NSIDES] = {rank_mask[RANK_2], rank_mask[RANK_7]};
-    const uint64_t rank2[NSIDES] = {rank_mask[RANK_3], rank_mask[RANK_6]};
-    uint64_t pawns;
-    uint64_t shield1;
-    uint64_t shield2;
-    int      score;
+    const uint64_t     rank1[NSIDES] = {rank_mask[RANK_2], rank_mask[RANK_7]};
+    const uint64_t     rank2[NSIDES] = {rank_mask[RANK_3], rank_mask[RANK_6]};
+    uint64_t           pawns;
+    uint64_t           shield1;
+    uint64_t           shield2;
+    int                score;
+    struct pawntt_item *item;
 
+    item = &eval->pawntt;
     pawns = pos->bb_pieces[PAWN+side];
 
     /* Queenside pawn shield */
@@ -242,7 +247,7 @@ static void evaluate_pawn_shield(struct gamestate *pos,
  * - passed pawns
  * - pawn shield
  */
-static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
+static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
                                     int side)
 {
     uint64_t            pieces;
@@ -297,13 +302,13 @@ static void evaluate_pawn_structure(struct gamestate *pos, struct eval *eval,
      * Calculate a pawnshield score. This score will be used
      * later when evaluating king safety.
      */
-    evaluate_pawn_shield(pos, item, side);
+    evaluate_pawn_shield(pos, eval, side);
 }
 
 /*
  * - mobility
  */
-static void evaluate_knights(struct gamestate *pos, struct eval *eval, int side)
+static void evaluate_knights(struct position *pos, struct eval *eval, int side)
 {
     uint64_t pieces;
     uint64_t moves;
@@ -347,7 +352,7 @@ static void evaluate_knights(struct gamestate *pos, struct eval *eval, int side)
  * - bishop pair
  * - mobility
  */
-static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
+static void evaluate_bishops(struct position *pos, struct eval *eval, int side)
 {
     uint64_t pieces;
     uint64_t moves;
@@ -405,7 +410,7 @@ static void evaluate_bishops(struct gamestate *pos, struct eval *eval, int side)
  * - open and half-open files
  * - mobility
  */
-static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
+static void evaluate_rooks(struct position *pos, struct eval *eval, int side)
 {
     const uint64_t rank7[NSIDES] = {rank_mask[RANK_7], rank_mask[RANK_2]};
     const uint64_t rank8[NSIDES] = {rank_mask[RANK_8], rank_mask[RANK_1]};
@@ -479,7 +484,7 @@ static void evaluate_rooks(struct gamestate *pos, struct eval *eval, int side)
  * - open and half-open files
  * - mobility
  */
-static void evaluate_queens(struct gamestate *pos, struct eval *eval, int side)
+static void evaluate_queens(struct position *pos, struct eval *eval, int side)
 {
     uint64_t pieces;
     uint64_t all_pawns;
@@ -530,7 +535,7 @@ static void evaluate_queens(struct gamestate *pos, struct eval *eval, int side)
  * - pawn shield
  * - king preassure
  */
-static void evaluate_king(struct gamestate *pos, struct eval *eval, int side)
+static void evaluate_king(struct position *pos, struct eval *eval, int side)
 {
     const uint64_t      queenside[NSIDES] = {
                                         sq_mask[A1]|sq_mask[B1]|sq_mask[C1],
@@ -592,9 +597,91 @@ static void evaluate_king(struct gamestate *pos, struct eval *eval, int side)
     TRACE_MD(TP_KING_ATTACK_SCALE_MG, TP_KING_ATTACK_SCALE_EG, score, 100);
 }
 
-static void do_eval(struct gamestate *pos, struct eval *eval)
+static int do_eval_material(struct position *pos, struct eval *eval, int side,
+                            bool endgame)
 {
-    int k;
+    int score;
+    int piece;
+
+    assert(valid_position(pos));
+    assert(valid_side(side));
+
+    (void)eval;
+
+    score = 0;
+    for (piece=side;piece<NPIECES;piece+=2) {
+        if (!endgame) {
+            score += BITCOUNT(pos->bb_pieces[piece])*material_values_mg[piece];
+        } else {
+            score += BITCOUNT(pos->bb_pieces[piece])*material_values_eg[piece];
+        }
+        TRACE_MATERIAL(piece, endgame, BITCOUNT(pos->bb_pieces[piece]));
+    }
+
+    return score;
+}
+
+static int do_eval_psq(struct position *pos, struct eval *eval, int side,
+                       bool endgame)
+{
+    int      score;
+    uint64_t pieces;
+    int      sq;
+    int      piece;
+
+    assert(valid_position(pos));
+    assert(valid_side(side));
+
+    (void)eval;
+
+    score = 0;
+    pieces = pos->bb_sides[side];
+    while (pieces != 0ULL) {
+        sq = POPBIT(&pieces);
+        piece = pos->pieces[sq];
+        if (side == BLACK) {
+            sq = MIRROR(sq);
+        }
+        switch (piece) {
+        case WHITE_PAWN:
+        case BLACK_PAWN:
+            score += endgame?PSQ_TABLE_PAWN_EG[sq]:PSQ_TABLE_PAWN_MG[sq];
+            break;
+        case WHITE_KNIGHT:
+        case BLACK_KNIGHT:
+            score += endgame?PSQ_TABLE_KNIGHT_EG[sq]:PSQ_TABLE_KNIGHT_MG[sq];
+            break;
+        case WHITE_BISHOP:
+        case BLACK_BISHOP:
+            score += endgame?PSQ_TABLE_BISHOP_EG[sq]:PSQ_TABLE_BISHOP_MG[sq];
+            break;
+        case WHITE_ROOK:
+        case BLACK_ROOK:
+            score += endgame?PSQ_TABLE_ROOK_EG[sq]:PSQ_TABLE_ROOK_MG[sq];
+            break;
+        case WHITE_QUEEN:
+        case BLACK_QUEEN:
+            score += endgame?PSQ_TABLE_QUEEN_EG[sq]:PSQ_TABLE_QUEEN_MG[sq];
+            break;
+        case WHITE_KING:
+        case BLACK_KING:
+            score += endgame?PSQ_TABLE_KING_EG[sq]:PSQ_TABLE_KING_MG[sq];
+            break;
+        default:
+            break;
+        }
+        TRACE_PSQ(piece, sq, endgame);
+    }
+
+    return score;
+}
+
+static void do_eval(struct worker *worker, struct eval *eval)
+{
+    struct position *pos;
+    int             k;
+
+    pos = &worker->pos;
 
     memset(eval, 0, sizeof(struct eval));
 
@@ -607,7 +694,7 @@ static void do_eval(struct gamestate *pos, struct eval *eval)
     }
 
     /* Check if the position is present in the pawn transposition table */
-    eval->in_pawntt = hash_pawntt_lookup(pos, &eval->pawntt);
+    eval->in_pawntt = hash_pawntt_lookup(worker, &eval->pawntt);
 
     /* Evaluate the position from each sides pov */
     if (!eval->in_pawntt) {
@@ -641,7 +728,7 @@ static void do_eval(struct gamestate *pos, struct eval *eval)
 
     /* Update the pawn hash table */
     if (!eval->in_pawntt) {
-        hash_pawntt_store(pos, &eval->pawntt);
+        hash_pawntt_store(worker, &eval->pawntt);
     }
 }
 
@@ -718,26 +805,26 @@ void eval_reset(void)
     material_values_eg[BLACK_KING] = 20000;
 }
 
-int eval_evaluate(struct gamestate *pos)
+int eval_evaluate(struct worker *worker)
 {
     struct eval eval;
     int         k;
     int         phase;
     int         score[NPHASES];
 
-    assert(valid_board(pos));
-    assert(valid_scores(pos));
+    assert(valid_position(&worker->pos));
+    assert(valid_scores(&worker->pos));
 
     /*
      * If no player have enough material left
      * to checkmate then it's a draw.
      */
-    if (eval_is_material_draw(pos)) {
+    if (eval_is_material_draw(&worker->pos)) {
         return 0;
     }
 
     /* Evaluate the position */
-    do_eval(pos, &eval);
+    do_eval(worker, &eval);
 
     /* Summarize each evaluation term from side to moves's pov */
     for (k=0;k<NPHASES;k++) {
@@ -761,15 +848,15 @@ int eval_evaluate(struct gamestate *pos)
         score[k] -= eval.positional[k][BLACK];
         score[k] -= eval.mobility[k][BLACK];
 
-        score[k] = (pos->stm == WHITE)?score[k]:-score[k];
+        score[k] = (worker->pos.stm == WHITE)?score[k]:-score[k];
     }
 
     /* Return score adjusted for game phase */
-    phase = calculate_game_phase(pos);
+    phase = calculate_game_phase(&worker->pos);
     return calculate_tapered_eval(phase, score[MIDDLEGAME], score[ENDGAME]);
 }
 
-void eval_display(struct gamestate *pos)
+void eval_display(struct worker *worker)
 {
     struct eval eval;
     int         k;
@@ -786,21 +873,21 @@ void eval_display(struct gamestate *pos)
     int         positional[NPHASES];
     int         mobility[NPHASES];
 
-    assert(valid_board(pos));
-    assert(valid_scores(pos));
+    assert(valid_position(&worker->pos));
+    assert(valid_scores(&worker->pos));
 
     /*
      * If no player have enough material left
      * to checkmate then it's a draw.
      */
-    if (eval_is_material_draw(pos)) {
+    if (eval_is_material_draw(&worker->pos)) {
         printf("Draw by insufficient material\n");
         printf("Score: 0\n");
         return;
     }
 
     /* Evaluate the position */
-    do_eval(pos, &eval);
+    do_eval(worker, &eval);
 
     /* Summarize each evaluation term from white's pov */
     for (k=0;k<NPHASES;k++) {
@@ -845,7 +932,7 @@ void eval_display(struct gamestate *pos)
     }
 
     /* Adjust score for game phase */
-    phase = calculate_game_phase(pos);
+    phase = calculate_game_phase(&worker->pos);
     score = calculate_tapered_eval(phase, sum_white_pov[MIDDLEGAME],
                                    sum_white_pov[ENDGAME]);
 
@@ -903,33 +990,24 @@ void eval_display(struct gamestate *pos)
     printf("Score:      %d (for white)\n", score);
 }
 
-int eval_material(struct gamestate *pos, int side, bool endgame)
+int eval_material(struct position *pos, int side, bool endgame)
 {
-    int score;
-    int piece;
+#ifdef TRACE
+    struct eval eval;
 
-    assert(valid_board(pos));
-    assert(valid_side(side));
-
-    score = 0;
-    for (piece=side;piece<NPIECES;piece+=2) {
-        if (!endgame) {
-            score += BITCOUNT(pos->bb_pieces[piece])*material_values_mg[piece];
-        } else {
-            score += BITCOUNT(pos->bb_pieces[piece])*material_values_eg[piece];
-        }
-        TRACE_MATERIAL(piece, endgame, BITCOUNT(pos->bb_pieces[piece]));
-    }
-
-    return score;
+    memset(&eval, 0, sizeof(struct eval));
+    return do_eval_material(pos, &eval, side, endgame);
+#else
+    return do_eval_material(pos, NULL, side, endgame);
+#endif
 }
 
-void eval_update_material_score(struct gamestate *pos, int add, int piece)
+void eval_update_material_score(struct position *pos, int add, int piece)
 {
     int delta;
     int color;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_piece(piece));
 
     delta = add?1:-1;
@@ -969,64 +1047,24 @@ void eval_update_material_score(struct gamestate *pos, int add, int piece)
     }
 }
 
-int eval_psq(struct gamestate *pos, int side, bool endgame)
+int eval_psq(struct position *pos, int side, bool endgame)
 {
-    int      score;
-    uint64_t pieces;
-    int      sq;
-    int      piece;
+#ifdef TRACE
+    struct eval eval;
 
-    assert(valid_board(pos));
-    assert(valid_side(side));
-
-    score = 0;
-    pieces = pos->bb_sides[side];
-    while (pieces != 0ULL) {
-        sq = POPBIT(&pieces);
-        piece = pos->pieces[sq];
-        if (side == BLACK) {
-            sq = MIRROR(sq);
-        }
-        switch (piece) {
-        case WHITE_PAWN:
-        case BLACK_PAWN:
-            score += endgame?PSQ_TABLE_PAWN_EG[sq]:PSQ_TABLE_PAWN_MG[sq];
-            break;
-        case WHITE_KNIGHT:
-        case BLACK_KNIGHT:
-            score += endgame?PSQ_TABLE_KNIGHT_EG[sq]:PSQ_TABLE_KNIGHT_MG[sq];
-            break;
-        case WHITE_BISHOP:
-        case BLACK_BISHOP:
-            score += endgame?PSQ_TABLE_BISHOP_EG[sq]:PSQ_TABLE_BISHOP_MG[sq];
-            break;
-        case WHITE_ROOK:
-        case BLACK_ROOK:
-            score += endgame?PSQ_TABLE_ROOK_EG[sq]:PSQ_TABLE_ROOK_MG[sq];
-            break;
-        case WHITE_QUEEN:
-        case BLACK_QUEEN:
-            score += endgame?PSQ_TABLE_QUEEN_EG[sq]:PSQ_TABLE_QUEEN_MG[sq];
-            break;
-        case WHITE_KING:
-        case BLACK_KING:
-            score += endgame?PSQ_TABLE_KING_EG[sq]:PSQ_TABLE_KING_MG[sq];
-            break;
-        default:
-            break;
-        }
-        TRACE_PSQ(piece, sq, endgame);
-    }
-
-    return score;
+    memset(&eval, 0, sizeof(struct eval));
+    return do_eval_psq(pos, &eval, side, endgame);
+#else
+    return do_eval_psq(pos, NULL, side, endgame);
+#endif
 }
 
-void eval_update_psq_score(struct gamestate *pos, int add, int piece, int sq)
+void eval_update_psq_score(struct position *pos, int add, int piece, int sq)
 {
     int delta;
     int color;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_piece(piece));
     assert(valid_square(sq));
 
@@ -1076,7 +1114,7 @@ void eval_update_psq_score(struct gamestate *pos, int add, int piece, int sq)
  * - King+Knight vs King
  * - King+Bishops vs King (if the bishops operate on the same color squares)
  */
-bool eval_is_material_draw(struct gamestate *pos)
+bool eval_is_material_draw(struct position *pos)
 {
     int wb;
     int wn;
@@ -1124,19 +1162,20 @@ bool eval_is_material_draw(struct gamestate *pos)
 }
 
 #ifdef TRACE
-void eval_generate_trace(struct gamestate *pos)
+void eval_generate_trace(struct position *pos, struct eval_trace *trace)
 {
     struct eval eval;
 
-    assert(valid_board(pos));
-    assert(pos->trace != NULL);
+    assert(valid_position(pos));
+    assert(trace != NULL);
 
     /* Clear the trace */
-    memset(pos->trace, 0, sizeof(struct eval_trace));
+    memset(trace, 0, sizeof(struct eval_trace));
     memset(&eval, 0, sizeof(struct eval));
+    eval.trace = trace;
 
     /* Calculate game phase */
-    pos->trace->phase = calculate_game_phase(pos);
+    trace->phase = calculate_game_phase(pos);
 
     /* If there is insufficiernt mating material there is nothing to do */
     if (eval_is_material_draw(pos)) {

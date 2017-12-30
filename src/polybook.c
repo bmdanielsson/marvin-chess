@@ -336,7 +336,7 @@ static uint8_t engine2poly_piece(uint8_t piece)
     }
 }
 
-static uint8_t engine2poly_enpassant(struct gamestate *pos, uint8_t ep)
+static uint8_t engine2poly_enpassant(struct position *pos, uint8_t ep)
 {
     int sq;
     int file;
@@ -360,7 +360,7 @@ static uint8_t engine2poly_turn(uint8_t side)
     return side == WHITE?1:0;
 }
 
-static uint32_t poly2engine_move(struct gamestate *pos, struct movelist *list,
+static uint32_t poly2engine_move(struct position *pos, struct movelist *list,
                                  uint16_t polymove)
 {
     uint32_t move;
@@ -387,7 +387,7 @@ static uint32_t poly2engine_move(struct gamestate *pos, struct movelist *list,
     return NOMOVE;
 }
 
-static uint64_t generate_polykey(struct gamestate *pos)
+static uint64_t generate_polykey(struct position *pos)
 {
     uint64_t key;
     int      k;
@@ -459,7 +459,7 @@ static bool read_book_entry(long offset, struct polybook_entry *entry)
     return true;
 }
 
-static struct book_entry* read_book_entries(struct gamestate *pos,
+static struct book_entry* read_book_entries(struct position *pos,
                                             uint64_t polykey, long index,
                                             int *count)
 {
@@ -554,7 +554,7 @@ void polybook_close(void)
  * A description of the opening book format can be found at:
  * http://hgm.nubati.net/book_format.html
  */
-uint32_t polybook_probe(struct gamestate *pos)
+uint32_t polybook_probe(struct position *pos)
 {
     uint64_t              polykey;
     struct polybook_entry polyentry;
@@ -567,7 +567,7 @@ uint32_t polybook_probe(struct gamestate *pos)
     long                  index;
     uint32_t              move;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 
     if (bookfp == NULL) {
         return NOMOVE;
@@ -635,7 +635,7 @@ uint32_t polybook_probe(struct gamestate *pos)
  * A description of the opening book format can be found at:
  * http://hgm.nubati.net/book_format.html
  */
-struct book_entry* polybook_get_entries(struct gamestate *pos, int *nentries)
+struct book_entry* polybook_get_entries(struct position *pos, int *nentries)
 {
     uint64_t              polykey;
     struct polybook_entry polyentry;
@@ -645,7 +645,7 @@ struct book_entry* polybook_get_entries(struct gamestate *pos, int *nentries)
     long                  center;
     long                  index;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
 
     if (bookfp == NULL) {
         return NOMOVE;

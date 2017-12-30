@@ -25,12 +25,12 @@
 /*
  * Handle an UCI command.
  *
- * @param pos The game state object.
+ * @param state The game state object.
  * @param cmd The command to handle.
  * @param stop Flag set if the engine should stop after this command.
  * @return Returns true if the command was handled, false otherwise.
  */
-bool uci_handle_command(struct gamestate *pos, char *cmd, bool *stop);
+bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop);
 
 /*
  * Function called during search to check if input has arrived.
@@ -43,16 +43,16 @@ bool uci_check_input(bool *ponderhit);
 /*
  * Send information about the principle variation.
  *
- * @param pos The board structure.
+ * @param state The board structure.
  * @param score The PV score.
  */
-void uci_send_pv_info(struct gamestate *pos, int score);
+void uci_send_pv_info(struct gamestate *state, int score);
 
 /*
  * Send information about the move currently being searched.
  *
- * @param pos The board structure.
+ * @param state The board structure.
  */
-void uci_send_move_info(struct gamestate *pos);
+void uci_send_move_info(struct gamestate *state);
 
 #endif

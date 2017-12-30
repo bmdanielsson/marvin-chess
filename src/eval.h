@@ -19,6 +19,7 @@
 #define EVAL_H
 
 #include "chess.h"
+#include "trace.h"
 
 /* Reset the evaluation module */
 void eval_reset(void);
@@ -26,18 +27,18 @@ void eval_reset(void);
 /*
  * Evaluate the position and assign a static score to it.
  *
- * @param pos The board structure.
+ * @param worker The worker.
  * @return Returns the score assigned to the position from the side
  *         to move point of view.
  */
-int eval_evaluate(struct gamestate *pos);
+int eval_evaluate(struct worker *worker);
 
 /*
  * Print evaluation details about the position.
  *
- * @param pos The board structure.
+ * @param worker The worker.
  */
-void eval_display(struct gamestate *pos);
+void eval_display(struct worker *worker);
 
 /*
  * Calculate the material for a specific side.
@@ -47,7 +48,7 @@ void eval_display(struct gamestate *pos);
  * @param endgame If the score should be or the endgame.
  * @return Returns the material score.
  */
-int eval_material(struct gamestate *pos, int side, bool endgame);
+int eval_material(struct position *pos, int side, bool endgame);
 
 /*
  * Incrementally update the material score for a piece.
@@ -56,7 +57,7 @@ int eval_material(struct gamestate *pos, int side, bool endgame);
  * @param pos The board structure.
  * @param piece The piece.
  */
-void eval_update_material_score(struct gamestate *pos, int add, int piece);
+void eval_update_material_score(struct position *pos, int add, int piece);
 
 /*
  * Calculate the piece/square table score for a specific side.
@@ -66,7 +67,7 @@ void eval_update_material_score(struct gamestate *pos, int add, int piece);
  * @param endgame If the score should be or the endgame.
  * @return Returns the piece/square table score.
  */
-int eval_psq(struct gamestate *pos, int side, bool endgame);
+int eval_psq(struct position *pos, int side, bool endgame);
 
 /*
  * Incrementally update the piece/square table score for a piece
@@ -77,7 +78,7 @@ int eval_psq(struct gamestate *pos, int side, bool endgame);
  * @param piece The piece.
  * @param sq The square.
  */
-void eval_update_psq_score(struct gamestate *pos, int add, int piece, int sq);
+void eval_update_psq_score(struct position *pos, int add, int piece, int sq);
 
 /*
  * Check if the position is a draw by insufficient material.
@@ -85,16 +86,16 @@ void eval_update_psq_score(struct gamestate *pos, int add, int piece, int sq);
  * @param pos The board structure.
  * @return Returns true if the position is a draw.
  */
-bool eval_is_material_draw(struct gamestate *pos);
+bool eval_is_material_draw(struct position *pos);
 
 #ifdef TRACE
 /*
  * Generate a trace for the evaluation function.
  *
- * @param pos The position. Before calling this function the trace structure
- *            must be allocated before calling this function.
+ * @param pos The position.
+ * @param trace The evaluation trace.
  */
-void eval_generate_trace(struct gamestate *pos);
+void eval_generate_trace(struct position *pos, struct eval_trace *trace);
 #endif
 
 #endif

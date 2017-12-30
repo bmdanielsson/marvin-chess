@@ -28,7 +28,7 @@
  * @param pos The board structure.
  * @param list The list to store the moves in.
  */
-void gen_moves(struct gamestate *pos, struct movelist *list);
+void gen_moves(struct position *pos, struct movelist *list);
 
 /*
  * Generate all legal move for this position.
@@ -36,7 +36,7 @@ void gen_moves(struct gamestate *pos, struct movelist *list);
  * @param pos The board structure.
  * @param list The list to store the moves in.
  */
-void gen_legal_moves(struct gamestate *pos, struct movelist *list);
+void gen_legal_moves(struct position *pos, struct movelist *list);
 
 /*
  * Generate moves for the quiscence search.
@@ -44,7 +44,7 @@ void gen_legal_moves(struct gamestate *pos, struct movelist *list);
  * @param pos The board structure.
  * @param list The list to store the moves in.
  */
-void gen_quiscence_moves(struct gamestate *pos, struct movelist *list,
+void gen_quiscence_moves(struct position *pos, struct movelist *list,
                          bool checks);
 
 /*
@@ -55,7 +55,7 @@ void gen_quiscence_moves(struct gamestate *pos, struct movelist *list,
  * @param list The list to store the moves in. Moves are appended to the list
  * so it must be initialized before first use.
  */
-void gen_normal_moves(struct gamestate *pos, struct movelist *list);
+void gen_normal_moves(struct position *pos, struct movelist *list);
 
 /*
  * Generate all capture moves (including en-passant). Promotions with
@@ -65,7 +65,7 @@ void gen_normal_moves(struct gamestate *pos, struct movelist *list);
  * @param list The list to store the moves in. Moves are appended to the list
  * so it must be initialized before first use.
  */
-void gen_capture_moves(struct gamestate *pos, struct movelist *list);
+void gen_capture_moves(struct position *pos, struct movelist *list);
 
 /*
  * Generate all promotion moves (excluding captures).
@@ -74,6 +74,6 @@ void gen_capture_moves(struct gamestate *pos, struct movelist *list);
  * @param list The list to store the moves in. Moves are appended to the list
  * so it must be initialized before first use.
  */
-void gen_promotion_moves(struct gamestate *pos, struct movelist *list);
+void gen_promotion_moves(struct position *pos, struct movelist *list);
 
 #endif

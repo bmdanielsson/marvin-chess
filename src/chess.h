@@ -221,6 +221,9 @@ enum {
  */
 #define PAWN_BASE_VALUE 100
 
+/* The maximum number of supported workers */
+#define MAX_WORKERS 16
+
 /* Data structure used to keep track of the principle variation */
 struct pv {
     /* The moves that makes up the principle variation */
@@ -376,18 +379,8 @@ struct pawntt_item {
     uint8_t padding[52];
 };
 
-/* Enum for different chess protocols */
-enum protocol {
-    PROTOCOL_UNSET,
-    PROTOCOL_UCI,
-    PROTOCOL_XBOARD
-};
-
-/* Data structure holding the state of an ongoing game */
-struct gamestate {
-    /* Engine protocol mode */
-    enum protocol protocol;
-
+/* Internal representation of a chess position */
+struct position {
     /*
      * Location of each piece on the board. An
      * empty square is identified NO_PIECE.
@@ -406,7 +399,6 @@ struct gamestate {
      * the pawns in the current position.
      */
     uint64_t pawnkey;
-
     /* The en-passant target square */
     int ep_sq;
     /* Castling availability for both sides */
@@ -421,13 +413,27 @@ struct gamestate {
     int fifty;
     /* Fullmove counter */
     int fullmove;
-
     /* Game history used for undoing moves */
     struct unmake history[MAX_HISTORY_SIZE];
-    /* Move selector struct for each ply in the search tree */
-    struct moveselect ppms[MAX_PLY];
+    /*
+     * The material score and piece/square table score for each
+     * player. These value is incrementally updated during the search.
+     */
+    int material[NPHASES][NSIDES];
+    int psq[NPHASES][NSIDES];
+
+    struct worker *worker;
+    struct gamestate *state;
+};
+
+/* Per-thread worker instance */
+struct worker {
+    /* The current position */
+    struct position pos;
     /* List of moves to search */
     struct movelist root_moves;
+    /* Move selector struct for each ply in the search tree */
+    struct moveselect ppms[MAX_PLY];
     /*
      * Parameter used during the search to keep track of the current
      * principle variation at a certain depth. After the search the
@@ -442,34 +448,40 @@ struct gamestate {
     uint32_t best_move;
     /* The move the engine would like to ponder on */
     uint32_t ponder_move;
-
-    /* Default size of the main transposition table (in MB) */
-    int default_hash_size;
-    /* Main transposition table */
-    struct tt_bucket *tt_table;
-    /* The number of entries in the transposition table */
-    int tt_size;
-    /* The current "date" of the transposition table */
-    uint8_t date;
-
     /* Pawn transposition table */
-    struct pawntt_item *pawntt_table;
+    struct pawntt_item *pawntt;
     /* The number of entries in the pawn transposition table */
     int pawntt_size;
+    /* Flag indicating if it's time to abort the search */
+    bool abort;
+    /* Indicates if the engine is resolving a fail-low/fail-high at the root */
+    bool resolving_root_fail;
+    /* The number of nodes searched so far */
+    uint32_t nodes;
+    /* The number of quiscence nodes searched so far */
+    uint32_t qnodes;
+    /* The current search depth in plies */
+    int depth;
+    /* The current selective search depth in plies */
+    int seldepth;
+    /* The move currently being searched */
+    uint32_t currmove;
+    /* The number of the move currently being searched (one-based) */
+    int currmovenumber;
 
-    /* Flag indicating if Syzygy tablebases should be used */
-    bool use_tablebases;
-    /* Value indicating which tablebases are available */
-    int tb_men;
+    struct gamestate *state;
+};
+
+/* Data structure holding the state of an ongoing game */
+struct gamestate {
+    /* Search workers */
+    struct worker worker;
     /* Flag indicating if the root position was found in the tablebases */
     bool root_in_tb;
     /* Score for the root position based on tablebases */
     int  root_tb_score;
     /* Flag indicating if the WDL tables should be probed during search */
     bool probe_wdl;
-
-    /* Flag indicating if it's time to abort the search */
-    bool abort;
     /*
      * Indicates if it is ok for the engine to abort a
      * search if it detects a mate.
@@ -479,67 +491,16 @@ struct gamestate {
     int sd;
     /* Flag used to suppress output during search */
     bool silent;
-    /* Flag indicating if the engine should use it's own opening book */
-    bool use_own_book;
     /*
      * Flag indicating if the engine is currently following
      * the opening book.
      */
     bool in_book;
-    /* Flag indicating if pondering is enabled */
-    bool ponder;
 	/*
 	 * Flag indicating if the engine is currently
 	 * searching in pondering mode.
 	 */
 	bool pondering;
-
-    /* The time control type to use for the search */
-    enum timectl_type tc_type;
-    /* The number of milliseconds left on the clock */
-    int time_left;
-    /* The time increment (in milliseconds) */
-    int increment;
-    /* The number of moves to the next time control */
-    int movestogo;
-    /* The time when the current search was started */
-    time_t search_start;
-    /*
-     * Limit on how long the engine is allowed to search. In
-     * some special circumstances it can be ok to exceed
-     * this limit.
-     */
-    time_t soft_time_limit;
-    /* A hard time limit that may not be exceeded */
-    time_t hard_time_limit;
-    /* Indicates if the engine is resolving a fail-low/fail-high at the root */
-    bool resolving_root_fail;
-
-    /*
-     * The material score and piece/square table score for each
-     * player. These value is incrementally updated during the search.
-     */
-    int material[NPHASES][NSIDES];
-    int psq[NPHASES][NSIDES];
-
-    /* The current search depth in plies */
-    int depth;
-    /* The current selective search depth in plies */
-    int seldepth;
-    /* The move currently being searched */
-    uint32_t currmove;
-    /* The number of the move currently being searched (one-based) */
-    int currmovenumber;
-    /* The number of nodes searched so far */
-    uint32_t nodes;
-    /* The number of quiscence nodes searched so far */
-    uint32_t qnodes;
-    /* The number of entries used in the main transposition table */
-    uint32_t tt_used;
-
-#ifdef TRACE
-    struct eval_trace *trace;
-#endif
 };
 
 /* Bitboard mask for each square */
@@ -634,33 +595,29 @@ extern int mirror_table[NSQUARES];
 /* Table containing the square color for all squares on the chess table */
 extern int sq_color[NSQUARES];
 
-/* Path to Syzygy tablebases */
-extern char syzygy_path[1024];
-
 /* Initialize chess data */
 void chess_data_init(void);
 
 /*
  * Create a new game state object.
  *
- * @param hash_size The size of the main transposition table.
  * @return Returns the new object.
  */
-struct gamestate* create_game_state(int hash_size);
+struct gamestate* create_game_state(void);
 
 /*
  * Destroy a game state object.
  *
- * @param pos The object to destroy.
+ * @param state The object to destroy.
  */
-void destroy_game_state(struct gamestate *pos);
+void destroy_game_state(struct gamestate *state);
 
 /*
  * Reset a game state object.
  *
- * @param pos The object to destroy.
+ * @param state The object to destroy.
  */
-void reset_game_state(struct gamestate *pos);
+void reset_game_state(struct gamestate *state);
 
 /*
  * Convert a move into a string representation.
@@ -677,6 +634,6 @@ void move2str(uint32_t move, char *str);
  * @param pos The current chess position.
  * @return Returns the move in our internal representation.
  */
-uint32_t str2move(char *str, struct gamestate *pos);
+uint32_t str2move(char *str, struct position *pos);
 
 #endif

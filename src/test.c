@@ -30,6 +30,8 @@
 #include "movegen.h"
 #include "validation.h"
 #include "moveselect.h"
+#include "engine.h"
+#include "timectl.h"
 
 /* Positions used for benchmark */
 struct benchmark_positions {
@@ -49,7 +51,7 @@ struct benchmark_positions positions[] = {
     {"r1bqk2r/pp2bppp/2p5/3pP3/P2Q1P2/2N1B3/1PP3PP/R4RK1 b kq - 0 1", 16}
 };
 
-static void perft(struct gamestate *pos, int depth, uint32_t *nleafs)
+static void perft(struct position *pos, int depth, uint32_t *nleafs)
 {
     struct movelist list;
     int             k;
@@ -71,12 +73,12 @@ static void perft(struct gamestate *pos, int depth, uint32_t *nleafs)
     }
 }
 
-void test_run_perft(struct gamestate *pos, int depth)
+void test_run_perft(struct position *pos, int depth)
 {
     uint32_t nleafs;
     char     fenstr[FEN_MAX_LENGTH];
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(depth > 0);
 
     fen_build_string(pos, fenstr);
@@ -86,7 +88,7 @@ void test_run_perft(struct gamestate *pos, int depth)
     printf("Nodes: %u\n", nleafs);
 }
 
-void test_run_divide(struct gamestate *pos, int depth)
+void test_run_divide(struct position *pos, int depth)
 {
     struct movelist list;
     uint32_t        nleafs;
@@ -95,7 +97,7 @@ void test_run_divide(struct gamestate *pos, int depth)
     char            movestr[6];
     char            fenstr[FEN_MAX_LENGTH];
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(depth > 0);
 
     fen_build_string(pos, fenstr);
@@ -120,7 +122,7 @@ void test_run_divide(struct gamestate *pos, int depth)
 
 void test_run_benchmark(void)
 {
-    struct gamestate *pos;
+    struct gamestate *state;
     int              k;
     int              npos;
     uint64_t         nodes;
@@ -128,20 +130,21 @@ void test_run_benchmark(void)
     time_t           total;
     uint32_t         ponder_move;
 
-    pos = create_game_state(DEFAULT_MAIN_HASH_SIZE);
+    engine_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
+
+    state = create_game_state();
     nodes = 0ULL;
     start = get_current_time();
     npos = sizeof(positions)/sizeof(struct benchmark_positions);
     for (k=0;k<npos;k++) {
-        board_setup_from_fen(pos, positions[k].fen);
-        search_reset_data(pos);
-        pos->tc_type = TC_INFINITE;
-        pos->sd = positions[k].depth;
-        pos->silent = true;
-        pos->use_tablebases = false;
+        board_setup_from_fen(&state->worker.pos, positions[k].fen);
+        search_reset_data(state);
+        tc_configure_time_control(TC_INFINITE, 0, 0, 0);
+        state->sd = positions[k].depth;
+        state->silent = true;
 
-        (void)search_find_best_move(pos, false, &ponder_move);
-        nodes += pos->nodes;
+        (void)search_find_best_move(state, false, false, false, &ponder_move);
+        nodes += state->worker.nodes;
 
         printf("#");
     }
@@ -153,5 +156,5 @@ void test_run_benchmark(void)
     printf("Total number of nodes: %"PRIu64"\n", nodes);
     printf("Speed: %.2fkN/s\n", ((double)nodes)/(total/1000.0)/1000);
 
-    destroy_game_state(pos);
+    destroy_game_state(state);
 }

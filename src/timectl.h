@@ -23,52 +23,67 @@
 /*
  * Configure the time control to use for the next search.
  *
- * @param pos The board structure.
  * @param type Time control type.
  * @param time The number of milliseconds left on the clock for the engine.
- *             TC_FIXED: the time to search for
  * @param inc The time increment.
  * @param movestogo The number of moves left to the next time control.
  */
-void tc_configure_time_control(struct gamestate *pos, enum timectl_type type,
-                               int time, int inc, int movestogo);
+void tc_configure_time_control(enum timectl_type type, int time, int inc,
+                               int movestogo);
 
 /*
  * Check if the the time control is flexible or if any part of it is fixed.
  *
- * @param pos The board structure.
  * @return Return true if the time control is flexible.
  */
-bool tc_is_flexible(struct gamestate *pos);
+bool tc_is_flexible(void);
+
+/*
+ * Check if the an infinite time control has been configured.
+ *
+ * @return Return true if the time control is infinite.
+ */
+bool tc_is_infinite(void);
 
 /*
  * Start the clock.
- *
- * @param pos The board structure.
  */
-void tc_start_clock(struct gamestate *pos);
+void tc_start_clock(void);
 
 /*
  * Allocate time for the current search.
- *
- * @param pos The board structure.
  */
-void tc_allocate_time(struct gamestate *pos);
+void tc_allocate_time(void);
+
+/*
+ * Update the remaining time.
+ *
+ * @param time The remaining time.
+ */
+void tc_update_time(int time);
+
+/*
+ * Get the time since the search was started.
+ *
+ * @return Returns the number of elapsed milli seconds since the search was
+ *         started.
+ */
+time_t tc_elapsed_time(void);
 
 /*
  * Check if there is still time left.
  *
- * @param pos The board structure.
+ * @param worker The worker.
  * @return Returns true if there is more time left.
  */
-bool tc_check_time(struct gamestate *pos);
+bool tc_check_time(struct worker *worker);
 
 /*
  * Check if there is enough time left to start a new search iteration.
  *
- * @param pos The board structure.
+ * @param worker The worker.
  * @return Returns true if there is enough time left.
  */
-bool tc_new_iteration(struct gamestate *pos);
+bool tc_new_iteration(struct worker *worker);
 
 #endif
