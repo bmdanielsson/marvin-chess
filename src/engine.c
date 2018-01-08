@@ -71,7 +71,7 @@ static void cmd_bench(void)
  */
 static void cmd_browse(struct gamestate *state)
 {
-    dbg_browse_transposition_table(&state->worker.pos);
+    dbg_browse_transposition_table(&state->pos);
 }
 
 /*
@@ -80,7 +80,7 @@ static void cmd_browse(struct gamestate *state)
  */
 static void cmd_display(struct gamestate *state)
 {
-    dbg_print_board(&state->worker.pos);
+    dbg_print_board(&state->pos);
 }
 
 /*
@@ -102,7 +102,7 @@ static void cmd_divide(char *cmd, struct gamestate *state)
         return;
     }
 
-    test_run_divide(&state->worker.pos, depth);
+    test_run_divide(&state->pos, depth);
 }
 
 /*
@@ -111,7 +111,10 @@ static void cmd_divide(char *cmd, struct gamestate *state)
  */
 static void cmd_eval(struct gamestate *state)
 {
+    (void)state;
+    /* TODO Implement this
     eval_display(&state->worker);
+    */
 }
 
 /*
@@ -163,7 +166,7 @@ static void cmd_perft(char *cmd, struct gamestate *state)
         return;
     }
 
-    test_run_perft(&state->worker.pos, depth);
+    test_run_perft(&state->pos, depth);
 }
 
 void engine_loop(struct gamestate *state)
@@ -271,7 +274,7 @@ void engine_clear_pending_command(void)
     pending_cmd_buffer[0] = '\0';
 }
 
-bool engine_check_input(struct gamestate *state, bool *ponderhit)
+bool engine_check_input(struct search_worker *worker, bool *ponderhit)
 {
     *ponderhit = false;
 
@@ -282,13 +285,14 @@ bool engine_check_input(struct gamestate *state, bool *ponderhit)
     if (engine_protocol == PROTOCOL_UCI) {
         return uci_check_input(ponderhit);
     } else {
-        return xboard_check_input(state, ponderhit);
+        return xboard_check_input(worker, ponderhit);
     }
 
     return false;
 }
 
-void engine_send_pv_info(struct gamestate *state, int score)
+void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
+                         int seldepth, int score, uint32_t nodes)
 {
     char movestr[6];
     char buffer[1024];
@@ -296,30 +300,32 @@ void engine_send_pv_info(struct gamestate *state, int score)
     int  k;
     int  nlines;
 
-    if (state->silent) {
+    (void)seldepth;
+
+    if (worker->state->silent) {
         return;
     }
 
     if (engine_protocol == PROTOCOL_UCI) {
-        return uci_send_pv_info(state, score);
+        return uci_send_pv_info(worker, pv, depth, seldepth, score, nodes);
     } else if (engine_protocol == PROTOCOL_XBOARD) {
-        return xboard_send_pv_info(state, score);
+        return xboard_send_pv_info(worker, pv, depth, score, nodes);
     }
 
     /* Get the currently searched time */
     msec = (int)tc_elapsed_time();
 
     printf("=> depth: %d, score: %d, time: %d, nodes: %d\n",
-           state->worker.depth, score, msec, state->worker.nodes);
+           depth, score, msec, nodes);
     buffer[0] = '\0';
     nlines = 1;
     strcat(buffer, "  ");
-    for (k=0;k<state->worker.pv_table[0].length;k++) {
+    for (k=0;k<pv->length;k++) {
         strcat(buffer, " ");
-        move2str(state->worker.pv_table[0].moves[k], movestr);
+        move2str(pv->moves[k], movestr);
         strcat(buffer, movestr);
         if (((int)strlen(buffer) > (nlines*70)) &&
-            ((k+1) < state->worker.pv_table[0].length)) {
+            ((k+1) < pv->length)) {
             strcat(buffer, "\n  ");
             nlines++;
         }
@@ -327,13 +333,13 @@ void engine_send_pv_info(struct gamestate *state, int score)
     printf("%s\n", buffer);
 }
 
-void engine_send_move_info(struct gamestate *state)
+void engine_send_move_info(struct search_worker *worker)
 {
-    if (state->silent) {
+    if (worker->state->silent) {
         return;
     }
 
     if (engine_protocol == PROTOCOL_UCI) {
-        uci_send_move_info(state);
+        uci_send_move_info(worker);
     }
 }

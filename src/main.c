@@ -33,6 +33,7 @@
 #include "test.h"
 #include "eval.h"
 #include "tbprobe.h"
+#include "smp.h"
 
 /* The maximum length of a line in the configuration file */
 #define CFG_MAX_LINE_LENGTH 1024
@@ -83,7 +84,7 @@ static void read_config_file(void)
 
 int main(int argc, char *argv[])
 {
-    struct gamestate *pos;
+    struct gamestate *state;
 
     /* Register a clean up function */
     atexit(cleanup);
@@ -104,6 +105,10 @@ int main(int argc, char *argv[])
     eval_reset();
     polybook_open(BOOKFILE_NAME);
 
+    /* Setup SMP */
+    smp_init();
+    smp_create_workers(1);
+
     /* Handle specific benchmark command line option */
     if ((argc == 2) && !strncmp(argv[1], "-b", 2)) {
         test_run_benchmark();
@@ -111,17 +116,19 @@ int main(int argc, char *argv[])
     }
 
     /* Create game state */
-    pos = create_game_state();
-    if (pos == NULL) {
+    state = create_game_state();
+    if (state == NULL) {
         return 1;
     }
 
     /* Enter the main engine loop */
-    engine_loop(pos);
+    engine_loop(state);
 
-    /* Destroy game state */
+    /* Clean up */
     polybook_close();
-    destroy_game_state(pos);
+    destroy_game_state(state);
+    smp_destroy_workers();
+    smp_destroy();
 
     return 0;
 }

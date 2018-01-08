@@ -75,25 +75,30 @@ void engine_clear_pending_command(void);
 /*
  * Function called during search to check if input has arrived.
  *
- * @param state The board structure.
+ * @param worker The worker.
  * @param ponderhit Location to store if a ponderhit command was received.
  * @return Returns true if the current search should be stopped.
  */
-bool engine_check_input(struct gamestate *state, bool *ponderhit);
+bool engine_check_input(struct search_worker *worker, bool *ponderhit);
 
 /*
  * Send information about the principle variation.
  *
- * @param state The board structure.
+ * @param worker The worker
+ * @param pv The pv.
+ * @param depth The depth.
+ * @param seldepth The selctive depth.
  * @param score The PV score.
+ * @param nodes The number of searched nodes.
  */
-void engine_send_pv_info(struct gamestate *state, int score);
+void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
+                         int seldepth, int score, uint32_t nodes);
 
 /*
  * Send information about the move currently being searched.
  *
- * @param state The board structure.
+ * @param worker The worker.
  */
-void engine_send_move_info(struct gamestate *state);
+void engine_send_move_info(struct search_worker *worker);
 
 #endif

@@ -170,7 +170,7 @@ void tc_update_time(int time)
     search_time_left = time;
 }
 
-bool tc_check_time(struct worker *worker)
+bool tc_check_time(struct search_worker *worker)
 {
     assert(worker != NULL);
 
@@ -189,7 +189,7 @@ bool tc_check_time(struct worker *worker)
     }
 }
 
-bool tc_new_iteration(struct worker *worker)
+bool tc_new_iteration(struct search_worker *worker)
 {
     return worker->state->pondering || (time_control_type == TC_INFINITE) ||
            (get_current_time() < soft_time_limit);

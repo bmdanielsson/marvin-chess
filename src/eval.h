@@ -31,14 +31,14 @@ void eval_reset(void);
  * @return Returns the score assigned to the position from the side
  *         to move point of view.
  */
-int eval_evaluate(struct worker *worker);
+int eval_evaluate(struct search_worker *worker);
 
 /*
  * Print evaluation details about the position.
  *
  * @param worker The worker.
  */
-void eval_display(struct worker *worker);
+void eval_display(struct search_worker *worker);
 
 /*
  * Calculate the material for a specific side.

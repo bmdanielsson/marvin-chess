@@ -22,6 +22,8 @@
 #include <stdbool.h>
 #include <time.h>
 
+#include "thread.h"
+
 /* The number of sides */
 #define NSIDES 2
 
@@ -221,9 +223,6 @@ enum {
  */
 #define PAWN_BASE_VALUE 100
 
-/* The maximum number of supported workers */
-#define MAX_WORKERS 16
-
 /* Data structure used to keep track of the principle variation */
 struct pv {
     /* The moves that makes up the principle variation */
@@ -422,12 +421,14 @@ struct position {
     int material[NPHASES][NSIDES];
     int psq[NPHASES][NSIDES];
 
-    struct worker *worker;
+    struct search_worker *worker;
     struct gamestate *state;
 };
 
 /* Per-thread worker instance */
-struct worker {
+struct search_worker {
+    /* The id of this thread */
+    int id;
     /* The current position */
     struct position pos;
     /* List of moves to search */
@@ -444,10 +445,6 @@ struct worker {
     uint32_t killer_table[MAX_PLY][2];
     /* Tables used for history heuristics */
     int history_table[NSIDES][NSQUARES][NSQUARES];
-    /* The best move found so far */
-    uint32_t best_move;
-    /* The move the engine would like to ponder on */
-    uint32_t ponder_move;
     /* Pawn transposition table */
     struct pawntt_item *pawntt;
     /* The number of entries in the pawn transposition table */
@@ -469,13 +466,27 @@ struct worker {
     /* The number of the move currently being searched (one-based) */
     int currmovenumber;
 
+    /* The best move found so far */
+    uint32_t best_move;
+    int best_score;
+    struct pv best_pv;
+    uint32_t ponder_move;
+
+    /* Data for the worker thread */
+    thread_t thread;
+    event_t ev_start;
+    event_t ev_done;
+    int action;
+
     struct gamestate *state;
 };
 
 /* Data structure holding the state of an ongoing game */
 struct gamestate {
-    /* Search workers */
-    struct worker worker;
+    /* The current position */
+    struct position pos;
+    /* List of moves to search */
+    struct movelist root_moves;
     /* Flag indicating if the root position was found in the tablebases */
     bool root_in_tb;
     /* Score for the root position based on tablebases */
@@ -501,6 +512,14 @@ struct gamestate {
 	 * searching in pondering mode.
 	 */
 	bool pondering;
+    /*The best move */
+    uint32_t best_move;
+    /*The ponder move */
+    uint32_t ponder_move;
+    /* The depth completed so far */
+    int completed_depth;
+    /* The  number of moves searched */
+    uint32_t nodes;
 };
 
 /* Bitboard mask for each square */
@@ -635,5 +654,13 @@ void move2str(uint32_t move, char *str);
  * @return Returns the move in our internal representation.
  */
 uint32_t str2move(char *str, struct position *pos);
+
+/*
+ * Copy one pv to another.
+ *
+ * @param from The pv to copy from.
+ * @param to The pv to copy to.
+ */
+void copy_pv(struct pv *from, struct pv *to);
 
 #endif

@@ -313,13 +313,9 @@ struct gamestate* create_game_state(void)
         return NULL;
     }
     memset(state, 0, sizeof(struct gamestate));
-    state->worker.state = state;
-    state->worker.pos.state = state;
-    state->worker.pos.worker = &state->worker;
     hash_tt_create_table(engine_default_hash_size);
-    hash_pawntt_create_table(&state->worker, PAWN_HASH_SIZE);
-    board_reset(&state->worker.pos);
-    board_start_position(&state->worker.pos);
+    board_reset(&state->pos);
+    board_start_position(&state->pos);
 
     return state;
 }
@@ -329,15 +325,13 @@ void destroy_game_state(struct gamestate *state)
     assert(state != NULL);
 
     hash_tt_destroy_table();
-    hash_pawntt_destroy_table(&state->worker);
     free(state);
 }
 
 void reset_game_state(struct gamestate *state)
 {
-    board_start_position(&state->worker.pos);
+    board_start_position(&state->pos);
     hash_tt_clear_table();
-    hash_pawntt_clear_table(&state->worker);
 }
 
 void move2str(uint32_t move, char *str)
@@ -443,4 +437,14 @@ uint32_t str2move(char *str, struct position *pos)
     }
 
     return NOMOVE;
+}
+
+void copy_pv(struct pv *from, struct pv *to)
+{
+    int k;
+
+    to->length = from->length;
+    for (k=0;k<from->length;k++) {
+        to->moves[k] = from->moves[k];
+    }
 }

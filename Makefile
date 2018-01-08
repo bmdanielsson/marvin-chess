@@ -93,6 +93,7 @@ SOURCES = src/bitboard.c \
           src/polybook.c \
           src/search.c \
           src/see.c \
+          src/smp.c \
           src/test.c \
           src/thread.c \
           src/timectl.c \
@@ -116,6 +117,7 @@ TUNER_SOURCES = src/bitboard.c \
                 src/polybook.c \
                 src/search.c \
                 src/see.c \
+                src/smp.c \
                 src/test.c \
                 src/thread.c \
                 src/timectl.c \

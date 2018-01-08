@@ -36,6 +36,7 @@
 #include "polybook.h"
 #include "debug.h"
 #include "tbprobe.h"
+#include "smp.h"
 
 /* Possible game results */
 enum game_result {
@@ -85,8 +86,8 @@ static void update_moves_to_time_control(struct gamestate *state)
         return;
     }
 
-    moves_in_tc = state->worker.pos.fullmove%moves_per_time_control;
-    if (state->worker.pos.fullmove == 1) {
+    moves_in_tc = state->pos.fullmove%moves_per_time_control;
+    if (state->pos.fullmove == 1) {
         /*
          * This is the first move of the game so the number of
          * moves to go have already been set.
@@ -108,7 +109,7 @@ static void write_result(struct gamestate *state, enum game_result result)
 {
 	switch (result) {
 	case RESULT_CHECKMATE:
-		if (state->worker.pos.stm == WHITE) {
+		if (state->pos.stm == WHITE) {
 			engine_write_command("0-1 {Black mates}");
         } else {
 			engine_write_command("1-0 {White mates}");
@@ -125,18 +126,18 @@ static void write_result(struct gamestate *state, enum game_result result)
 	}
 }
 
-static void write_search_status(struct gamestate *state)
+static void write_search_status(struct search_worker *worker)
 {
 	uint32_t msec;
 	char     movestr[6];
     int      moves_left;
 
 	msec = tc_elapsed_time();
-	move2str(state->worker.currmove, movestr);
-    moves_left = state->worker.root_moves.nmoves - state->worker.currmovenumber;
-	engine_write_command("stat01: %d %d %d %d %d %s\n", msec/10,
-                         state->worker.nodes, state->worker.depth, moves_left,
-                         state->worker.root_moves.nmoves, movestr);
+	move2str(worker->currmove, movestr);
+    moves_left = worker->root_moves.nmoves - worker->currmovenumber;
+	engine_write_command("stat01: %d %d %d %d %d %s\n", msec/10, smp_nodes(),
+                         worker->depth, moves_left, worker->root_moves.nmoves,
+                         movestr);
 }
 
 static bool is_three_fold_repetition(struct position *pos)
@@ -215,8 +216,9 @@ static void make_engine_move(struct gamestate *state)
                                   engine_time_increment, moves_to_time_control);
 
         /* Search the position for a move */
-        best_move = search_find_best_move(state, ponder_mode && ponder, true,
-                                          tablebase_mode, &ponder_move);
+        smp_search(state, ponder_mode && ponder, true, tablebase_mode);
+        best_move = state->best_move;
+        ponder_move = state->ponder_move;
 
         /*
          * If the search finishes while the engine is pondering
@@ -224,19 +226,19 @@ static void make_engine_move(struct gamestate *state)
          * in order to handle the user move and restart the search.
          */
         if (pondering_on != NOMOVE) {
-            board_unmake_move(&state->worker.pos);
+            board_unmake_move(&state->pos);
             break;
         }
 
         /* Make move */
-        (void)board_make_move(&state->worker.pos, best_move);
+        (void)board_make_move(&state->pos, best_move);
 
         /* Send move */
         move2str(best_move, best_movestr);
         engine_write_command("move %s", best_movestr);
 
         /* Check if the game is over */
-        result = is_game_over(&state->worker.pos);
+        result = is_game_over(&state->pos);
         if (result != RESULT_UNDETERMINED) {
             write_result(state, result);
             game_over = true;
@@ -249,9 +251,9 @@ static void make_engine_move(struct gamestate *state)
 			 * Make the pondering move. If the move causes
 			 * the game to finish then cancel pondering.
 			 */
-			(void)board_make_move(&state->worker.pos, ponder_move);
-			if (is_game_over(&state->worker.pos) != RESULT_UNDETERMINED) {
-				board_unmake_move(&state->worker.pos);
+			(void)board_make_move(&state->pos, ponder_move);
+			if (is_game_over(&state->pos) != RESULT_UNDETERMINED) {
+				board_unmake_move(&state->pos);
 				break;
 			}
 
@@ -266,8 +268,7 @@ static void make_engine_move(struct gamestate *state)
 
 static void xboard_cmd_analyze(struct gamestate *state)
 {
-    uint32_t ponder_move;
-    char     *cmd;
+    char *cmd;
 
     analyze_mode = true;
 
@@ -278,9 +279,8 @@ static void xboard_cmd_analyze(struct gamestate *state)
         engine_clear_pending_command();
         tc_configure_time_control(TC_INFINITE, 0, 0, 0);
 
-        /* Until told otherwise */
-        (void)search_find_best_move(state, false, false, tablebase_mode,
-                                    &ponder_move);
+        /* Search until told otherwise */
+        smp_search(state, false, false, tablebase_mode);
 
         /* Exit analyze mode if there is no pending command */
         cmd = engine_get_pending_command();
@@ -314,7 +314,7 @@ static void xboard_cmd_bk(struct gamestate *state)
     int               sum;
 
     /* Find all book moves for this position */
-    entries = polybook_get_entries(&state->worker.pos, &nentries);
+    entries = polybook_get_entries(&state->pos, &nentries);
     if ((entries == NULL) || (nentries == 0)) {
         engine_write_command(" No book moves found");
         engine_write_command("");
@@ -335,6 +335,23 @@ static void xboard_cmd_bk(struct gamestate *state)
     engine_write_command("");
 
     free(entries);
+}
+
+static void xboard_cmd_cores(char *cmd)
+{
+    int ncores;
+
+    if (sscanf(cmd, "cores %d", &ncores) == 1) {
+        if (ncores > MAX_WORKERS) {
+            ncores = MAX_WORKERS;
+        } else if (ncores < 1) {
+            ncores = 1;
+        }
+        smp_destroy_workers();
+        smp_create_workers(ncores);
+    } else {
+        engine_write_command("Error (malformed command): %s", cmd);
+    }
 }
 
 static void xboard_cmd_easy(void)
@@ -375,7 +392,7 @@ static void xboard_cmd_force(void)
 
 static void xboard_cmd_go(struct gamestate *state)
 {
-    engine_side = state->worker.pos.stm;
+    engine_side = state->pos.stm;
     force_mode = false;
     if (!game_over) {
         make_engine_move(state);
@@ -390,20 +407,19 @@ static void xboard_cmd_hard(void)
 static void xboard_cmd_hint(struct gamestate *state)
 {
     uint32_t move;
-    uint32_t ponder_move;
     char     movestr[6];
 
     /* Check the opening book */
-    move = polybook_probe(&state->worker.pos);
+    move = polybook_probe(&state->pos);
 
     /*
      * If there is no move in the opening book try to
      * find a move to suggest through other means.
      */
     if (move == NOMOVE) {
-        /* Check if there is a move in the priciple variation */
-        if (state->worker.ponder_move != NOMOVE) {
-            move = state->worker.ponder_move;
+        /* Check if there is a ponder move */
+        if (state->ponder_move != NOMOVE) {
+            move = state->ponder_move;
         } else {
 		    /*
              * If all else fails do a shallow search to
@@ -413,8 +429,8 @@ static void xboard_cmd_hint(struct gamestate *state)
             tc_configure_time_control(TC_INFINITE, 0, 0, 0);
 		    state->sd = 6;
             state->silent = true;
-            move = search_find_best_move(state, false, true, tablebase_mode,
-                                         &ponder_move);
+            smp_search(state, false, true, tablebase_mode);
+            move = state->best_move;
             state->silent = false;
         }
 	}
@@ -555,7 +571,7 @@ static void xboard_cmd_ping(char *cmd)
 static void xboard_cmd_playother(struct gamestate *state)
 {
     force_mode = false;
-    engine_side = FLIP_COLOR(state->worker.pos.stm);
+    engine_side = FLIP_COLOR(state->pos.stm);
 }
 
 static void xboard_cmd_post(void)
@@ -578,18 +594,19 @@ static void xboard_cmd_protover(void)
 	engine_write_command("feature name=0");
 	engine_write_command("feature nps=0");
 	engine_write_command("feature memory=1");
+	engine_write_command("feature smp=1");
 	engine_write_command("feature egt=\"syzygy\"");
     engine_write_command("feature done=1");
 }
 
 static void xboard_cmd_remove(struct gamestate *state)
 {
-    if (state->worker.pos.ply >= 2) {
-        board_unmake_move(&state->worker.pos);
-        board_unmake_move(&state->worker.pos);
+    if (state->pos.ply >= 2) {
+        board_unmake_move(&state->pos);
+        board_unmake_move(&state->pos);
     }
 
-    game_over = is_game_over(&state->worker.pos) != RESULT_UNDETERMINED;
+    game_over = is_game_over(&state->pos) != RESULT_UNDETERMINED;
 }
 
 static void xboard_cmd_sd(char *cmd)
@@ -614,7 +631,7 @@ static void xboard_cmd_setboard(char *cmd, struct gamestate *state)
         return;
     }
 
-    if (!board_setup_from_fen(&state->worker.pos, iter+1)) {
+    if (!board_setup_from_fen(&state->pos, iter+1)) {
         engine_write_command("tellusererror Illegal position");
     }
 }
@@ -651,15 +668,15 @@ static void xboard_cmd_time(char *cmd)
 static void xboard_cmd_undo(struct gamestate *state)
 {
     if (force_mode || analyze_mode) {
-        if (state->worker.pos.ply >= 1) {
-            board_unmake_move(&state->worker.pos);
+        if (state->pos.ply >= 1) {
+            board_unmake_move(&state->pos);
         }
     } else {
         engine_write_command("Error (command not legal now): undo");
         return;
     }
 
-    game_over = is_game_over(&state->worker.pos) != RESULT_UNDETERMINED;
+    game_over = is_game_over(&state->pos) != RESULT_UNDETERMINED;
 }
 
 static void xboard_cmd_usermove(char *cmd, struct gamestate *state,
@@ -675,20 +692,20 @@ static void xboard_cmd_usermove(char *cmd, struct gamestate *state,
         engine_write_command("Error (malformed command): %s", cmd);
         return;
     }
-    move = str2move(iter+1, &state->worker.pos);
+    move = str2move(iter+1, &state->pos);
     if (move == NOMOVE) {
         engine_write_command("Illegal move: %s", cmd);
         return;
     }
 
     /* Make the move */
-    if (!board_make_move(&state->worker.pos, move)) {
+    if (!board_make_move(&state->pos, move)) {
         engine_write_command("Illegal move: %s", cmd);
         return;
     }
 
     /* Check if the game is over */
-    result = is_game_over(&state->worker.pos);
+    result = is_game_over(&state->pos);
     if (result != RESULT_UNDETERMINED) {
         write_result(state, result);
         game_over = true;
@@ -734,6 +751,8 @@ bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop)
         xboard_cmd_bk(state);
     } else if (!strncmp(cmd, "computer", 8)) {
         /* Ignore */
+    } else if (!strncmp(cmd, "cores", 5)) {
+        xboard_cmd_cores(cmd);
     } else if (!strncmp(cmd, "easy", 4)) {
         xboard_cmd_easy();
     } else if (!strncmp(cmd, "exit", 4)) {
@@ -800,12 +819,12 @@ bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop)
     return true;
 }
 
-bool xboard_check_input(struct gamestate *state, bool *ponderhit)
+bool xboard_check_input(struct search_worker *worker, bool *ponderhit)
 {
-    char             *cmd;
-    bool             stop = false;
-    char             movestr[6];
-    char             *iter;
+    char *cmd;
+    bool stop = false;
+    char movestr[6];
+    char *iter;
 
     assert(ponderhit != NULL);
 
@@ -820,7 +839,12 @@ bool xboard_check_input(struct gamestate *state, bool *ponderhit)
 
     /* Process command */
     if (!strncmp(cmd, ".", 1)) {
-        write_search_status(state);
+        write_search_status(worker);
+    } else if(!strncmp(cmd, "cores", 5)) {
+        engine_set_pending_command(cmd);
+        if (worker->state->pondering) {
+            stop = true;
+        }
     } else if (!strncmp(cmd, "?", 1) ||
                !strncmp(cmd, "exit", 4)) {
         stop = true;
@@ -829,7 +853,7 @@ bool xboard_check_input(struct gamestate *state, bool *ponderhit)
          * This only makes sense if the engine is in analyze mode
          * so send the current best move as a hint.
          */
-        move2str(state->worker.best_move, movestr);
+        move2str(worker->best_move, movestr);
         engine_write_command("Hint: %s", movestr);
     } else if (!strncmp(cmd, "easy", 4)) {
         xboard_cmd_easy();
@@ -845,11 +869,11 @@ bool xboard_check_input(struct gamestate *state, bool *ponderhit)
         xboard_cmd_post();
     } else if (!strncmp(cmd, "time", 4)) {
         xboard_cmd_time(cmd);
-        if (state->pondering) {
+        if (worker->state->pondering) {
             tc_update_time(engine_time_left);
         }
     } else if (!strncmp(cmd, "usermove", 8)) {
-        if (!state->pondering) {
+        if (!worker->state->pondering) {
             engine_set_pending_command(cmd);
             stop = true;
         } else {
@@ -870,7 +894,7 @@ bool xboard_check_input(struct gamestate *state, bool *ponderhit)
             } else {
                 engine_set_pending_command(cmd);
                 stop = true;
-                state->pondering = false;
+                worker->state->pondering = false;
             }
         }
     } else if (!strncmp(cmd, "bk", 2) ||
@@ -886,7 +910,8 @@ bool xboard_check_input(struct gamestate *state, bool *ponderhit)
     return stop;
 }
 
-void xboard_send_pv_info(struct gamestate *state, int score)
+void xboard_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
+                         int score, uint32_t nodes)
 {
 	char     buffer[1024];
 	int      k;
@@ -899,18 +924,17 @@ void xboard_send_pv_info(struct gamestate *state, int score)
     }
 
     /* Adjust score in case the root position was found in tablebases */
-    if (state->root_in_tb) {
+    if (worker->state->root_in_tb) {
         score = ((score > FORCED_MATE) || (score < (-FORCED_MATE)))?
-                                                    score:state->root_tb_score;
+                                            score:worker->state->root_tb_score;
     }
 
 	/* Display thinking according to the current output mode */
 	msec = tc_elapsed_time();
-	sprintf(buffer, "%3d %6d %7d %9d", state->worker.depth, score, msec/10,
-            state->worker.nodes);
-	for (k=0;k<state->worker.pv_table[0].length;k++) {
+	sprintf(buffer, "%3d %6d %7d %9d", depth, score, msec/10, nodes);
+	for (k=0;k<pv->length;k++) {
 		strcat(buffer, " ");
-        move2str(state->worker.pv_table[0].moves[k], movestr);
+        move2str(pv->moves[k], movestr);
 		strcat(buffer, movestr);
 	}
 	engine_write_command(buffer);

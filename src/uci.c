@@ -34,6 +34,7 @@
 #include "engine.h"
 #include "validation.h"
 #include "tbprobe.h"
+#include "smp.h"
 
 /* Different UCI modes */
 static bool ponder_mode = false;
@@ -57,8 +58,6 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     char     *temp;
     bool     ponder = false;
     uint32_t move;
-    uint32_t best_move;
-    uint32_t ponder_move = NOMOVE;
 
     /* Prepare for the search */
     search_reset_data(state);
@@ -148,12 +147,12 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             if (temp != NULL) {
                 *temp = '\0';
             }
-            move = str2move(iter, &state->worker.pos);
+            move = str2move(iter, &state->pos);
             if (move != NOMOVE) {
-                if (board_make_move(&state->worker.pos, move)) {
-                    board_unmake_move(&state->worker.pos);
-                    state->worker.root_moves.moves[state->worker.root_moves.nmoves] = move;
-                    state->worker.root_moves.nmoves++;
+                if (board_make_move(&state->pos, move)) {
+                    board_unmake_move(&state->pos);
+                    state->root_moves.moves[state->root_moves.nmoves] = move;
+                    state->root_moves.nmoves++;
                 }
             }
             if (temp != NULL) {
@@ -170,17 +169,17 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
         state->in_book = false;
     } else if (movetime > 0) {
         tc_configure_time_control(TC_FIXED_TIME, movetime, 0, 0);
-    } else if ((winc > 0) && (state->worker.pos.stm == WHITE)) {
+    } else if ((winc > 0) && (state->pos.stm == WHITE)) {
         tc_configure_time_control(TC_FISCHER, wtime, winc, 0);
-    } else if ((binc > 0) && (state->worker.pos.stm == BLACK)) {
+    } else if ((binc > 0) && (state->pos.stm == BLACK)) {
         tc_configure_time_control(TC_FISCHER, btime, binc, 0);
-    } else if ((movestogo > 0) && (state->worker.pos.stm == WHITE)) {
+    } else if ((movestogo > 0) && (state->pos.stm == WHITE)) {
         tc_configure_time_control(TC_TOURNAMENT, wtime, 0, movestogo);
-    } else if ((movestogo > 0) && (state->worker.pos.stm == BLACK)) {
+    } else if ((movestogo > 0) && (state->pos.stm == BLACK)) {
         tc_configure_time_control(TC_TOURNAMENT, btime, 0, movestogo);
-    } else if ((state->worker.pos.stm == WHITE) && (wtime > 0)) {
+    } else if ((state->pos.stm == WHITE) && (wtime > 0)) {
         tc_configure_time_control(TC_SUDDEN_DEATH, wtime, 0, 0);
-    } else if ((state->worker.pos.stm == BLACK) && (btime > 0)) {
+    } else if ((state->pos.stm == BLACK) && (btime > 0)) {
         tc_configure_time_control(TC_SUDDEN_DEATH, btime, 0, 0);
     } else {
         tc_configure_time_control(TC_INFINITE, 0, 0, 0);
@@ -189,14 +188,12 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     }
 
     /* Search the position for a move */
-    best_move = search_find_best_move(state, ponder && ponder_mode,
-                                      own_book_mode, tablebase_mode,
-                                      &ponder_move);
+    smp_search(state, ponder && ponder_mode, own_book_mode, tablebase_mode);
 
     /* Send the best move */
-    move2str(best_move, best_movestr);
-    if (ponder_mode && (ponder_move != NOMOVE)) {
-        move2str(ponder_move, ponder_movestr);
+    move2str(state->best_move, best_movestr);
+    if (ponder_mode && (state->ponder_move != NOMOVE)) {
+        move2str(state->ponder_move, ponder_movestr);
         engine_write_command("bestmove %s ponder %s", best_movestr,
                              ponder_movestr);
     } else {
@@ -220,7 +217,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
     iter = strchr(cmd, ' ');
     if (iter == NULL) {
         /* Invalid command, set start position and return */
-        board_start_position(&state->worker.pos);
+        board_start_position(&state->pos);
         return;
     }
     iter = skip_whitespace(iter);
@@ -230,7 +227,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
 
     /* Check if the parameter is fen or startpos */
     if (!strncmp(iter, "startpos", 8)) {
-        board_start_position(&state->worker.pos);
+        board_start_position(&state->pos);
     } else if (!strncmp(iter, "fen", 3)) {
         /* Find beginning of FEN string */
         iter += strlen("fen");
@@ -242,9 +239,9 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
         }
 
         /* Setup the position */
-        if (!board_setup_from_fen(&state->worker.pos, iter)) {
+        if (!board_setup_from_fen(&state->pos, iter)) {
             /* Failed to setup position */
-            board_start_position(&state->worker.pos);
+            board_start_position(&state->pos);
             return;
         }
 
@@ -254,7 +251,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
         }
     } else {
         /* Invalid command, set start position and return */
-        board_start_position(&state->worker.pos);
+        board_start_position(&state->pos);
         return;
     }
 
@@ -271,8 +268,8 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
         /* Play all moves on the internal board */
         while (iter != NULL) {
             movestr = skip_whitespace(iter);
-            move = str2move(movestr, &state->worker.pos);
-            if (!board_make_move(&state->worker.pos, move)) {
+            move = str2move(movestr, &state->pos);
+            if (!board_make_move(&state->pos, move)) {
                 /* Illegal move */
                 return;
             }
@@ -284,7 +281,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
 static void uci_cmd_setoption(char *cmd, struct gamestate *state)
 {
     char *iter;
-    int size;
+    int value;
 
     /*
      * Handle options. Options that are not
@@ -298,13 +295,13 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
         if (!strncmp(iter, "Hash", 4)) {
             iter += 4;
             iter = skip_whitespace(iter);
-            if (sscanf(iter, "value %d", &size) == 1) {
-                if (size > MAX_MAIN_HASH_SIZE) {
-                    size = MAX_MAIN_HASH_SIZE;
-                } else if (size < MIN_MAIN_HASH_SIZE) {
-                    size = MIN_MAIN_HASH_SIZE;
+            if (sscanf(iter, "value %d", &value) == 1) {
+                if (value > MAX_MAIN_HASH_SIZE) {
+                    value = MAX_MAIN_HASH_SIZE;
+                } else if (value < MIN_MAIN_HASH_SIZE) {
+                    value = MIN_MAIN_HASH_SIZE;
                 }
-                hash_tt_create_table(size);
+                hash_tt_create_table(value);
             }
         } else if (!strncmp(iter, "Clear Hash", 10)) {
             hash_tt_clear_table();
@@ -336,8 +333,19 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
             strncpy(engine_syzygy_path, iter, sizeof(engine_syzygy_path));
             tb_init(engine_syzygy_path);
             tablebase_mode = TB_LARGEST > 0;
+        } else if (!strncmp(iter, "Threads", 7)) {
+            iter += 7;
+            iter = skip_whitespace(iter);
+            if (sscanf(iter, "value %d", &value) == 1) {
+                if (value > MAX_WORKERS) {
+                    value = MAX_WORKERS;
+                } else if (value < 1) {
+                    value = 1;
+                }
+                smp_destroy_workers();
+                smp_create_workers(value);
+            }
         }
-
         iter = strstr(iter, "name");
     }
 }
@@ -362,6 +370,8 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command("option name SyzygyPath type string default %s",
                          engine_syzygy_path[0] != '\0'?
                                                 engine_syzygy_path:"<empty>");
+    engine_write_command("option name Threads type spin default 1 min 1 max %d",
+                         MAX_WORKERS);
     engine_write_command("uciok");
 }
 
@@ -443,7 +453,8 @@ bool uci_check_input(bool *ponderhit)
     return stop;
 }
 
-void uci_send_pv_info(struct gamestate *state, int score)
+void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
+                      int seldepth, int score, uint32_t nodes)
 {
     char movestr[6];
     char buffer[1024];
@@ -453,22 +464,20 @@ void uci_send_pv_info(struct gamestate *state, int score)
 
     /* Get the currently searched time */
     msec = (int)tc_elapsed_time();
-    nps = (msec > 0)?(state->worker.nodes/msec)*1000:0;
+    nps = (msec > 0)?(nodes/msec)*1000:0;
 
     /* Adjust score in case the root position was found in tablebases */
-    if (state->root_in_tb) {
+    if (worker->state->root_in_tb) {
         score = ((score > FORCED_MATE) || (score < (-FORCED_MATE)))?
-                                                    score:state->root_tb_score;
+                                            score:worker->state->root_tb_score;
     }
 
     /* Build command */
     sprintf(buffer, "info depth %d seldepth %d nodes %d time %d nps %d "
-            "score cp %d pv",
-            state->worker.depth, state->worker.seldepth, state->worker.nodes,
-            msec, nps, score);
-    for (k=0;k<state->worker.pv_table[0].length;k++) {
+            "score cp %d pv", depth, seldepth, nodes, msec, nps, score);
+    for (k=0;k<pv->length;k++) {
         strcat(buffer, " ");
-        move2str(state->worker.pv_table[0].moves[k], movestr);
+        move2str(pv->moves[k], movestr);
         strcat(buffer, movestr);
     }
 
@@ -476,26 +485,20 @@ void uci_send_pv_info(struct gamestate *state, int score)
     engine_write_command(buffer);
 }
 
-void uci_send_move_info(struct gamestate *state)
+void uci_send_move_info(struct search_worker *worker)
 {
-    char   movestr[6];
-    int    msec;
-    double usage;
+    char movestr[6];
+    int  msec;
 
     /* Get the currently searched time */
     msec = (int)tc_elapsed_time();
     if (msec < 1000) {
-        /* Wait 1s before starting to send info to avoid traffic */
+        /* Wait 1s before starting to send move info to avoid traffic */
         return;
     }
 
     /* Send command */
-    usage = hash_tt_usage();
-    move2str(state->worker.currmove, movestr);
-    engine_write_command("info depth %d seldepth %d nodes %d time %d nps %d "
-                         "currmove %s currmovenumber %d hashfull %d",
-                         state->worker.depth, state->worker.seldepth,
-                         state->worker.nodes, msec,
-                         (state->worker.nodes/msec)*1000, movestr,
-                         state->worker.currmovenumber, (int)(usage*10.0));
+    move2str(worker->currmove, movestr);
+    engine_write_command("info depth %d currmove %s currmovenumber %d",
+                         worker->depth, movestr, worker->currmovenumber);
 }

@@ -35,11 +35,11 @@ bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop);
 /*
  * Function called during search to check if input has arrived.
  *
- * @param state The game state object.
+ * @param worker The worker.
  * @param ponderhit Location to store if a ponderhit command was received.
  * @return Returns true if the current search should be stopped.
  */
-bool xboard_check_input(struct gamestate *state, bool *ponderhit);
+bool xboard_check_input(struct search_worker *worker, bool *ponderhit);
 
 /*
  * Send information about the principle variation.
@@ -47,20 +47,7 @@ bool xboard_check_input(struct gamestate *state, bool *ponderhit);
  * @param state The board structure.
  * @param score The PV score.
  */
-void xboard_send_pv_info(struct gamestate *state, int score);
-
-/*
- * Send information about the move currently being searched.
- *
- * @param state The board structure.
- */
-void xboard_send_move_info(struct gamestate *state);
-
-/*
- * Send statistics for a completed search.
- *
- * @param state The board structure.
- */
-void xboard_send_search_stats(struct gamestate *state);
+void xboard_send_pv_info(struct search_worker *worker, struct pv *pv,
+                         int depth, int score, uint32_t nodes);
 
 #endif

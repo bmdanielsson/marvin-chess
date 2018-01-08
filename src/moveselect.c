@@ -70,8 +70,8 @@ static int calculate_see_score(struct position *pos, uint32_t move)
     return 0;
 }
 
-static void assign_root_score(struct worker *worker, struct moveselect *ms,
-                              int idx)
+static void assign_root_score(struct search_worker *worker,
+                              struct moveselect *ms, int idx)
 {
     int             from;
     int             to;
@@ -105,7 +105,7 @@ static void assign_root_score(struct worker *worker, struct moveselect *ms,
     }
 }
 
-static void assign_score(struct worker *worker, struct moveselect *ms,
+static void assign_score(struct search_worker *worker, struct moveselect *ms,
                          struct movelist *list, int iter)
 {
     int             from;
@@ -164,7 +164,7 @@ static void assign_score(struct worker *worker, struct moveselect *ms,
     }
 }
 
-static void assign_quiscence_score(struct worker *worker,
+static void assign_quiscence_score(struct search_worker *worker,
                                    struct moveselect *ms, struct movelist *list,
                                    int iter)
 {
@@ -253,7 +253,8 @@ static uint32_t select_move(struct moveselect *ms, int *see_score)
     return ms->moveinfo[start].move;
 }
 
-void select_init_node(struct worker *worker, int depth, bool qnode, bool root)
+void select_init_node(struct search_worker *worker, int depth, bool qnode,
+                      bool root)
 {
     struct moveselect *ms;
     uint32_t          move;
@@ -277,7 +278,7 @@ void select_init_node(struct worker *worker, int depth, bool qnode, bool root)
      * The move info list at the root is reused for each iteration
      * so it should be setup only during the first iteration.
      */
-    if (root && (depth == 1)) {
+    if (root && (ms->nmoves == 0)) {
         ms->nmoves = worker->root_moves.nmoves;
         for (k=0;k<worker->root_moves.nmoves;k++) {
             move = worker->root_moves.moves[k];
@@ -288,7 +289,7 @@ void select_init_node(struct worker *worker, int depth, bool qnode, bool root)
     }
 }
 
-void select_set_tt_move(struct worker *worker, uint32_t move)
+void select_set_tt_move(struct search_worker *worker, uint32_t move)
 {
     struct moveselect *ms;
     struct position *pos;
@@ -303,7 +304,7 @@ void select_set_tt_move(struct worker *worker, uint32_t move)
     ms->ttmove = move;
 }
 
-bool select_get_root_move(struct worker *worker, uint32_t *move,
+bool select_get_root_move(struct search_worker *worker, uint32_t *move,
                           int *see_score)
 {
     struct moveselect *ms;
@@ -318,7 +319,8 @@ bool select_get_root_move(struct worker *worker, uint32_t *move,
     return *move != NOMOVE;
 }
 
-bool select_get_move(struct worker *worker, uint32_t *move, int *see_score)
+bool select_get_move(struct search_worker *worker, uint32_t *move,
+                     int *see_score)
 {
     struct moveselect *ms;
     struct movelist   list;
@@ -426,7 +428,7 @@ bool select_get_move(struct worker *worker, uint32_t *move, int *see_score)
     return *move != NOMOVE;
 }
 
-bool select_get_quiscence_move(struct worker *worker, uint32_t *move,
+bool select_get_quiscence_move(struct search_worker *worker, uint32_t *move,
                                int *see_score)
 {
     struct moveselect *ms;
@@ -468,7 +470,7 @@ bool select_get_quiscence_move(struct worker *worker, uint32_t *move,
     return *move != NOMOVE;
 }
 
-void select_update_root_move_scores(struct worker *worker)
+void select_update_root_move_scores(struct search_worker *worker)
 {
     struct moveselect *ms;
     int               k;

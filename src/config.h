@@ -37,6 +37,9 @@
 /* The size to use for the pawn hash tables (in MB) */
 #define PAWN_HASH_SIZE 2
 
+/* The maximum number of supported worker threads */
+#define MAX_WORKERS 64
+
 /* The name of the opening book file */
 #define BOOKFILE_NAME "book.bin"
 

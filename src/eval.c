@@ -676,7 +676,7 @@ static int do_eval_psq(struct position *pos, struct eval *eval, int side,
     return score;
 }
 
-static void do_eval(struct worker *worker, struct eval *eval)
+static void do_eval(struct search_worker *worker, struct eval *eval)
 {
     struct position *pos;
     int             k;
@@ -805,7 +805,7 @@ void eval_reset(void)
     material_values_eg[BLACK_KING] = 20000;
 }
 
-int eval_evaluate(struct worker *worker)
+int eval_evaluate(struct search_worker *worker)
 {
     struct eval eval;
     int         k;
@@ -856,7 +856,7 @@ int eval_evaluate(struct worker *worker)
     return calculate_tapered_eval(phase, score[MIDDLEGAME], score[ENDGAME]);
 }
 
-void eval_display(struct worker *worker)
+void eval_display(struct search_worker *worker)
 {
     struct eval eval;
     int         k;

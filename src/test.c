@@ -32,6 +32,7 @@
 #include "moveselect.h"
 #include "engine.h"
 #include "timectl.h"
+#include "smp.h"
 
 /* Positions used for benchmark */
 struct benchmark_positions {
@@ -128,7 +129,6 @@ void test_run_benchmark(void)
     uint64_t         nodes;
     time_t           start;
     time_t           total;
-    uint32_t         ponder_move;
 
     engine_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
 
@@ -137,14 +137,14 @@ void test_run_benchmark(void)
     start = get_current_time();
     npos = sizeof(positions)/sizeof(struct benchmark_positions);
     for (k=0;k<npos;k++) {
-        board_setup_from_fen(&state->worker.pos, positions[k].fen);
+        board_setup_from_fen(&state->pos, positions[k].fen);
         search_reset_data(state);
         tc_configure_time_control(TC_INFINITE, 0, 0, 0);
         state->sd = positions[k].depth;
         state->silent = true;
 
-        (void)search_find_best_move(state, false, false, false, &ponder_move);
-        nodes += state->worker.nodes;
+        smp_search(state, false, false, false);
+        nodes += state->nodes;
 
         printf("#");
     }

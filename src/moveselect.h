@@ -34,7 +34,7 @@
  * @param qnode Indicates if this is a quiscence node.
  * @param root Indicates if this is the root node.
  */
-void select_init_node(struct worker *worker, int depth, bool qnode,
+void select_init_node(struct search_worker *worker, int depth, bool qnode,
                       bool root);
 
 /*
@@ -43,7 +43,7 @@ void select_init_node(struct worker *worker, int depth, bool qnode,
  * @param worker The worker.
  * @param move The move.
  */
-void select_set_tt_move(struct worker *worker, uint32_t move);
+void select_set_tt_move(struct search_worker *worker, uint32_t move);
 
 /*
  * Get the next root move to search. Should only be called
@@ -54,7 +54,7 @@ void select_set_tt_move(struct worker *worker, uint32_t move);
  * @param see_score Location to store the SEE score of the move at.
  * @return Returns true if a move was available, false otherwise.
  */
-bool select_get_root_move(struct worker *worker, uint32_t *move,
+bool select_get_root_move(struct search_worker *worker, uint32_t *move,
                           int *see_score);
 
 /*
@@ -66,7 +66,8 @@ bool select_get_root_move(struct worker *worker, uint32_t *move,
  * @param see_score Location to store the SEE score of the move at.
  * @return Returns true if a move was available, false otherwise.
  */
-bool select_get_move(struct worker *worker, uint32_t *move, int *see_score);
+bool select_get_move(struct search_worker *worker, uint32_t *move,
+                     int *see_score);
 
 /*
  * Get the next quiscence move to search.
@@ -76,7 +77,7 @@ bool select_get_move(struct worker *worker, uint32_t *move, int *see_score);
  * @param see_score Location to store the SEE score of the move at.
  * @return Returns true if a move was available, false otherwise.
  */
-bool select_get_quiscence_move(struct worker *worker, uint32_t *move,
+bool select_get_quiscence_move(struct search_worker *worker, uint32_t *move,
                                int *see_score);
 
 /*
@@ -84,7 +85,7 @@ bool select_get_quiscence_move(struct worker *worker, uint32_t *move,
  *
  * @param worker The worker.
  */
-void select_update_root_move_scores(struct worker *worker);
+void select_update_root_move_scores(struct search_worker *worker);
 
 #endif
 

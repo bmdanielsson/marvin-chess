@@ -162,7 +162,9 @@ bool board_make_move(struct position *pos, uint32_t move)
 
     assert(valid_position(pos));
     assert(valid_move(move));
+    assert(board_is_move_pseudo_legal(pos, move));
     assert(pos->ply < MAX_MOVES);
+
 
     from = FROM(move);
     to = TO(move);

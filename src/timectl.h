@@ -76,7 +76,7 @@ time_t tc_elapsed_time(void);
  * @param worker The worker.
  * @return Returns true if there is more time left.
  */
-bool tc_check_time(struct worker *worker);
+bool tc_check_time(struct search_worker *worker);
 
 /*
  * Check if there is enough time left to start a new search iteration.
@@ -84,6 +84,6 @@ bool tc_check_time(struct worker *worker);
  * @param worker The worker.
  * @return Returns true if there is enough time left.
  */
-bool tc_new_iteration(struct worker *worker);
+bool tc_new_iteration(struct search_worker *worker);
 
 #endif

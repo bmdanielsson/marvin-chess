@@ -70,7 +70,7 @@ static void allocate_tt(int size)
     assert(transposition_table != NULL);
 }
 
-static void allocate_pawntt(struct worker *worker, int size)
+static void allocate_pawntt(struct search_worker *worker, int size)
 {
     worker->pawntt_size = largest_power_of_2(size, sizeof(struct pawntt_item));
     worker->pawntt = aligned_malloc(CACHE_LINE_SIZE,
@@ -369,7 +369,7 @@ void hash_tt_insert_pv(struct position *pos, struct pv *pv)
     }
 }
 
-void hash_pawntt_create_table(struct worker *worker, int size)
+void hash_pawntt_create_table(struct search_worker *worker, int size)
 {
     assert(size >= 0);
 
@@ -379,14 +379,14 @@ void hash_pawntt_create_table(struct worker *worker, int size)
     hash_pawntt_clear_table(worker);
 }
 
-void hash_pawntt_destroy_table(struct worker *worker)
+void hash_pawntt_destroy_table(struct search_worker *worker)
 {
     aligned_free(worker->pawntt);
     worker->pawntt = NULL;
     worker->pawntt_size = 0;
 }
 
-void hash_pawntt_clear_table(struct worker *worker)
+void hash_pawntt_clear_table(struct search_worker *worker)
 {
     assert(worker != NULL);
     assert(worker->pawntt != NULL);
@@ -402,7 +402,7 @@ void hash_pawntt_init_item(struct pawntt_item *item)
     item->used = true;
 }
 
-void hash_pawntt_store(struct worker *worker, struct pawntt_item *item)
+void hash_pawntt_store(struct search_worker *worker, struct pawntt_item *item)
 {
     struct position *pos;
     uint32_t        idx;
@@ -427,7 +427,7 @@ void hash_pawntt_store(struct worker *worker, struct pawntt_item *item)
     worker->pawntt[idx].pawnkey = pos->pawnkey;
 }
 
-bool hash_pawntt_lookup(struct worker *worker, struct pawntt_item *item)
+bool hash_pawntt_lookup(struct search_worker *worker, struct pawntt_item *item)
 {
     struct position *pos;
     uint32_t        idx;
@@ -456,7 +456,7 @@ bool hash_pawntt_lookup(struct worker *worker, struct pawntt_item *item)
     return found && item->used;
 }
 
-void hash_prefetch(struct worker *worker)
+void hash_prefetch(struct search_worker *worker)
 {
     PREFETCH_ADDRESS(&transposition_table[worker->pos.key&(tt_size-1)]);
     PREFETCH_ADDRESS(&worker->pawntt[worker->pos.pawnkey&(worker->pawntt_size-1)]);
