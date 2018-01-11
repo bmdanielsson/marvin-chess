@@ -327,27 +327,27 @@ static void find_quiet_trainingset(struct gamestate *state,
     char               fenstr[FEN_MAX_LENGTH];
 
     /* Iterate over all training positions */
+    pv = malloc(sizeof(struct pv));
+    memset(pv, 0, sizeof(struct pv));
     trainingset = worker->trainingset;
     for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
         /* Setup position */
-        board_reset(&state->worker.pos);
-        (void)fen_setup_board(&state->worker.pos, trainingset->positions[iter].epd, true);
+        board_reset(&state->pos);
+        (void)fen_setup_board(&state->pos, trainingset->positions[iter].epd,
+                              true);
 
         /* Do a quiscence search to get the pv */
-        search_reset_data(state);
-        state->sd = 0;
-        state->silent = true;
-        (void)search_get_quiscence_score(state);
+        (void)search_get_quiscence_score(state, pv);
 
         /* Find the position at the end of the pv */
-        pv = &state->worker.pv_table[0];
         for (k=0;k<pv->length;k++) {
-           board_make_move(&state->worker.pos, pv->moves[k]);
+           board_make_move(&state->pos, pv->moves[k]);
         }
-        fen_build_string(&state->worker.pos, fenstr);
+        fen_build_string(&state->pos, fenstr);
         free(trainingset->positions[iter].fen_quiet);
         trainingset->positions[iter].fen_quiet = strdup(fenstr);
     }
+    free(pv);
 }
 
 static double calc_texel_sigmoid(int score, double k)
@@ -372,8 +372,6 @@ static void* calc_texel_error_func(void *data)
     /* Initialize worker */
     worker = (struct tuning_worker*)data;
     state = create_game_state();
-    hash_tt_destroy_table();
-    hash_pawntt_destroy_table(&state->worker);
     trainingset = worker->trainingset;
 
     /* Worker main loop */
@@ -398,12 +396,12 @@ static void* calc_texel_error_func(void *data)
              * and create a corresponding equation
              */
             if (!trainingset->positions[iter].has_equation) {
-                board_reset(&state->worker.pos);
-                (void)fen_setup_board(&state->worker.pos,
+                board_reset(&state->pos);
+                (void)fen_setup_board(&state->pos,
                                       trainingset->positions[iter].fen_quiet,
                                       true);
                 trace = malloc(sizeof(struct eval_trace));
-                eval_generate_trace(&state->worker.pos, trace);
+                eval_generate_trace(&state->pos, trace);
                 setup_eval_equation(trace,
                                     &trainingset->positions[iter].equation);
                 trainingset->positions[iter].has_equation = true;
@@ -412,9 +410,9 @@ static void* calc_texel_error_func(void *data)
             }
 
             /* Evaluate the equation */
-            score = evaluate_equation(&state->worker.pos, worker->tuningset,
+            score = evaluate_equation(&state->pos, worker->tuningset,
                                       &trainingset->positions[iter]);
-            score = (state->worker.pos.stm == WHITE)?score:-score;
+            score = (state->pos.stm == WHITE)?score:-score;
 
             /* Calculate error */
             sigmoid = calc_texel_sigmoid(score, worker->k);
@@ -426,6 +424,9 @@ static void* calc_texel_error_func(void *data)
         worker->state = WORKER_FINISHED;
         event_set(&worker->ev_done);
     }
+
+    /* Clean up */
+    destroy_game_state(state);
 
     return NULL;
 }
@@ -627,8 +628,8 @@ static struct trainingset* read_trainingset(struct gamestate *state, char *file)
         }
 
         /* Verify that the position is legal */
-        board_reset(&state->worker.pos);
-        if (!fen_setup_board(&state->worker.pos, buffer, true)) {
+        board_reset(&state->pos);
+        if (!fen_setup_board(&state->pos, buffer, true)) {
             str = fgets(buffer, sizeof(buffer), fp);
             continue;
         }
@@ -636,6 +637,7 @@ static struct trainingset* read_trainingset(struct gamestate *state, char *file)
         /* Update training set */
         trainingset->positions[trainingset->size].epd = strdup(buffer);
         trainingset->positions[trainingset->size].fen_quiet = NULL;
+        trainingset->positions[trainingset->size].has_equation = false;
         trainingset->size++;
 
         /* Next position */
@@ -755,7 +757,7 @@ static struct tuningset* read_tuningset(char *file)
 
 void find_k(char *file, int nthreads)
 {
-    struct gamestate    *pos;
+    struct gamestate    *state;
     struct trainingset  *trainingset;
     struct tuningset    *tuningset;
     double              k;
@@ -770,10 +772,10 @@ void find_k(char *file, int nthreads)
     printf("Finding K based on %s\n", file);
 
     /* Create game state */
-    pos = create_game_state();
+    state = create_game_state();
 
     /* Read training set */
-    trainingset = read_trainingset(pos, file);
+    trainingset = read_trainingset(state, file);
     if (trainingset == NULL) {
         printf("Error: failed to read training set\n");
         return;
@@ -839,7 +841,7 @@ void find_k(char *file, int nthreads)
     free(workers);
     free_trainingset(trainingset);
     free_tuningset(tuningset);
-    destroy_game_state(pos);
+    destroy_game_state(state);
 }
 
 void tune_parameters(char *training_file, char *parameter_file, int nthreads,
@@ -847,7 +849,7 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
 {
     struct tuningset    *tuningset;
     struct trainingset  *trainingset;
-    struct gamestate    *pos;
+    struct gamestate    *state;
     FILE                *fp;
     time_t              start;
     time_t              diff;
@@ -865,7 +867,7 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     start = get_current_time();
 
     /* Create game state */
-    pos = create_game_state();
+    state = create_game_state();
 
     /* Read tuning set */
     tuningset = read_tuningset(parameter_file);
@@ -877,7 +879,7 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     printf("Found %d parameter(s) to tune\n", tuningset->nactive);
 
     /* Read training set */
-    trainingset = read_trainingset(pos, training_file);
+    trainingset = read_trainingset(state, training_file);
     if (trainingset == NULL) {
         printf("Error: failed to read training set\n");
         return;
@@ -922,7 +924,7 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     free(workers);
     free_tuningset(tuningset);
     free_trainingset(trainingset);
-    destroy_game_state(pos);
+    destroy_game_state(state);
 }
 
 static void print_parameters(char *output_file)
@@ -975,20 +977,20 @@ static void verify_trace(char *training_file)
     /* Iterate over all positions */
     for (k=0;k<trainingset->size;k++) {
         /* Setup position */
-        board_reset(&state->worker.pos);
-        (void)fen_setup_board(&state->worker.pos, trainingset->positions[k].epd,
+        board_reset(&state->pos);
+        (void)fen_setup_board(&state->pos, trainingset->positions[k].epd,
                               true);
 
         /* Evaluate the position */
-        score = eval_evaluate(&state->worker);
+        score = eval_evaluate_full(&state->pos, false);
 
         /* Generate a trace for this function */
         trace = malloc(sizeof(struct eval_trace));
-        eval_generate_trace(&state->worker.pos, trace);
+        eval_generate_trace(&state->pos, trace);
 
         /* Setup an equation and evaluate it */
         setup_eval_equation(trace, &trainingset->positions[k].equation);
-        score2 = evaluate_equation(&state->worker.pos, tuningset,
+        score2 = evaluate_equation(&state->pos, tuningset,
                                    &trainingset->positions[k]);
         free(trace);
         trace = NULL;

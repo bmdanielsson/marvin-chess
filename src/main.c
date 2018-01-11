@@ -34,6 +34,7 @@
 #include "eval.h"
 #include "tbprobe.h"
 #include "smp.h"
+#include "hash.h"
 
 /* The maximum length of a line in the configuration file */
 #define CFG_MAX_LINE_LENGTH 1024
@@ -104,6 +105,7 @@ int main(int argc, char *argv[])
     bb_init();
     eval_reset();
     polybook_open(BOOKFILE_NAME);
+    hash_tt_create_table(engine_default_hash_size);
 
     /* Setup SMP */
     smp_init();

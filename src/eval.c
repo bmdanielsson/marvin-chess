@@ -676,12 +676,10 @@ static int do_eval_psq(struct position *pos, struct eval *eval, int side,
     return score;
 }
 
-static void do_eval(struct search_worker *worker, struct eval *eval)
+static void do_eval(struct search_worker *worker, struct position *pos,
+                    struct eval *eval)
 {
-    struct position *pos;
-    int             k;
-
-    pos = &worker->pos;
+    int k;
 
     memset(eval, 0, sizeof(struct eval));
 
@@ -694,7 +692,8 @@ static void do_eval(struct search_worker *worker, struct eval *eval)
     }
 
     /* Check if the position is present in the pawn transposition table */
-    eval->in_pawntt = hash_pawntt_lookup(worker, &eval->pawntt);
+    eval->in_pawntt = (worker != NULL)?
+                                hash_pawntt_lookup(worker, &eval->pawntt):false;
 
     /* Evaluate the position from each sides pov */
     if (!eval->in_pawntt) {
@@ -727,7 +726,7 @@ static void do_eval(struct search_worker *worker, struct eval *eval)
     }
 
     /* Update the pawn hash table */
-    if (!eval->in_pawntt) {
+    if (!eval->in_pawntt && (worker != NULL)) {
         hash_pawntt_store(worker, &eval->pawntt);
     }
 }
@@ -824,7 +823,7 @@ int eval_evaluate(struct search_worker *worker)
     }
 
     /* Evaluate the position */
-    do_eval(worker, &eval);
+    do_eval(worker, &worker->pos, &eval);
 
     /* Summarize each evaluation term from side to moves's pov */
     for (k=0;k<NPHASES;k++) {
@@ -856,7 +855,7 @@ int eval_evaluate(struct search_worker *worker)
     return calculate_tapered_eval(phase, score[MIDDLEGAME], score[ENDGAME]);
 }
 
-void eval_display(struct search_worker *worker)
+int eval_evaluate_full(struct position *pos, bool display)
 {
     struct eval eval;
     int         k;
@@ -873,21 +872,23 @@ void eval_display(struct search_worker *worker)
     int         positional[NPHASES];
     int         mobility[NPHASES];
 
-    assert(valid_position(&worker->pos));
-    assert(valid_scores(&worker->pos));
+    assert(valid_position(pos));
+    assert(valid_scores(pos));
 
     /*
      * If no player have enough material left
      * to checkmate then it's a draw.
      */
-    if (eval_is_material_draw(&worker->pos)) {
-        printf("Draw by insufficient material\n");
-        printf("Score: 0\n");
-        return;
+    if (eval_is_material_draw(pos)) {
+        if (display) {
+            printf("Draw by insufficient material\n");
+            printf("Score: 0\n");
+        }
+        return 0;
     }
 
     /* Evaluate the position */
-    do_eval(worker, &eval);
+    do_eval(NULL, pos, &eval);
 
     /* Summarize each evaluation term from white's pov */
     for (k=0;k<NPHASES;k++) {
@@ -932,9 +933,12 @@ void eval_display(struct search_worker *worker)
     }
 
     /* Adjust score for game phase */
-    phase = calculate_game_phase(&worker->pos);
+    phase = calculate_game_phase(pos);
     score = calculate_tapered_eval(phase, sum_white_pov[MIDDLEGAME],
                                    sum_white_pov[ENDGAME]);
+    if (!display) {
+        return (pos->stm == WHITE)?score:-score;
+    }
 
     /* Print the evaluation */
     printf("  Evaluation Term       White        Black         Total\n");
@@ -988,6 +992,8 @@ void eval_display(struct search_worker *worker)
     printf("\n");
     printf("Game phase: %d [0, 256]\n", phase);
     printf("Score:      %d (for white)\n", score);
+
+    return (pos->stm == WHITE)?score:-score;
 }
 
 int eval_material(struct position *pos, int side, bool endgame)
@@ -1183,16 +1189,18 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
     }
 
     /* Trace material evaluation */
-    pos->material[MIDDLEGAME][WHITE] = eval_material(pos, WHITE, false);
-    pos->material[MIDDLEGAME][BLACK] = eval_material(pos, BLACK, false);
-    pos->material[ENDGAME][WHITE] = eval_material(pos, WHITE, true);
-    pos->material[ENDGAME][BLACK] = eval_material(pos, BLACK, true);
+    pos->material[MIDDLEGAME][WHITE] = do_eval_material(pos, &eval, WHITE,
+                                                        false);
+    pos->material[MIDDLEGAME][BLACK] = do_eval_material(pos, &eval, BLACK,
+                                                        false);
+    pos->material[ENDGAME][WHITE] = do_eval_material(pos, &eval, WHITE, true);
+    pos->material[ENDGAME][BLACK] = do_eval_material(pos, &eval, BLACK, true);
 
     /* Trace psq evaluation */
-    pos->psq[MIDDLEGAME][WHITE] = eval_psq(pos, WHITE, false);
-    pos->psq[MIDDLEGAME][BLACK] = eval_psq(pos, BLACK, false);
-    pos->psq[ENDGAME][WHITE] = eval_psq(pos, WHITE, true);
-    pos->psq[ENDGAME][BLACK] = eval_psq(pos, BLACK, true);
+    pos->psq[MIDDLEGAME][WHITE] = do_eval_psq(pos, &eval, WHITE, false);
+    pos->psq[MIDDLEGAME][BLACK] = do_eval_psq(pos, &eval, BLACK, false);
+    pos->psq[ENDGAME][WHITE] = do_eval_psq(pos, &eval, WHITE, true);
+    pos->psq[ENDGAME][BLACK] = do_eval_psq(pos, &eval, BLACK, true);
 
     /* Trace pawn structure evaluation */
     hash_pawntt_init_item(&eval.pawntt);

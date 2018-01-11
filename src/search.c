@@ -901,22 +901,55 @@ void search_find_best_move(struct search_worker *worker)
 	}
 }
 
-int search_get_quiscence_score(struct gamestate *state)
+int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
 {
-    (void)state;
-#if 0
-    assert(valid_position(&state->worker.pos));
+    struct search_worker *worker;
+    int                  k;
+    int                  l;
+    int                  m;
+    int                  score;
 
     tc_configure_time_control(TC_INFINITE, 0, 0, 0);
+
+    worker = malloc(sizeof(struct search_worker));
+    memset(worker, 0, sizeof(struct search_worker));
+
     search_reset_data(state);
     state->pondering = false;
-    state->worker.ponder_move = NOMOVE;
-    state->worker.pos.sply = 0;
-    state->worker.abort = false;
-    state->worker.resolving_root_fail = false;
     state->probe_wdl = false;
+    state->sd = 0;
+    state->silent = true;
 
-    return quiescence(&state->worker, 0, -INFINITE_SCORE, INFINITE_SCORE);
-#endif
-    return 0;
+    worker->pos = state->pos;
+    worker->root_moves = state->root_moves;
+    for (k=0;k<MAX_PLY;k++) {
+        worker->killer_table[k][0] = NOMOVE;
+        worker->killer_table[k][1] = NOMOVE;
+    }
+    for (k=0;k<NSIDES;k++) {
+        for (l=0;l<NSQUARES;l++) {
+            for (m=0;m<NSQUARES;m++) {
+                worker->history_table[k][l][m] = 0;
+            }
+        }
+    }
+    worker->depth = 0;
+    worker->abort = false;
+    worker->nodes = 0;
+    worker->id = 0;
+    worker->resolving_root_fail = false;
+    worker->ppms[0].nmoves = 0;
+    worker->pawntt = NULL;
+    worker->pawntt_size = 0;
+    worker->state = state;
+    worker->pos.state = state;
+    worker->pos.worker = worker;
+
+    pv->length = 0;
+    score = quiescence(worker, 0, -INFINITE_SCORE, INFINITE_SCORE);
+    copy_pv(&worker->pv_table[0], pv);
+
+    free(worker);
+
+    return score;
 }

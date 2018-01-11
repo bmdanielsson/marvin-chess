@@ -52,12 +52,6 @@ void search_reset_data(struct gamestate *state);
 
 void search_find_best_move(struct search_worker *worker);
 
-/*
- * Get a quiscence score for the current position.
- *
- * @param state The chess board structure.
- * @return Returns the score.
- */
-int search_get_quiscence_score(struct gamestate *state);
+int search_get_quiscence_score(struct gamestate *state, struct pv *pv);
 
 #endif

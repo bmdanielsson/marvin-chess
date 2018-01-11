@@ -111,10 +111,7 @@ static void cmd_divide(char *cmd, struct gamestate *state)
  */
 static void cmd_eval(struct gamestate *state)
 {
-    (void)state;
-    /* TODO Implement this
-    eval_display(&state->worker);
-    */
+    eval_evaluate_full(&state->pos, true);
 }
 
 /*

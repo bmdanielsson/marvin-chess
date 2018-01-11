@@ -29,6 +29,7 @@
 #include "tbprobe.h"
 #include "polybook.h"
 #include "bitboard.h"
+#include "board.h"
 
 #define ACTION_IDLE 0
 #define ACTION_EXIT 1
@@ -120,7 +121,7 @@ static bool probe_dtz_tables(struct gamestate *state, int *score)
     state->root_moves.moves[0] = MOVE(from, to, promotion, flags);
     state->root_moves.nmoves++;
 
-    assert(board_is_move_pseudo_legal(pos, state->root_moves.moves[0]));
+    assert(board_is_move_pseudo_legal(&state->pos, state->root_moves.moves[0]));
 
     return true;
 }
@@ -313,6 +314,16 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     if (state->root_moves.nmoves == 0) {
         gen_legal_moves(&state->pos, &state->root_moves);
         assert(state->root_moves.nmoves > 0);
+    }
+
+    /*
+     * If there is only one legal move then there is no
+     * need to do a search. Instead save the time for later.
+     */
+    if ((state->root_moves.nmoves == 1) && !state->pondering && !analysis &&
+        !state->root_in_tb) {
+        state->best_move = state->root_moves.moves[0];
+        return;
     }
 
     /* Prepare workers for a new search */

@@ -34,11 +34,16 @@ void eval_reset(void);
 int eval_evaluate(struct search_worker *worker);
 
 /*
- * Print evaluation details about the position.
+ * Evaluate the position and assign a static score to it. It doesn't use any
+ * stored data such as pawn transposition tables.
  *
- * @param worker The worker.
+ * @param pos The position.
+ * @param display Flag indicating if detailed evaluation information should
+ *                be printed.
+ * @return Returns the score assigned to the position from the side
+ *         to move point of view.
  */
-void eval_display(struct search_worker *worker);
+int eval_evaluate_full(struct position *pos, bool display);
 
 /*
  * Calculate the material for a specific side.

@@ -313,7 +313,6 @@ struct gamestate* create_game_state(void)
         return NULL;
     }
     memset(state, 0, sizeof(struct gamestate));
-    hash_tt_create_table(engine_default_hash_size);
     board_reset(&state->pos);
     board_start_position(&state->pos);
 
