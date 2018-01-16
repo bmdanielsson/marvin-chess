@@ -130,7 +130,8 @@ void test_run_benchmark(void)
     time_t           start;
     time_t           total;
 
-    engine_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
+    hash_tt_destroy_table();
+    hash_tt_create_table(DEFAULT_MAIN_HASH_SIZE);
 
     state = create_game_state();
     nodes = 0ULL;

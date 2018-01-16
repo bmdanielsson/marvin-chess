@@ -20,23 +20,58 @@
 
 #include "chess.h"
 
+/* Initilaize the SMP component */
 void smp_init(void);
 
+/* Clean up the SMP component */
 void smp_destroy(void);
 
+/*
+ * Create worker threads.
+ *
+ * @param nthreads The number of threads to create.
+ */
 void smp_create_workers(int nthreads);
 
+/* Destroy all workers */
 void smp_destroy_workers(void);
 
+/*
+ * Start a new search.
+ *
+ * @param state The game state.
+ * @param pondering If a pindering search should be started.
+ * @param use_book If the opening book should be used.
+ * @param use_tablebases If tablebases should be used.
+ */
 void smp_search(struct gamestate *state, bool pondering, bool use_book,
                 bool use_tablebases);
 
+/*
+ * The number of nodes searched.
+ *
+ * @return Returns the total number of nodes searched (by all workers).
+ */
 uint32_t smp_nodes(void);
 
+/* Stop all workers */
 void smp_stop_all(void);
 
+/*
+ * Check if a worker should stop.
+ *
+ * @param worker The worker.
+ * @return Returns true if the worker should stop.
+ */
 bool smp_should_stop(struct search_worker *worker);
 
-void smp_complete_iteration(struct search_worker *worker);
+/*
+ * Called by workers when they have finished a search iteration.
+ *
+ * @param worker The worker.
+ * @param new_depth The depth the worker should search to for the
+ *                  next iteration.
+ */
+void smp_complete_iteration(struct search_worker *worker, int *new_depth);
 
 #endif

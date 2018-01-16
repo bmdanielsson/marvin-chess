@@ -31,6 +31,7 @@
 #include "bitboard.h"
 #include "board.h"
 
+/* Worker actions */
 #define ACTION_IDLE 0
 #define ACTION_EXIT 1
 #define ACTION_RUN 2
@@ -299,6 +300,8 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     state->pondering = pondering;
     state->pos.sply = 0;
     state->completed_depth = 0;
+    state->completed_move = NOMOVE;
+    state->completed_ponder_move = NOMOVE;
 
     /* Age the transposition table */
     hash_tt_age_table();
@@ -343,24 +346,27 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
         event_wait(&workers[k].ev_done);
     }
 
-    /* Find out which worker that has the best move */
-    best_worker = &workers[0];
-    for (k=1;k<number_of_workers;k++) {
-        if ((workers[k].depth > best_worker->depth) ||
-            ((workers[k].depth == best_worker->depth) &&
-             (workers[k].best_score > best_worker->best_score))) {
-            best_worker = &workers[k];
+    /*
+     * Find the best move found by any worker and
+     * store that as the search result.
+     */
+    best_worker = NULL;
+    for (k=0;k<number_of_workers;k++) {
+        if (workers[k].depth > state->completed_depth) {
+            if (best_worker == NULL) {
+                best_worker = &workers[k];
+            } else if (workers[k].depth == best_worker->depth) {
+                best_worker = &workers[k];
+            }
         }
     }
-
-    /* Send stats */
-    engine_send_pv_info(best_worker, &best_worker->best_pv,
-                        best_worker->depth, best_worker->seldepth,
-                        best_worker->best_score, smp_nodes());
-
-    /* Remember the result of the search */
-    state->best_move = best_worker->best_move;
-    state->ponder_move = best_worker->ponder_move;
+    if (best_worker == NULL) {
+        state->best_move = state->completed_move;
+        state->ponder_move = state->completed_ponder_move;
+    } else {
+        state->best_move = best_worker->best_move;
+        state->ponder_move = best_worker->ponder_move;
+    }
     state->nodes = smp_nodes();
 }
 
@@ -378,12 +384,8 @@ uint32_t smp_nodes(void)
 
 void smp_stop_all(void)
 {
-    int k;
-
     mutex_lock(&stop_lock);
-    for (k=0;k<number_of_workers;k++) {
-        stop_mask |= (1ULL << workers[k].id);
-    }
+	stop_mask = 0xFFFFFFFFFFFFFFFFULL;
     mutex_unlock(&stop_lock);
 }
 
@@ -392,12 +394,38 @@ bool smp_should_stop(struct search_worker *worker)
     return (stop_mask&(1ULL << worker->id)) != 0ULL;
 }
 
-void smp_complete_iteration(struct search_worker *worker)
+void smp_complete_iteration(struct search_worker *worker, int *new_depth)
 {
+    int highest_depth;
+    int count;
+    int k;
+
     mutex_lock(&state_lock);
+
     if (worker->depth > worker->state->completed_depth) {
         worker->state->completed_depth = worker->depth;
+        worker->state->completed_move = worker->best_move;
+        worker->state->completed_ponder_move = worker->ponder_move;
         hash_tt_insert_pv(&worker->pos, &worker->pv_table[0]);
+        engine_send_pv_info(worker, &worker->pv_table[0],
+                        worker->depth, worker->seldepth,
+                        worker->best_score, smp_nodes());
     }
+
+    highest_depth = 0;
+    count = 0;
+    for (k=0;k<number_of_workers;k++) {
+        if (workers[k].depth > highest_depth) {
+            highest_depth = workers[k].depth;
+            count = 1;
+        } else if (workers[k].depth == highest_depth) {
+            count++;
+        }
+    }
+    *new_depth = MAX(worker->depth+1, highest_depth);
+    if ((*new_depth == highest_depth) && (count >= (number_of_workers/2))) {
+        (*new_depth)++;
+    }
+
     mutex_unlock(&state_lock);
 }

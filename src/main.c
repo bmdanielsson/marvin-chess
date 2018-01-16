@@ -62,17 +62,14 @@ static void read_config_file(void)
 	line = fgets(buffer, CFG_MAX_LINE_LENGTH, fp);
 	while (line != NULL) {
 	    if (sscanf(line, "HASH_SIZE=%d", &int_val) == 1) {
-		    if (int_val > MAX_MAIN_HASH_SIZE) {
-	            engine_default_hash_size = MAX_MAIN_HASH_SIZE;
-            } else if (int_val < MIN_MAIN_HASH_SIZE) {
-			    engine_default_hash_size = MIN_MAIN_HASH_SIZE;
-            } else {
-			    engine_default_hash_size = int_val;
-            }
+            engine_default_hash_size = CLAMP(int_val, MIN_MAIN_HASH_SIZE,
+                                             MAX_MAIN_HASH_SIZE);
         } else if (sscanf(line, "LOG_LEVEL=%d", &int_val) == 1) {
             dbg_set_log_level(int_val);
         } else if (sscanf(line, "SYZYGY_PATH=%s", engine_syzygy_path) == 1) {
             tb_init(engine_syzygy_path);
+        } else if (sscanf(line, "NUM_THREADS=%d", &int_val) == 1) {
+            engine_default_num_threads = CLAMP(int_val, 1, MAX_WORKERS);
         }
 
         /* Next line */
@@ -109,7 +106,7 @@ int main(int argc, char *argv[])
 
     /* Setup SMP */
     smp_init();
-    smp_create_workers(1);
+    smp_create_workers(engine_default_num_threads);
 
     /* Handle specific benchmark command line option */
     if ((argc == 2) && !strncmp(argv[1], "-b", 2)) {

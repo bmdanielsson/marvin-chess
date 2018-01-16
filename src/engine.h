@@ -33,6 +33,7 @@ enum protocol {
 extern enum protocol engine_protocol;
 extern char engine_syzygy_path[1024];
 extern int engine_default_hash_size;
+extern int engine_default_num_threads;
 
 /*
  * The main engine loop.
@@ -80,6 +81,15 @@ void engine_clear_pending_command(void);
  * @return Returns true if the current search should be stopped.
  */
 bool engine_check_input(struct search_worker *worker, bool *ponderhit);
+
+/*
+ * Function used to wait until input arrives.
+ *
+ * @param worker The worker.
+ * @param ponderhit Location to store if a ponderhit command was received.
+ * @return Returns true if the current search should be stopped.
+ */
+bool engine_wait_for_input(struct search_worker *worker, bool *ponderhit);
 
 /*
  * Send information about the principle variation.

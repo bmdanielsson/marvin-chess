@@ -582,7 +582,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         }
         board_unmake_move(pos);
         if (worker->abort) {
-            return best_score;
+            return 0;
         }
 
         /* Check if we have found a new best move */
@@ -681,7 +681,8 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
         /* Send stats for the first worker */
         worker->currmovenumber++;
         worker->currmove = move;
-        if (worker->id == 0) {
+        if ((worker->id == 0) &&
+            (worker->depth > worker->state->completed_depth))  {
             engine_send_move_info(worker);
         }
 
@@ -690,7 +691,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
         score = -search(worker, depth-1, -beta, -alpha, true);
         board_unmake_move(pos);
         if (worker->abort) {
-            return best_score;
+            return 0;
         }
 
         /* Check if a new best move have been found */
@@ -724,7 +725,8 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 update_history_table(worker, move, depth);
 
                 /* Send stats for the first worker */
-                if (worker->id == 0) {
+                if ((worker->id == 0) &&
+                    (worker->depth > worker->state->completed_depth))  {
                     engine_send_pv_info(worker, &worker->pv_table[0],
                                         worker->depth, worker->seldepth,
                                         best_score, smp_nodes());
@@ -737,6 +739,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                  * be trusted.
                  */
                 worker->best_move = move;
+                worker->best_score = best_score;
                 worker->ponder_move = (worker->pv_table[0].length > 1)?
                                             worker->pv_table[0].moves[1]:NOMOVE;
             }
@@ -766,25 +769,17 @@ void search_find_best_move(struct search_worker *worker)
     int       awindex;
     int       bwindex;
 	bool      ponderhit;
-    int       best_score;
     uint32_t  best_move;
-    int       best_depth;
-    int       best_seldepth;
-    struct pv best_pv;
     uint32_t  ponder_move;
 
     assert(valid_position(&worker->pos));
 
-    /* Update best move information */
-    best_score = 0;
-    best_depth = 0;
-    best_seldepth = 0;
+    /* Initialize best move information */
     best_move = worker->root_moves.moves[0];
-    best_pv.length = 0;
     ponder_move = NOMOVE;
 
     /* Setup the first iteration */
-    depth = 1;
+    depth = 1 + worker->id%2;
     alpha = -INFINITE_SCORE;
     beta = INFINITE_SCORE;
     awindex = 0;
@@ -802,20 +797,8 @@ void search_find_best_move(struct search_worker *worker)
         /* Check if the search was interrupted for some reason */
         if (worker->abort) {
             assert(worker->best_move != NOMOVE);
-            if ((worker->best_move != best_move) &&
-                (score > alpha) && (score < beta) &&
-                (score > best_score)) {
-                best_score = score;
-                best_depth = worker->depth;
-                best_seldepth = worker->seldepth;
-                best_move = worker->best_move;
-                copy_pv(&worker->pv_table[0], &best_pv);
-                ponder_move = worker->ponder_move;
-            } else if ((score > alpha) && (score < beta)) {
-                best_score = score;
-                best_depth = worker->depth;
-                best_seldepth = worker->seldepth;
-            }
+            best_move = worker->best_move;
+            ponder_move = worker->ponder_move;
             break;
         }
 
@@ -838,15 +821,11 @@ void search_find_best_move(struct search_worker *worker)
         worker->resolving_root_fail = false;
 
         /* Update best move */
-        best_score = score;
-        best_depth = worker->depth;
-        best_seldepth = worker->seldepth;
         best_move = worker->best_move;
-        copy_pv(&worker->pv_table[0], &best_pv);
         ponder_move = worker->ponder_move;
 
         /* Report iteration as completed */
-        smp_complete_iteration(worker);
+        smp_complete_iteration(worker, &depth);
 
         /*
          * Check if the score indicates a known win in
@@ -864,7 +843,6 @@ void search_find_best_move(struct search_worker *worker)
          * from having an aspiration window for the first few
          * iterations so an infinite window is used to start with.
          */
-        depth++;
         awindex = 0;
         bwindex = 0;
         if (depth > 5) {
@@ -877,11 +855,7 @@ void search_find_best_move(struct search_worker *worker)
     }
 
     /* Copy information back about the best move before returning */
-    worker->best_score = best_score;
-    worker->depth = best_depth;
-    worker->seldepth = best_seldepth;
     worker->best_move = best_move;
-    copy_pv(&best_pv, &worker->best_pv);
     worker->ponder_move = ponder_move;
 
     /*
@@ -890,13 +864,14 @@ void search_find_best_move(struct search_worker *worker)
      * command is received so that the bestmove command is not sent too
      * early.
      */
-	while (worker->state->pondering && !worker->abort) {
-		sleep_ms(100);
-		if (engine_check_input(worker, &ponderhit)) {
+	while ((worker->id == 0) && worker->state->pondering && !worker->abort) {
+		if (engine_wait_for_input(worker, &ponderhit)) {
 			worker->abort = true;
+			smp_stop_all();
 		}
 		if (ponderhit) {
 			worker->state->pondering = false;
+			smp_stop_all();
 		}
 	}
 }

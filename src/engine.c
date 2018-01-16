@@ -32,6 +32,7 @@
 #include "utils.h"
 #include "chess.h"
 #include "timectl.h"
+#include "thread.h"
 
 /* Size of the receive buffer */
 #define RX_BUFFER_SIZE 4096
@@ -43,6 +44,7 @@
 enum protocol engine_protocol = PROTOCOL_UNSPECIFIED;
 char engine_syzygy_path[1024] = {'\0'};
 int engine_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
+int engine_default_num_threads = 1;
 
 /* Buffer used for receiving commands */
 static char rx_buffer[RX_BUFFER_SIZE];
@@ -55,6 +57,9 @@ static char tx_buffer[TX_BUFFER_SIZE];
  * executed when the search finishes.
  */
 static char pending_cmd_buffer[RX_BUFFER_SIZE];
+
+/* Lock used to synchronize command output */
+static mutex_t tx_lock;
 
 /*
  * Custom command
@@ -172,6 +177,8 @@ void engine_loop(struct gamestate *state)
     bool stop = false;
     bool handled = false;
 
+    mutex_init(&tx_lock);
+
     /* Enter the main command loop */
     while (!stop) {
         if (strlen(pending_cmd_buffer) != 0) {
@@ -181,7 +188,7 @@ void engine_loop(struct gamestate *state)
         } else {
             cmd = engine_read_command();
             if (cmd == NULL) {
-                /* The GUI exited unexpectidly */
+                /* The GUI exited unexpectedly */
                 break;
             }
         }
@@ -217,6 +224,8 @@ void engine_loop(struct gamestate *state)
             LOG_INFO1("Unknown command: %s\n", cmd);
         }
     }
+
+    mutex_destroy(&tx_lock);
 }
 
 char* engine_read_command(void)
@@ -246,10 +255,14 @@ void engine_write_command(char *format, ...)
 
     assert(format != NULL);
 
+    mutex_lock(&tx_lock);
+
     va_start(ap, format);
     vsprintf(tx_buffer, format, ap);
     printf("%s\n", tx_buffer);
     va_end(ap);
+
+    mutex_unlock(&tx_lock);
 
     LOG_INFO2("<== %s\n", tx_buffer);
 }
@@ -278,6 +291,19 @@ bool engine_check_input(struct search_worker *worker, bool *ponderhit)
     if (!poll_input()) {
         return false;
     }
+
+    if (engine_protocol == PROTOCOL_UCI) {
+        return uci_check_input(ponderhit);
+    } else {
+        return xboard_check_input(worker, ponderhit);
+    }
+
+    return false;
+}
+
+bool engine_wait_for_input(struct search_worker *worker, bool *ponderhit)
+{
+	*ponderhit = false;
 
     if (engine_protocol == PROTOCOL_UCI) {
         return uci_check_input(ponderhit);

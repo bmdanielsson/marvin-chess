@@ -28,12 +28,16 @@
 #include "hash.h"
 #include "movegen.h"
 #include "board.h"
+#include "thread.h"
 
 /* Pointer to log file. */
 static FILE *logfp = NULL;
 
 /* The log level */
 static int log_level = 0;
+
+/* Lock for synchronizing log file writes */
+static mutex_t log_lock;
 
 static bool browse_display_move(struct position *pos, uint32_t move, int id,
                                 bool pv, int current_score)
@@ -148,6 +152,9 @@ void dbg_set_log_level(int level)
         return;
     }
 
+    /* Initialize lock */
+    mutex_init(&log_lock);
+
     /* Construct the name of the log file */
     snprintf(name, sizeof(name), LOGFILE_NAME, get_current_pid());
 
@@ -176,6 +183,7 @@ void dbg_log_close(void)
     if (logfp != NULL) {
         fclose(logfp);
         logfp = NULL;
+        mutex_destroy(&log_lock);
     }
 }
 
@@ -189,9 +197,13 @@ void dbg_log_info(int level, char *fmt, ...)
         return;
     }
 
+    mutex_lock(&log_lock);
+
     va_start(ap, fmt);
     vfprintf(logfp, fmt, ap);
     va_end(ap);
+
+    mutex_unlock(&log_lock);
 }
 
 void dbg_print_board(struct position *pos)

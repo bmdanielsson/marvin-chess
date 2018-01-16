@@ -833,7 +833,7 @@ bool xboard_check_input(struct search_worker *worker, bool *ponderhit)
     /* Read command */
     cmd = engine_read_command();
     if (cmd == NULL) {
-        /* The GUI exited unexpectidely */
+        /* The GUI exited unexpectedly */
         return false;
     }
 

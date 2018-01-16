@@ -12,6 +12,7 @@ When started Marvin looks for a configuration file called marvin.ini in the same
 * HASH_SIZE: The amount of memory used for the main hash table (in MB). For best performance the size should be a power-of-2.
 * LOG_LEVEL: The log level. If set to 2 the engine will log all commands that are sent and received.
 * SYZYGY_PATH: Path to where the Syzygy tablebases are located.
+* NUM_THREADS: The number of threads to use for searching.
 
 Additionally Marvin looks for a file called book.bin in the same directory. The book.bin file should be an opening book file in Polyglot format.
 

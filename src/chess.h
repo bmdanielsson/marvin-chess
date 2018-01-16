@@ -421,6 +421,7 @@ struct position {
     int material[NPHASES][NSIDES];
     int psq[NPHASES][NSIDES];
 
+    /* Pointers to the owning worker and the active game state */
     struct search_worker *worker;
     struct gamestate *state;
 };
@@ -478,6 +479,7 @@ struct search_worker {
     event_t ev_done;
     int action;
 
+    /* Pointer to the active game state */
     struct gamestate *state;
 };
 
@@ -516,8 +518,10 @@ struct gamestate {
     uint32_t best_move;
     /*The ponder move */
     uint32_t ponder_move;
-    /* The depth completed so far */
+    /* Information about the highest completed depth */
     int completed_depth;
+    uint32_t completed_move;
+    uint32_t completed_ponder_move;
     /* The  number of moves searched */
     uint32_t nodes;
 };

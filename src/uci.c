@@ -370,8 +370,9 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command("option name SyzygyPath type string default %s",
                          engine_syzygy_path[0] != '\0'?
                                                 engine_syzygy_path:"<empty>");
-    engine_write_command("option name Threads type spin default 1 min 1 max %d",
-                         MAX_WORKERS);
+    engine_write_command(
+                        "option name Threads type spin default %d min 1 max %d",
+                        engine_default_num_threads, MAX_WORKERS);
     engine_write_command("uciok");
 }
 
@@ -437,7 +438,7 @@ bool uci_check_input(bool *ponderhit)
     /* Read command */
     cmd = engine_read_command();
     if (cmd == NULL) {
-        /* The GUI exited unexpectidely */
+        /* The GUI exited unexpectedly */
         return false;
     }
 
