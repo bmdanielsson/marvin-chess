@@ -190,7 +190,6 @@ static void prepare_worker(struct search_worker *worker,
     worker->best_pv.length = 0;
 
     /* Initialize helper variables */
-    worker->abort = false;
     worker->resolving_root_fail = false;
     worker->ppms[0].nmoves = 0;
 

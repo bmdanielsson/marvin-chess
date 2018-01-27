@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <time.h>
+#include <setjmp.h>
 
 #include "thread.h"
 
@@ -450,8 +451,6 @@ struct search_worker {
     struct pawntt_item *pawntt;
     /* The number of entries in the pawn transposition table */
     int pawntt_size;
-    /* Flag indicating if it's time to abort the search */
-    bool abort;
     /* Indicates if the engine is resolving a fail-low/fail-high at the root */
     bool resolving_root_fail;
     /* The number of nodes searched so far */
@@ -478,6 +477,7 @@ struct search_worker {
     event_t ev_start;
     event_t ev_done;
     int action;
+    jmp_buf env;
 
     /* Pointer to the active game state */
     struct gamestate *state;

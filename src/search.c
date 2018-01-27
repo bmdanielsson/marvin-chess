@@ -42,6 +42,11 @@
 /* Calculates if it is time to check the clock and poll for commands */
 #define CHECKUP(n) (((n)&1023)==0)
 
+/* Different exceptions that can happen during search */
+#define EXCEPTION_COMMAND 1
+#define EXCEPTION_STOP 2
+#define EXCEPTION_TIMEOUT 3
+
 /* Configuration constants for null move pruning */
 #define NULLMOVE_DEPTH 3
 #define NULLMOVE_BASE_REDUCTION 2
@@ -196,34 +201,28 @@ static void update_pv(struct search_worker *worker, uint32_t move)
                                     worker->pv_table[pos->sply+1].length + 1;
 }
 
-static bool checkup(struct search_worker *worker)
+static void checkup(struct search_worker *worker)
 {
     bool ponderhit = false;
 
-    assert(!worker->abort);
-
     /* Check if the worker is requested to stop */
     if (smp_should_stop(worker)) {
-        worker->abort = true;
-        return true;
+        longjmp(worker->env, EXCEPTION_STOP);
     }
 
     /* Perform checkup */
     if (!tc_check_time(worker)) {
-        worker->abort = true;
-        return true;
+        longjmp(worker->env, EXCEPTION_TIMEOUT);
     }
     if ((worker->id == 0) && engine_check_input(worker, &ponderhit)) {
-        worker->abort = true;
         smp_stop_all();
+        longjmp(worker->env, EXCEPTION_COMMAND);
     }
 	if (ponderhit) {
 		tc_start_clock();
 		tc_allocate_time();
 		worker->state->pondering = false;
 	}
-
-    return worker->abort;
 }
 
 static int quiescence(struct search_worker *worker, int depth, int alpha,
@@ -246,10 +245,8 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     }
 
     /* Check if the time is up or if we have received a new command */
-    if (worker->abort || CHECKUP(worker->nodes)) {
-        if (checkup(worker)) {
-            return 0;
-        }
+    if (CHECKUP(worker->nodes)) {
+        checkup(worker);
     }
 
     /* Reset the search tree for this ply */
@@ -308,9 +305,6 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
         found_move = true;
         score = -quiescence(worker, depth-1, -beta, -alpha);
         board_unmake_move(pos);
-        if (worker->abort) {
-            return 0;
-        }
 
         /* Check if we have found a better move */
         if (score > best_score) {
@@ -369,10 +363,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Check if the time is up or if we have received a new command */
-    if (worker->abort || CHECKUP(worker->nodes)) {
-        if (checkup(worker)) {
-            return 0;
-        }
+    if (CHECKUP(worker->nodes)) {
+        checkup(worker);
     }
 
     /* Check if the selective depth should be updated */
@@ -471,9 +463,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         board_make_null_move(pos);
         score = -search(worker, depth-reduction-1, -beta, -beta+1, false);
         board_unmake_null_move(pos);
-        if (worker->abort) {
-            return 0;
-        }
         if (score >= beta) {
             /*
              * Since the score is based on doing a null move a checkmate
@@ -567,7 +556,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             score = -search(worker, depth-reduction-1, -alpha-1, -alpha, true);
 
             /* Re-search with full depth if the move improved alpha */
-            if ((score > alpha) && (reduction > 0) && !worker->abort) {
+            if ((score > alpha) && (reduction > 0)) {
                 score = -search(worker, depth-1, -alpha-1, -alpha, true);
             }
 
@@ -576,14 +565,11 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
              * improved. If this is not a pv node then the full window
              * is actually a null window so there is no need to re-search.
              */
-            if (pv_node && (score > alpha) && !worker->abort) {
+            if (pv_node && (score > alpha)) {
                 score = -search(worker, depth-1, -beta, -alpha, true);
             }
         }
         board_unmake_move(pos);
-        if (worker->abort) {
-            return 0;
-        }
 
         /* Check if we have found a new best move */
         if (score > best_score) {
@@ -652,9 +638,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
 
     pos = &worker->pos;
 
-    if (checkup(worker)) {
-        return -INFINITE_SCORE;
-    }
+    checkup(worker);
 
     /* Reset the search tree for this ply */
     worker->pv_table[0].length = 0;
@@ -690,9 +674,6 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
         (void)board_make_move(pos, move);
         score = -search(worker, depth-1, -beta, -alpha, true);
         board_unmake_move(pos);
-        if (worker->abort) {
-            return 0;
-        }
 
         /* Check if a new best move have been found */
         if (score > best_score) {
@@ -762,15 +743,16 @@ void search_reset_data(struct gamestate *state)
 
 void search_find_best_move(struct search_worker *worker)
 {
-    int       score;
-    int       alpha;
-    int       beta;
-    int       depth;
-    int       awindex;
-    int       bwindex;
-	bool      ponderhit;
-    uint32_t  best_move;
-    uint32_t  ponder_move;
+    volatile uint32_t best_move;
+    volatile uint32_t ponder_move;
+    volatile int      alpha;
+    volatile int      beta;
+    volatile int      awindex;
+    volatile int      bwindex;
+    int               score;
+    int               depth;
+	bool              ponderhit;
+    int               exception;
 
     assert(valid_position(&worker->pos));
 
@@ -788,14 +770,14 @@ void search_find_best_move(struct search_worker *worker)
     /* Main iterative deepening loop */
     while (tc_new_iteration(worker) && (depth <= worker->state->sd)) {
 		/* Search */
-        worker->depth = depth;
-        worker->seldepth = 0;
-        alpha = MAX(alpha, -INFINITE_SCORE);
-        beta = MIN(beta, INFINITE_SCORE);
-        score = search_root(worker, depth, alpha, beta);
-
-        /* Check if the search was interrupted for some reason */
-        if (worker->abort) {
+        exception = setjmp(worker->env);
+        if (exception == 0) {
+            worker->depth = depth;
+            worker->seldepth = 0;
+            alpha = MAX(alpha, -INFINITE_SCORE);
+            beta = MIN(beta, INFINITE_SCORE);
+            score = search_root(worker, depth, alpha, beta);
+        } else {
             assert(worker->best_move != NOMOVE);
             best_move = worker->best_move;
             ponder_move = worker->ponder_move;
@@ -864,10 +846,10 @@ void search_find_best_move(struct search_worker *worker)
      * command is received so that the bestmove command is not sent too
      * early.
      */
-	while ((worker->id == 0) && worker->state->pondering && !worker->abort) {
+	while ((worker->id == 0) && worker->state->pondering) {
 		if (engine_wait_for_input(worker, &ponderhit)) {
-			worker->abort = true;
 			smp_stop_all();
+            break;
 		}
 		if (ponderhit) {
 			worker->state->pondering = false;
@@ -909,7 +891,6 @@ int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
         }
     }
     worker->depth = 0;
-    worker->abort = false;
     worker->nodes = 0;
     worker->id = 0;
     worker->resolving_root_fail = false;
