@@ -283,12 +283,11 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     }
 
 	/*
-	 * Allocate time for the search and start the clock. In
-	 * pondering mode the clock is started when the ponderhit
-	 * command is received.
+	 * Allocate time for the search. In pondering mode time
+     * is allocated when the engine stops pondering and
+     * enters the normal search.
 	 */
 	if (!pondering) {
-        tc_start_clock();
 		tc_allocate_time();
 	}
 

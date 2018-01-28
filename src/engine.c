@@ -284,31 +284,27 @@ void engine_clear_pending_command(void)
     pending_cmd_buffer[0] = '\0';
 }
 
-bool engine_check_input(struct search_worker *worker, bool *ponderhit)
+bool engine_check_input(struct search_worker *worker)
 {
-    *ponderhit = false;
-
     if (!poll_input()) {
         return false;
     }
 
     if (engine_protocol == PROTOCOL_UCI) {
-        return uci_check_input(ponderhit);
+        return uci_check_input(worker);
     } else {
-        return xboard_check_input(worker, ponderhit);
+        return xboard_check_input(worker);
     }
 
     return false;
 }
 
-bool engine_wait_for_input(struct search_worker *worker, bool *ponderhit)
+bool engine_wait_for_input(struct search_worker *worker)
 {
-	*ponderhit = false;
-
     if (engine_protocol == PROTOCOL_UCI) {
-        return uci_check_input(ponderhit);
+        return uci_check_input(worker);
     } else {
-        return xboard_check_input(worker, ponderhit);
+        return xboard_check_input(worker);
     }
 
     return false;

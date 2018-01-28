@@ -18,6 +18,8 @@
 #ifndef TIMECTL_H
 #define TIMECTL_H
 
+#include <stdbool.h>
+
 #include "chess.h"
 
 /*
@@ -49,6 +51,18 @@ bool tc_is_infinite(void);
  * Start the clock.
  */
 void tc_start_clock(void);
+
+/*
+ * Stop the clock.
+ */
+void tc_stop_clock(void);
+
+/*
+ * Check if the clock is running.
+ *
+ * @return Returns TRUE if the clock is running.
+ */
+bool tc_is_clock_running(void);
 
 /*
  * Allocate time for the current search.

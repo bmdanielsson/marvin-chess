@@ -59,6 +59,9 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     bool     ponder = false;
     uint32_t move;
 
+    /* Start the clock */
+    tc_start_clock();
+
     /* Prepare for the search */
     search_reset_data(state);
 
@@ -139,6 +142,13 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             ponder = true;
             iter = strchr(iter, ' ');
             in_movelist = false;
+
+            /*
+             * Stop the clock since the engine will be thinking
+             * on the opponents time. It will be started when
+             * a ponderhit or stop command is received.
+             */
+            tc_stop_clock();
         } else if (!strncmp(iter, "searchmoves", 11)) {
             iter = strchr(iter, ' ');
             in_movelist = true;
@@ -199,6 +209,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     } else {
         engine_write_command("bestmove %s", best_movestr);
     }
+    tc_stop_clock();
 }
 
 static void uci_cmd_isready(void)
@@ -426,14 +437,10 @@ bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop)
     return true;
 }
 
-bool uci_check_input(bool *ponderhit)
+bool uci_check_input(struct search_worker *worker)
 {
     char *cmd;
     bool stop = false;
-
-    assert(ponderhit != NULL);
-
-    *ponderhit = false;
 
     /* Read command */
     cmd = engine_read_command();
@@ -446,8 +453,11 @@ bool uci_check_input(bool *ponderhit)
     if (!strncmp(cmd, "isready", 7)) {
         uci_cmd_isready();
     } else if(!strncmp(cmd, "ponderhit", 9)) {
-        *ponderhit = true;
+		tc_start_clock();
+		tc_allocate_time();
+		worker->state->pondering = false;
     } else if (!strncmp(cmd, "stop", 4)) {
+		worker->state->pondering = false;
         stop = true;
     }
 

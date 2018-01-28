@@ -35,10 +35,10 @@ bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop);
 /*
  * Function called during search to check if input has arrived.
  *
- * @param ponderhit Location to store if a ponderhit command was received.
+ * @param worker The worker.
  * @return Returns true if the current search should be stopped.
  */
-bool uci_check_input(bool *ponderhit);
+bool uci_check_input(struct search_worker *worker);
 
 /*
  * Send information about the principle variation.

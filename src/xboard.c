@@ -203,6 +203,11 @@ static void make_engine_move(struct gamestate *state)
     enum game_result result;
     bool             ponder;
 
+    /* Start the clock */
+    if (!tc_is_clock_running()) {
+        tc_start_clock();
+    }
+
     /* Prepare for search */
     search_reset_data(state);
     ponder = false;
@@ -236,6 +241,7 @@ static void make_engine_move(struct gamestate *state)
         /* Send move */
         move2str(best_move, best_movestr);
         engine_write_command("move %s", best_movestr);
+		tc_stop_clock();
 
         /* Check if the game is over */
         result = is_game_over(&state->pos);
@@ -819,16 +825,12 @@ bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop)
     return true;
 }
 
-bool xboard_check_input(struct search_worker *worker, bool *ponderhit)
+bool xboard_check_input(struct search_worker *worker)
 {
     char *cmd;
     bool stop = false;
     char movestr[6];
     char *iter;
-
-    assert(ponderhit != NULL);
-
-    *ponderhit = false;
 
     /* Read command */
     cmd = engine_read_command();
@@ -889,13 +891,14 @@ bool xboard_check_input(struct search_worker *worker, bool *ponderhit)
             iter++;
             move2str(pondering_on, movestr);
             if (!strcmp(movestr, iter) && (strlen(movestr) == strlen(iter))) {
-                *ponderhit = true;
                 pondering_on = NOMOVE;
             } else {
                 engine_set_pending_command(cmd);
                 stop = true;
-                worker->state->pondering = false;
             }
+		    tc_start_clock();
+		    tc_allocate_time();
+		    worker->state->pondering = false;
         }
     } else if (!strncmp(cmd, "bk", 2) ||
                !strncmp(cmd, "force", 5) ||

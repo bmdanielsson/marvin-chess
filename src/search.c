@@ -203,8 +203,6 @@ static void update_pv(struct search_worker *worker, uint32_t move)
 
 static void checkup(struct search_worker *worker)
 {
-    bool ponderhit = false;
-
     /* Check if the worker is requested to stop */
     if (smp_should_stop(worker)) {
         longjmp(worker->env, EXCEPTION_STOP);
@@ -214,15 +212,10 @@ static void checkup(struct search_worker *worker)
     if (!tc_check_time(worker)) {
         longjmp(worker->env, EXCEPTION_TIMEOUT);
     }
-    if ((worker->id == 0) && engine_check_input(worker, &ponderhit)) {
+    if ((worker->id == 0) && engine_check_input(worker)) {
         smp_stop_all();
         longjmp(worker->env, EXCEPTION_COMMAND);
     }
-	if (ponderhit) {
-		tc_start_clock();
-		tc_allocate_time();
-		worker->state->pondering = false;
-	}
 }
 
 static int quiescence(struct search_worker *worker, int depth, int alpha,
@@ -751,7 +744,6 @@ void search_find_best_move(struct search_worker *worker)
     volatile int      bwindex;
     int               score;
     int               depth;
-	bool              ponderhit;
     int               exception;
 
     assert(valid_position(&worker->pos));
@@ -847,12 +839,11 @@ void search_find_best_move(struct search_worker *worker)
      * early.
      */
 	while ((worker->id == 0) && worker->state->pondering) {
-		if (engine_wait_for_input(worker, &ponderhit)) {
+		if (engine_wait_for_input(worker)) {
 			smp_stop_all();
             break;
 		}
-		if (ponderhit) {
-			worker->state->pondering = false;
+		if (!worker->state->pondering) {
 			smp_stop_all();
 		}
 	}

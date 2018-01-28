@@ -36,10 +36,9 @@ bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop);
  * Function called during search to check if input has arrived.
  *
  * @param worker The worker.
- * @param ponderhit Location to store if a ponderhit command was received.
  * @return Returns true if the current search should be stopped.
  */
-bool xboard_check_input(struct search_worker *worker, bool *ponderhit);
+bool xboard_check_input(struct search_worker *worker);
 
 /*
  * Send information about the principle variation.

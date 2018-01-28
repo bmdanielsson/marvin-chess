@@ -57,6 +57,9 @@ static time_t soft_time_limit = 0;
 /* A hard time limit that may not be exceeded */
 static time_t hard_time_limit = 0;
 
+/* Keeps track if the clock is running or not */
+static bool clock_is_running = false;
+
 void tc_configure_time_control(enum timectl_type type, int time, int inc,
                                int movestogo)
 {
@@ -88,6 +91,17 @@ bool tc_is_infinite(void)
 void tc_start_clock(void)
 {
     search_start = get_current_time();
+    clock_is_running = true;
+}
+
+void tc_stop_clock(void)
+{
+    clock_is_running = false;
+}
+
+bool tc_is_clock_running(void)
+{
+    return clock_is_running;
 }
 
 void tc_allocate_time(void)

@@ -77,19 +77,17 @@ void engine_clear_pending_command(void);
  * Function called during search to check if input has arrived.
  *
  * @param worker The worker.
- * @param ponderhit Location to store if a ponderhit command was received.
  * @return Returns true if the current search should be stopped.
  */
-bool engine_check_input(struct search_worker *worker, bool *ponderhit);
+bool engine_check_input(struct search_worker *worker);
 
 /*
  * Function used to wait until input arrives.
  *
  * @param worker The worker.
- * @param ponderhit Location to store if a ponderhit command was received.
  * @return Returns true if the current search should be stopped.
  */
-bool engine_wait_for_input(struct search_worker *worker, bool *ponderhit);
+bool engine_wait_for_input(struct search_worker *worker);
 
 /*
  * Send information about the principle variation.
