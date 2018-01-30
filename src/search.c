@@ -789,7 +789,6 @@ void search_find_best_move(struct search_worker *worker)
         if (score >= beta) {
             bwindex++;
             beta = score + aspiration_window[bwindex];
-            worker->resolving_root_fail = true;
             continue;
         }
         worker->resolving_root_fail = false;
