@@ -34,8 +34,8 @@ endif
 .PHONY : variant
 ifeq ($(variant), release)
     CPPFLAGS += -DNDEBUG
-    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer
-    LDFLAGS += $(ARCH)
+    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer -flto
+    LDFLAGS += $(ARCH) -flto
 else
 ifeq ($(variant), debug)
     CFLAGS += -g
