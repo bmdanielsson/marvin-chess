@@ -196,7 +196,8 @@ bool tc_check_time(struct search_worker *worker)
      * When resolving a fail-low we allow the search to exceed the soft
      * limit in the hope that the iteration can be finished.
      */
-    if (worker->resolving_root_fail) {
+    if (worker->resolving_root_fail &&
+        (worker->depth > worker->state->completed_depth)) {
         return get_current_time() < hard_time_limit;
     } else {
         return get_current_time() < soft_time_limit;
