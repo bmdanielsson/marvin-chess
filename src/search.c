@@ -204,8 +204,13 @@ static void update_pv(struct search_worker *worker, uint32_t move)
 static void checkup(struct search_worker *worker)
 {
     /* Check if the worker is requested to stop */
-    if (smp_should_stop(worker)) {
+    if (!worker->resolving_root_fail && smp_should_stop(worker)) {
         longjmp(worker->env, EXCEPTION_STOP);
+    }
+
+    /* Check if the time is up or if we have received a new command */
+    if (!CHECKUP(worker->nodes)) {
+        return;
     }
 
     /* Perform checkup */
@@ -238,9 +243,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     }
 
     /* Check if the time is up or if we have received a new command */
-    if (CHECKUP(worker->nodes)) {
-        checkup(worker);
-    }
+    checkup(worker);
 
     /* Reset the search tree for this ply */
     worker->pv_table[pos->sply].length = 0;
@@ -356,9 +359,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Check if the time is up or if we have received a new command */
-    if (CHECKUP(worker->nodes)) {
-        checkup(worker);
-    }
+    checkup(worker);
 
     /* Check if the selective depth should be updated */
     if (pos->sply > worker->seldepth) {
@@ -826,6 +827,9 @@ void search_find_best_move(struct search_worker *worker)
             beta = INFINITE_SCORE;
         }
     }
+
+    /* Stop all other workers */
+    smp_stop_all();
 
     /* Copy information back about the best move before returning */
     worker->best_move = best_move;
