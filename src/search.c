@@ -645,8 +645,6 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     (void)hash_tt_lookup(pos, depth, alpha, beta, &move, &score);
     select_set_tt_move(worker, move);
     best_move = move;
-    worker->best_move = move;
-	worker->ponder_move = NOMOVE;
 
     /* Update score for root moves */
     select_update_root_move_scores(worker);
