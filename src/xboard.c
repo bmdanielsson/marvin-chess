@@ -277,6 +277,7 @@ static void xboard_cmd_analyze(struct gamestate *state)
     char *cmd;
 
     analyze_mode = true;
+    tc_start_clock();
 
     while (true) {
         /* Prepare for search */
@@ -308,6 +309,7 @@ static void xboard_cmd_analyze(struct gamestate *state)
         }
     }
 
+    tc_stop_clock();
     analyze_mode = false;
 }
 
