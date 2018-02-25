@@ -468,8 +468,6 @@ struct search_worker {
 
     /* The best move found so far */
     uint32_t best_move;
-    int best_score;
-    struct pv best_pv;
     uint32_t ponder_move;
 
     /* Data for the worker thread */
@@ -514,16 +512,13 @@ struct gamestate {
 	 * searching in pondering mode.
 	 */
 	bool pondering;
-    /*The best move */
+    /* Information about the best move */
     uint32_t best_move;
-    /*The ponder move */
     uint32_t ponder_move;
+    int best_move_depth;
+    int best_move_score;
     /* Information about the highest completed depth */
     int completed_depth;
-    uint32_t completed_move;
-    uint32_t completed_ponder_move;
-    /* The  number of moves searched */
-    uint32_t nodes;
 };
 
 /* Bitboard mask for each square */

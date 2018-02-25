@@ -66,12 +66,20 @@ void smp_stop_all(void);
 bool smp_should_stop(struct search_worker *worker);
 
 /*
+ * Update best move so far and send status information.
+ *
+ * @param worker The worker.
+ * @param score The current search score.
+ */
+void smp_update(struct search_worker *worker, int score);
+
+/*
  * Called by workers when they have finished a search iteration.
  *
  * @param worker The worker.
- * @param new_depth The depth the worker should search to for the
- *                  next iteration.
+ * @return Returns the depth the worker should search to for the
+ *         next iteration.
  */
-void smp_complete_iteration(struct search_worker *worker, int *new_depth);
+int smp_complete_iteration(struct search_worker *worker);
 
 #endif

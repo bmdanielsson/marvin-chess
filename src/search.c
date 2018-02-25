@@ -697,24 +697,15 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 update_pv(worker, move);
                 update_history_table(worker, move, depth);
 
-                /* Send stats for the first worker */
-                if ((worker->id == 0) &&
-                    (worker->depth > worker->state->completed_depth))  {
-                    engine_send_pv_info(worker, &worker->pv_table[0],
-                                        worker->depth, worker->seldepth,
-                                        best_score, smp_nodes());
-                }
-
                 /*
-                 * Update the best move from the search and the ponder move.
-                 * The moves are only updated when the score is inside the
-                 * aspiration window since it's only then that the score can
-                 * be trusted.
+                 * Update the best move and the ponder move. The moves
+                 * are only updated when the score is inside the aspiration
+                 * window since it's only then that the score can be trusted.
                  */
                 worker->best_move = move;
-                worker->best_score = best_score;
                 worker->ponder_move = (worker->pv_table[0].length > 1)?
                                             worker->pv_table[0].moves[1]:NOMOVE;
+                smp_update(worker, score);
             }
         }
     }
@@ -735,21 +726,15 @@ void search_reset_data(struct gamestate *state)
 
 void search_find_best_move(struct search_worker *worker)
 {
-    volatile uint32_t best_move;
-    volatile uint32_t ponder_move;
-    volatile int      alpha;
-    volatile int      beta;
-    volatile int      awindex;
-    volatile int      bwindex;
-    int               score;
-    int               depth;
-    int               exception;
+    volatile int alpha;
+    volatile int beta;
+    volatile int awindex;
+    volatile int bwindex;
+    int          score;
+    int          depth;
+    int          exception;
 
     assert(valid_position(&worker->pos));
-
-    /* Initialize best move information */
-    best_move = worker->root_moves.moves[0];
-    ponder_move = NOMOVE;
 
     /* Setup the first iteration */
     depth = 1 + worker->id%2;
@@ -769,9 +754,6 @@ void search_find_best_move(struct search_worker *worker)
             beta = MIN(beta, INFINITE_SCORE);
             score = search_root(worker, depth, alpha, beta);
         } else {
-            assert(worker->best_move != NOMOVE);
-            best_move = worker->best_move;
-            ponder_move = worker->ponder_move;
             break;
         }
 
@@ -792,12 +774,8 @@ void search_find_best_move(struct search_worker *worker)
         }
         worker->resolving_root_fail = false;
 
-        /* Update best move */
-        best_move = worker->best_move;
-        ponder_move = worker->ponder_move;
-
         /* Report iteration as completed */
-        smp_complete_iteration(worker, &depth);
+        depth = smp_complete_iteration(worker);
 
         /*
          * Check if the score indicates a known win in
@@ -828,10 +806,6 @@ void search_find_best_move(struct search_worker *worker)
 
     /* Stop all other workers */
     smp_stop_all();
-
-    /* Copy information back about the best move before returning */
-    worker->best_move = best_move;
-    worker->ponder_move = ponder_move;
 
     /*
      * In some rare cases the search may reach the maximum depth. If this

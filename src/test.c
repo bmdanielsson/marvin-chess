@@ -145,7 +145,7 @@ void test_run_benchmark(void)
         state->silent = true;
 
         smp_search(state, false, false, false);
-        nodes += state->nodes;
+        nodes += smp_nodes();
 
         printf("#");
     }
