@@ -229,7 +229,9 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     int             score;
     int             see_score;
     int             best_score;
+    int             static_score;
     uint32_t        move;
+    uint32_t        tt_move;
     bool            found_move;
     bool            in_check;
     struct position *pos;
@@ -254,11 +256,11 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     }
 
     /* Evaluate the position */
-    score = eval_evaluate(worker);
+    static_score = eval_evaluate(worker);
 
     /* If we have reached the maximum depth then we stop */
     if (pos->sply >= MAX_PLY) {
-        return score;
+        return static_score;
     }
 
     /*
@@ -269,19 +271,20 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     in_check = board_in_check(pos, pos->stm);
     best_score = -INFINITE_SCORE;
     if (!in_check) {
-        best_score = score;
-        if (score >= beta) {
-            return score;
+        best_score = static_score;
+        if (static_score >= beta) {
+            return static_score;
         }
-        if (score > alpha) {
-            alpha = score;
+        if (static_score > alpha) {
+            alpha = static_score;
         }
     }
 
     /* Initialize the move selector for this node */
+    tt_move = NOMOVE;
     select_init_node(worker, depth, true, false);
-    (void)hash_tt_lookup(pos, 0, alpha, beta, &move, &score);
-    select_set_tt_move(worker, move);
+    (void)hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score);
+    select_set_tt_move(worker, tt_move);
 
     /* Search all moves */
     found_move = false;
@@ -329,7 +332,9 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     int             tb_score;
     int             see_score;
     int             best_score;
+    int             static_score;
     uint32_t        move;
+    uint32_t        tt_move;
     uint32_t        best_move;
     int             movenumber;
     bool            found_move;
@@ -397,12 +402,11 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * Check the main transposition table to see if the positon
      * have been searched before.
      */
-    score = -INFINITE_SCORE;
-    move = NOMOVE;
-    if (hash_tt_lookup(pos, depth, alpha, beta, &move, &score)) {
+    tt_move = NOMOVE;
+    if (hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &score)) {
         return score;
     }
-    select_set_tt_move(worker, move);
+    select_set_tt_move(worker, tt_move);
 
     /* Probe tablebases */
     if (worker->state->probe_wdl &&
@@ -416,15 +420,15 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * Evaluate the position in order to get a score
      * to use for pruning decisions.
      */
-    score = eval_evaluate(worker);
+    static_score = eval_evaluate(worker);
 
     /* Reverse futility pruning */
     if ((depth <= FUTILITY_DEPTH) &&
         !in_check &&
         !pv_node &&
         board_has_non_pawn(pos, pos->stm) &&
-        ((score-futility_margin[depth-1]) >= beta)) {
-        return score;
+        ((static_score-futility_margin[depth-1]) >= beta)) {
+        return static_score;
     }
 
     /*
@@ -434,9 +438,9 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      */
     if (!in_check &&
         !pv_node &&
-        (move == NOMOVE) &&
+        (tt_move == NOMOVE) &&
         (depth <= RAZORING_DEPTH) &&
-        ((score+razoring_margin[depth-1]) <= alpha)) {
+        ((static_score+razoring_margin[depth-1]) <= alpha)) {
         if (depth == 1) {
             return quiescence(worker, 0, alpha, beta);
         }
@@ -475,7 +479,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      */
     futility_pruning = false;
     if ((depth <= FUTILITY_DEPTH) &&
-        ((score+futility_margin[depth-1]) <= alpha)) {
+        ((static_score+futility_margin[depth-1]) <= alpha)) {
         futility_pruning = true;
     }
 
@@ -627,6 +631,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     int             best_score;
     uint32_t        move;
     uint32_t        best_move;
+    uint32_t        tt_move;
     int             tt_flag;
     struct position *pos;
 
@@ -641,10 +646,11 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
      * Initialize the move selector for this node. Also
      * initialize the best move found to the PV move.
      */
+    tt_move = NOMOVE;
     select_init_node(worker, depth, false, true);
-    (void)hash_tt_lookup(pos, depth, alpha, beta, &move, &score);
-    select_set_tt_move(worker, move);
-    best_move = move;
+    (void)hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &score);
+    select_set_tt_move(worker, tt_move);
+    best_move = tt_move;
 
     /* Update score for root moves */
     select_update_root_move_scores(worker);
