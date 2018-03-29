@@ -19,6 +19,7 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <inttypes.h>
 
 #include "debug.h"
 #include "bitboard.h"
@@ -122,7 +123,8 @@ static void browse_display_position(struct position *pos,
     default:
         break;
     }
-    printf(", Score: %d, Depth: %d\n", item->score, item->depth);
+    printf(", Score: %d, Depth: %d, Key: %"PRIu64"\n",
+           item->score, item->depth, pos->key);
     printf("\n");
 
     for (k=0;k<list->nmoves;k++) {
