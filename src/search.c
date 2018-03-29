@@ -203,9 +203,15 @@ static void update_pv(struct search_worker *worker, uint32_t move)
 
 static void checkup(struct search_worker *worker)
 {
+    bool stop;
+    bool abort;
+
     /* Check if the worker is requested to stop */
-    if (!worker->resolving_root_fail && smp_should_stop(worker)) {
-        longjmp(worker->env, EXCEPTION_STOP);
+    stop = smp_should_stop(worker, &abort);
+    if (stop) {
+        if (abort || !worker->resolving_root_fail) {
+            longjmp(worker->env, EXCEPTION_STOP);
+        }
     }
 
     /* Check if the time is up or if we have received a new command */
@@ -215,10 +221,11 @@ static void checkup(struct search_worker *worker)
 
     /* Perform checkup */
     if (!tc_check_time(worker)) {
+        smp_stop_all(worker, false);
         longjmp(worker->env, EXCEPTION_TIMEOUT);
     }
     if ((worker->id == 0) && engine_check_input(worker)) {
-        smp_stop_all();
+        smp_stop_all(worker, true);
         longjmp(worker->env, EXCEPTION_COMMAND);
     }
 }
@@ -750,7 +757,7 @@ void search_find_best_move(struct search_worker *worker)
     bwindex = 0;
 
     /* Main iterative deepening loop */
-    while (tc_new_iteration(worker) && (depth <= worker->state->sd)) {
+    while (true) {
 		/* Search */
         exception = setjmp(worker->env);
         if (exception == 0) {
@@ -790,6 +797,7 @@ void search_find_best_move(struct search_worker *worker)
          */
         if (worker->state->exit_on_mate && !worker->state->pondering) {
             if ((score > KNOWN_WIN) || (score < (-KNOWN_WIN))) {
+                smp_stop_all(worker, true);
                 break;
             }
         }
@@ -808,10 +816,15 @@ void search_find_best_move(struct search_worker *worker)
             alpha = -INFINITE_SCORE;
             beta = INFINITE_SCORE;
         }
+        if (!tc_new_iteration(worker)) {
+            smp_stop_all(worker, false);
+            break;
+        }
+        if (depth > worker->state->sd) {
+            smp_stop_all(worker, true);
+            break;
+        }
     }
-
-    /* Stop all other workers */
-    smp_stop_all();
 
     /*
      * In some rare cases the search may reach the maximum depth. If this
@@ -821,11 +834,11 @@ void search_find_best_move(struct search_worker *worker)
      */
 	while ((worker->id == 0) && worker->state->pondering) {
 		if (engine_wait_for_input(worker)) {
-			smp_stop_all();
+			smp_stop_all(worker, true);
             break;
 		}
 		if (!worker->state->pondering) {
-			smp_stop_all();
+			smp_stop_all(worker, true);
 		}
 	}
 }

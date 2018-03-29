@@ -17,6 +17,7 @@
  */
 #include <assert.h>
 #include <string.h>
+#include <stdatomic.h>
 
 #include "smp.h"
 #include "hash.h"
@@ -36,12 +37,16 @@
 #define ACTION_EXIT 1
 #define ACTION_RUN 2
 
+/* Constants used for stoping workers */
+#define ALL_WORKERS 0xFFFFFFFFFFFFFFFFULL
+#define ABORT       0xFFFFFFFFFFFFFFFFULL
+
 /* Lock for updating the state struct during search */
 static mutex_t state_lock;
 
 /* Variables used to signal to workers to stop searching */
 static mutex_t stop_lock;
-static uint64_t stop_mask = 0ULL;
+static atomic_uint_fast64_t stop_mask = 0ULL;
 
 /* Data for worker threads */
 static int number_of_workers = 0;
@@ -356,16 +361,31 @@ uint32_t smp_nodes(void)
     return nodes;
 }
 
-void smp_stop_all(void)
+void smp_stop_all(struct search_worker *worker, bool abort)
 {
+    uint64_t mask;
+
     mutex_lock(&stop_lock);
-	stop_mask = 0xFFFFFFFFFFFFFFFFULL;
+    mask = ALL_WORKERS;
+    if (!abort) {
+        /*
+         * Clear the bit for the current worker to indicate that this
+         * is a "soft stop". This is ok since the current worker
+         * already knows that it should stop.
+         */
+        mask &= (~(1ULL<<worker->id));
+    }
+    stop_mask = mask;
     mutex_unlock(&stop_lock);
 }
 
-bool smp_should_stop(struct search_worker *worker)
+bool smp_should_stop(struct search_worker *worker, bool *abort)
 {
-    return (stop_mask&(1ULL << worker->id)) != 0ULL;
+    uint64_t mask;
+
+    mask = atomic_load_explicit(&stop_mask, memory_order_relaxed);
+    *abort = (mask == ABORT);
+    return (mask&(1ULL << worker->id)) != 0ULL;
 }
 
 void smp_update(struct search_worker *worker, int score)
