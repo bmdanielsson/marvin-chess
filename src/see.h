@@ -20,11 +20,11 @@
 
 #include "chess.h"
 
-/* Material values for see calculations. Separate material values are
- * are used to make sure that knight and knights are treated equally. If
- * not then the quiscence search will prune some knight/bishop trades.
- */
+/* Material values for see calculations */
 extern int see_material[NPIECES];
+
+/* Initialize the SEE component */
+void see_init(void);
 
 /*
  * Evaluate a capture, including potential recaptures, using

@@ -21,6 +21,13 @@
 #include "chess.h"
 #include "trace.h"
 
+/*
+ * Material values for all pieces. The table is
+ * initialized by the eval_reset function.
+ */
+int material_values_mg[NPIECES];
+int material_values_eg[NPIECES];
+
 /* Reset the evaluation module */
 void eval_reset(void);
 

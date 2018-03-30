@@ -23,20 +23,7 @@
 #include "bitboard.h"
 #include "validation.h"
 
-int see_material[NPIECES] = {
-    100,    /* White pawn */
-    100,    /* Black pawn */
-    325,    /* White knight */
-    325,    /* Black knight */
-    325,    /* White bishop */
-    325,    /* Black bishop */
-    500,    /* White rook */
-    500,    /* Black rook */
-    975,    /* White queen */
-    975,    /* Black queen */
-    20000,  /* White king */
-    20000   /* Black king */
-};
+int see_material[NPIECES];
 
 static uint64_t find_xray_attackers(struct position *pos, uint64_t occ,
                                     int target, uint64_t attacker)
@@ -105,6 +92,15 @@ static uint64_t find_next_attacker(struct position *pos, uint64_t attackers,
         }
     }
     return 0ULL;
+}
+
+void see_init(void)
+{
+    int k;
+
+    for (k=0;k<NPIECES;k++) {
+        see_material[k] = (material_values_mg[k] + material_values_eg[k])/2;
+    }
 }
 
 /*

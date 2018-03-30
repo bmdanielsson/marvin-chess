@@ -80,13 +80,6 @@ static int mobility_table_eg[NPIECES];
 static int passed_pawn_scores_mg[NRANKS];
 static int passed_pawn_scores_eg[NRANKS];
 
-/*
- * Material values for all pieces. The table is
- * initialized by the eval_reset function.
- */
-static int material_values_mg[NPIECES];
-static int material_values_eg[NPIECES];
-
 /* Table of attack weights for all pieces */
 static int piece_attack_weights[NPIECES] = {
     0, 0,

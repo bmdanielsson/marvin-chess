@@ -35,6 +35,7 @@
 #include "tbprobe.h"
 #include "smp.h"
 #include "hash.h"
+#include "see.h"
 
 /* The maximum length of a line in the configuration file */
 #define CFG_MAX_LINE_LENGTH 1024
@@ -101,6 +102,7 @@ int main(int argc, char *argv[])
     chess_data_init();
     bb_init();
     eval_reset();
+    see_init();
     polybook_open(BOOKFILE_NAME);
     hash_tt_create_table(engine_default_hash_size);
 
