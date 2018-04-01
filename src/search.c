@@ -77,6 +77,10 @@ static int aspiration_window[] = {25, 50, 100, 200, 400, INFINITE_SCORE};
 #define LMP_DEPTH 6
 static int lmp_counts[LMP_DEPTH+1] = {0, 5, 10, 20, 35, 55};
 
+/* Configuration constants for probcut */
+#define PROBCUT_DEPTH 5
+#define PROBCUT_MARGIN 223
+
 static void update_history_table(struct search_worker *worker, uint32_t move,
                                  int depth)
 {
@@ -340,6 +344,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     int             see_score;
     int             best_score;
     int             static_score;
+    int             threshold;
     uint32_t        move;
     uint32_t        tt_move;
     uint32_t        best_move;
@@ -477,6 +482,44 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             return score < FORCED_MATE?score:beta;
         }
     }
+
+    /*
+     * Probcut. If there is a good capture and a reduced search confirms
+     * that it is better than beta (with a certain margin) then it's
+     * relativly safe to skip the search.
+     */
+    if (!pv_node && !in_check && (depth >= PROBCUT_DEPTH) &&
+        board_has_non_pawn(&worker->pos, pos->stm)) {
+        select_init_node(worker, depth, true, false);
+        select_set_tt_move(worker, tt_move);
+        threshold = beta + PROBCUT_MARGIN;
+
+        while (select_get_quiscence_move(worker, &move, &see_score)) {
+            /*
+             * Skip non-captures and captures that are not
+             * good enough (according to SEE).
+             */
+            if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
+                continue;
+            }
+            if (see_score < (threshold-static_score)) {
+                continue;
+            }
+
+            /* Search the move */
+            if (!board_make_move(pos, move)) {
+                continue;
+            }
+            score = -search(worker, depth-PROBCUT_DEPTH+1, -threshold,
+                            -threshold+1, true);
+            board_unmake_move(pos);
+            if (score >= threshold) {
+                return score;
+            }
+        }
+    }
+    select_init_node(worker, depth, false, false);
+    select_set_tt_move(worker, tt_move);
 
     /*
      * Decide if futility pruning should be tried for this node. The
