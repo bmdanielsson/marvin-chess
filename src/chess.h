@@ -613,6 +613,9 @@ extern int mirror_table[NSQUARES];
 /* Table containing the square color for all squares on the chess table */
 extern int sq_color[NSQUARES];
 
+/* Masks of squares that are considered possible outposts */
+extern uint64_t outpost_squares[NSIDES];
+
 /* Initialize chess data */
 void chess_data_init(void);
 

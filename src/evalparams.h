@@ -81,5 +81,7 @@ extern int ROOK_MATERIAL_VALUE_EG;
 extern int QUEEN_MATERIAL_VALUE_EG;
 extern int KING_ATTACK_SCALE_MG;
 extern int KING_ATTACK_SCALE_EG;
+extern int KNIGHT_OUTPOST;
+extern int PROTECTED_KNIGHT_OUTPOST;
 
 #endif

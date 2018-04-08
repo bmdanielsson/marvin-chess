@@ -128,7 +128,9 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"rook_material_value_eg", 813, 813, 400, 800},
     {"queen_material_value_eg", 814, 814, 700, 1600},
     {"king_attack_scale_mg", 815, 815, 0, 100},
-    {"king_attack_scale_eg", 816, 816, 0, 100}
+    {"king_attack_scale_eg", 816, 816, 0, 100},
+    {"knight_outpost", 817, 817, 0, 100},
+    {"protected_knight_outpost", 818, 818, 0, 100}
 };
 
 void tuning_param_assign_current(struct tuning_param *params)
@@ -198,6 +200,8 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN(TP_QUEEN_MATERIAL_VALUE_EG, QUEEN_MATERIAL_VALUE_EG)
     ASSIGN(TP_KING_ATTACK_SCALE_MG, KING_ATTACK_SCALE_MG)
     ASSIGN(TP_KING_ATTACK_SCALE_EG, KING_ATTACK_SCALE_EG)
+    ASSIGN(TP_KNIGHT_OUTPOST, KNIGHT_OUTPOST)
+    ASSIGN(TP_PROTECTED_KNIGHT_OUTPOST, PROTECTED_KNIGHT_OUTPOST)
 
     eval_reset();
 }
@@ -272,6 +276,8 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE(TP_QUEEN_MATERIAL_VALUE_EG, QUEEN_MATERIAL_VALUE_EG)
     DEFINE(TP_KING_ATTACK_SCALE_MG, KING_ATTACK_SCALE_MG)
     DEFINE(TP_KING_ATTACK_SCALE_EG, KING_ATTACK_SCALE_EG)
+    DEFINE(TP_KNIGHT_OUTPOST, KNIGHT_OUTPOST)
+    DEFINE(TP_PROTECTED_KNIGHT_OUTPOST, PROTECTED_KNIGHT_OUTPOST)
 
     return params;
 }

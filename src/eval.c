@@ -300,6 +300,7 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
 
 /*
  * - mobility
+ * - outposts
  */
 static void evaluate_knights(struct position *pos, struct eval *eval, int side)
 {
@@ -334,6 +335,18 @@ static void evaluate_knights(struct position *pos, struct eval *eval, int side)
         /* Preassure on enemy king */
         if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
             eval->nbr_king_attackers[KNIGHT+side]++;
+        }
+
+        /* Outposts */
+        if (sq_mask[sq]&outpost_squares[side] &&
+            ((front_attackspan[side][sq]&pos->bb_pieces[opp_side+PAWN]) == 0)) {
+            if (eval->pawntt.coverage[side]&sq_mask[sq]) {
+                eval->positional[MIDDLEGAME][side] += PROTECTED_KNIGHT_OUTPOST;
+                TRACE_M(TP_PROTECTED_KNIGHT_OUTPOST, -1, 1);
+            } else {
+                eval->positional[MIDDLEGAME][side] += KNIGHT_OUTPOST;
+                TRACE_M(TP_KNIGHT_OUTPOST, -1, 1);
+            }
         }
     }
 

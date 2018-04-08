@@ -23,7 +23,7 @@
 #include "chess.h"
 
 /* The total number of tunable parameters */
-#define NUM_TUNING_PARAMS 817
+#define NUM_TUNING_PARAMS 819
 
 /* Identifiers for all tunable parameters */
 enum {
@@ -88,6 +88,8 @@ enum {
     TP_QUEEN_MATERIAL_VALUE_EG,
     TP_KING_ATTACK_SCALE_MG,
     TP_KING_ATTACK_SCALE_EG,
+    TP_KNIGHT_OUTPOST,
+    TP_PROTECTED_KNIGHT_OUTPOST,
     NUM_PARAM_DECLARATIONS
 };
 

@@ -89,6 +89,8 @@ int sq_color[NSQUARES] = {
     WHITE, BLACK, WHITE, BLACK, WHITE, BLACK, WHITE, BLACK
 };
 
+uint64_t outpost_squares[NSIDES];
+
 static void init_king_attack_zones(void)
 {
     int sq;
@@ -299,6 +301,12 @@ void chess_data_init(void)
             front_span[BLACK][sq] |= sq_mask[k];
         }
     }
+
+    /* Outpost squares */
+    outpost_squares[WHITE] =
+                        rank_mask[RANK_4]|rank_mask[RANK_5]|rank_mask[RANK_6];
+    outpost_squares[BLACK] =
+                        rank_mask[RANK_5]|rank_mask[RANK_4]|rank_mask[RANK_3];
 
     /* Initialize king attack zone masks */
     init_king_attack_zones();
