@@ -36,6 +36,7 @@
 #include "eval.h"
 #include "thread.h"
 #include "trace.h"
+#include "see.h"
 
 /* Files that the tuning result is written to */
 #define TUNING_FINAL_RESULT_FILE "tuning.final"
@@ -1048,6 +1049,7 @@ int main(int argc, char *argv[])
     chess_data_init();
     bb_init();
     eval_reset();
+    see_init();
 
     /* Initialize options */
     training_file = NULL;
