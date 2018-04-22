@@ -241,7 +241,7 @@ char* skip_whitespace(char *str)
     return str;
 }
 
-void* aligned_malloc(int alignment, int size)
+void* aligned_malloc(int alignment, uint64_t size)
 {
 #ifdef HAS_ALIGNED_MALLOC
 #ifdef WINDOWS
@@ -270,4 +270,16 @@ void aligned_free(void *ptr)
 #else
     free(ptr);
 #endif
+}
+
+/*
+ * Check this is a 64-bit build.
+ *
+ * @return Returns true if this is a 64-bit build.
+ */
+bool is64bit(void)
+{
+	char *dummy;
+
+    return sizeof(dummy) == 8;
 }

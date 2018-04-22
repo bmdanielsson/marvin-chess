@@ -20,6 +20,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <limits.h>
+#include <inttypes.h>
 
 #include "hash.h"
 #include "validation.h"
@@ -37,21 +38,21 @@
 
 /* Main transposition table */
 static struct tt_bucket *transposition_table = NULL;
-static int tt_size = 0;
-static uint32_t tt_used = 0;
+static uint64_t tt_size = 0ULL;
+static uint64_t tt_used = 0ULL;
 static uint8_t tt_date = 0;
 
-static int largest_power_of_2(int size, int item_size)
+static int largest_power_of_2(uint64_t size, int item_size)
 {
-    int largest;
-    int nitems;
+    uint64_t largest;
+    uint64_t nitems;
 
-    nitems = (size*1024*1024)/item_size;
-    largest = 1;
+    nitems = (size*1024ULL*1024ULL)/item_size;
+    largest = 1ULL;
     while (largest <= nitems) {
-        largest <<= 1;
+        largest <<= 1ULL;
     }
-    largest >>= 1;
+    largest >>= 1ULL;
 
     return largest;
 }
@@ -120,10 +121,15 @@ static bool check_tt_cutoff(struct position *pos, struct tt_item *item,
     return cutoff;
 }
 
+int hash_tt_max_size(void)
+{
+	return is64bit()?MAX_MAIN_HASH_SIZE_64BIT:MAX_MAIN_HASH_SIZE_32BIT;
+}
+
 void hash_tt_create_table(int size)
 {
-    assert((size >= MIN_MAIN_HASH_SIZE) && (size <= MAX_MAIN_HASH_SIZE));
-
+	assert((size >= MIN_MAIN_HASH_SIZE) && (size <= hash_tt_max_size()));
+	
     hash_tt_destroy_table();
 
     allocate_tt(size);
@@ -134,8 +140,8 @@ void hash_tt_destroy_table(void)
 {
     aligned_free(transposition_table);
     transposition_table = NULL;
-    tt_size = 0;
-    tt_used = 0;
+    tt_size = 0ULL;
+    tt_used = 0ULL;
     tt_date = 0;
 }
 
@@ -144,7 +150,7 @@ void hash_tt_clear_table(void)
     assert(transposition_table != NULL);
 
     memset(transposition_table, 0, tt_size*sizeof(struct tt_bucket));
-    tt_used = 0;
+    tt_used = 0ULL;
 }
 
 void hash_tt_age_table(void)
@@ -160,7 +166,7 @@ double hash_tt_usage(void)
 void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
                    int type)
 {
-    uint32_t         idx;
+    uint64_t         idx;
     struct tt_bucket *bucket;
     struct tt_item   *item;
     struct tt_item   *worst_item;
@@ -206,7 +212,7 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
     }
 
     /* Find the correct bucket */
-    idx = (uint32_t)(pos->key&(tt_size-1));
+    idx = (uint64_t)(pos->key&(tt_size-1));
     bucket = &transposition_table[idx];
 
     /*
@@ -281,7 +287,7 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
 bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
                     uint32_t *move, int *score)
 {
-    uint32_t         idx;
+    uint64_t         idx;
     struct tt_bucket *bucket;
     struct tt_item   *item;
     bool             cutoff;
@@ -298,7 +304,7 @@ bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
     }
 
     /* Find the correct bucket */
-    idx = (uint32_t)(pos->key&(tt_size-1));
+    idx = (uint64_t)(pos->key&(tt_size-1));
     bucket = &transposition_table[idx];
 
     /*
@@ -324,7 +330,7 @@ bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
 
 struct tt_item* hash_tt_lookup_raw(struct position *pos)
 {
-    uint32_t         idx;
+    uint64_t         idx;
     struct tt_bucket *bucket;
     struct tt_item   *item;
     int              k;
@@ -335,7 +341,7 @@ struct tt_item* hash_tt_lookup_raw(struct position *pos)
         return NULL;
     }
 
-    idx = (uint32_t)(pos->key&(tt_size-1));
+    idx = (uint64_t)(pos->key&(tt_size-1));
     bucket = &transposition_table[idx];
     for (k=0;k<TT_BUCKET_SIZE;k++) {
         item = &bucket->items[k];

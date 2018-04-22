@@ -536,8 +536,8 @@ static void xboard_cmd_memory(char *cmd)
     int size;
 
     if (sscanf(cmd, "memory %d", &size) == 1) {
-        if (size > MAX_MAIN_HASH_SIZE) {
-            size = MAX_MAIN_HASH_SIZE;
+        if (size > hash_tt_max_size()) {
+            size = hash_tt_max_size();
         } else if (size < MIN_MAIN_HASH_SIZE) {
             size = MIN_MAIN_HASH_SIZE;
         }

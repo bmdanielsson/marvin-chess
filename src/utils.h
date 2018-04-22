@@ -129,7 +129,7 @@ char* skip_whitespace(char *str);
  * @param size The amount of memory to allocate.
  * @return Returns a pointer to the allocated memory.
  */
-void* aligned_malloc(int alignment, int size);
+void* aligned_malloc(int alignment, uint64_t size);
 
 /*
  * Free memory allocated with aligned_malloc.
@@ -137,5 +137,12 @@ void* aligned_malloc(int alignment, int size);
  * @param ptr Pointer to the memory to free.
  */
 void aligned_free(void *ptr);
+
+/*
+ * Check this is a 64-bit build.
+ *
+ * @return Returns true if this is a 64-bit build.
+ */
+bool is64bit(void);
 
 #endif

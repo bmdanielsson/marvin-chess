@@ -125,15 +125,11 @@ static void cmd_eval(struct gamestate *state)
  */
 static void cmd_info(void)
 {
-    char *dummy;
     char str[256];
-    bool is_64bit;
-
-    is_64bit = sizeof(dummy) == 8;
 
     str[0] = '\0';
     sprintf(str, "%s %s (%s", APP_NAME, APP_VERSION,
-            is_64bit?"64-bit":"32-bit");
+            is64bit()?"64-bit":"32-bit");
 #ifdef HAS_POPCNT
     strcat(str, ", popcnt");
 #endif

@@ -292,7 +292,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
 static void uci_cmd_setoption(char *cmd, struct gamestate *state)
 {
     char *iter;
-    int value;
+    int  value;
 
     /*
      * Handle options. Options that are not
@@ -307,8 +307,8 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
             iter += 4;
             iter = skip_whitespace(iter);
             if (sscanf(iter, "value %d", &value) == 1) {
-                if (value > MAX_MAIN_HASH_SIZE) {
-                    value = MAX_MAIN_HASH_SIZE;
+                if (value > hash_tt_max_size()) {
+                    value = hash_tt_max_size();
                 } else if (value < MIN_MAIN_HASH_SIZE) {
                     value = MIN_MAIN_HASH_SIZE;
                 }
@@ -374,7 +374,7 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command("id author %s", APP_AUTHOR);
     engine_write_command("option name Hash type spin default %d min %d max %d",
                          engine_default_hash_size, MIN_MAIN_HASH_SIZE,
-                         MAX_MAIN_HASH_SIZE);
+						 hash_tt_max_size());
     engine_write_command("option name Clear Hash type button");
     engine_write_command("option name OwnBook type check default true");
     engine_write_command("option name Ponder type check default false");

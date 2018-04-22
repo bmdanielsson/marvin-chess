@@ -64,7 +64,7 @@ static void read_config_file(void)
 	while (line != NULL) {
 	    if (sscanf(line, "HASH_SIZE=%d", &int_val) == 1) {
             engine_default_hash_size = CLAMP(int_val, MIN_MAIN_HASH_SIZE,
-                                             MAX_MAIN_HASH_SIZE);
+                                             hash_tt_max_size());
         } else if (sscanf(line, "LOG_LEVEL=%d", &int_val) == 1) {
             dbg_set_log_level(int_val);
         } else if (sscanf(line, "SYZYGY_PATH=%s", engine_syzygy_path) == 1) {
