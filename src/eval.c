@@ -80,6 +80,13 @@ static int mobility_table_eg[NPIECES];
 static int passed_pawn_scores_mg[NRANKS];
 static int passed_pawn_scores_eg[NRANKS];
 
+/*
+ * Table with scores for candidate passed pawns based on rank. The table is
+ * initialized by the eval_reset function.
+ */
+static int candidate_passed_pawn_scores_mg[NRANKS];
+static int candidate_passed_pawn_scores_eg[NRANKS];
+
 /* Table of attack weights for all pieces */
 static int piece_attack_weights[NPIECES] = {
     0, 0,
@@ -238,6 +245,7 @@ static void evaluate_pawn_shield(struct position *pos, struct eval *eval,
  * - double pawns
  * - isolated pawns
  * - passed pawns
+ * - candidate passed pawns
  * - pawn shield
  */
 static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
@@ -247,16 +255,22 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
     int                 sq;
     int                 file;
     int                 rank;
-    int                 opp_side;
+    int                 rel_rank;
+    int                 oside;
     uint64_t            attackspan;
+    uint64_t            attackers;
+    uint64_t            defenders;
+    uint64_t            helpers;
+    uint64_t            sentries;
     struct pawntt_item  *item;
 
     item = &eval->pawntt;
-    opp_side = FLIP_COLOR(side);
+    oside = FLIP_COLOR(side);
     pieces = pos->bb_pieces[PAWN+side];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         rank = RANKNR(sq);
+        rel_rank = (side==WHITE)?rank:7-rank;
         attackspan = rear_attackspan[side][sq]|front_attackspan[side][sq];
 
         /* Look for isolated pawns */
@@ -267,15 +281,30 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
         }
 
         /* Look for passed pawns */
-        if (ISEMPTY(front_attackspan[side][sq]&pos->bb_pieces[opp_side+PAWN]) &&
-            ISEMPTY(front_span[side][sq]&pos->bb_pieces[opp_side+PAWN])) {
-            item->score[MIDDLEGAME][side] +=
-                                passed_pawn_scores_mg[side==WHITE?rank:7-rank];
-            item->score[ENDGAME][side] +=
-                                passed_pawn_scores_eg[side==WHITE?rank:7-rank];
-            TRACE_OM(TP_PASSED_PAWN_RANK2_MG, TP_PASSED_PAWN_RANK2_EG,
-                         ((side == WHITE)?rank:7-rank)-1, 1);
+        if (ISEMPTY(front_attackspan[side][sq]&pos->bb_pieces[oside+PAWN]) &&
+            ISEMPTY(front_span[side][sq]&pos->bb_pieces[oside+PAWN])) {
             SETBIT(item->passers[side], sq);
+            item->score[MIDDLEGAME][side] += passed_pawn_scores_mg[rel_rank];
+            item->score[ENDGAME][side] += passed_pawn_scores_eg[rel_rank];
+            TRACE_OM(TP_PASSED_PAWN_RANK2_MG, TP_PASSED_PAWN_RANK2_EG,
+                     rel_rank-1, 1);
+        }
+
+        /* Look for candidate passed pawns */
+        sentries = front_attackspan[side][sq]&pos->bb_pieces[oside+PAWN];
+        helpers = rear_attackspan[side][sq]&pos->bb_pieces[side+PAWN];
+        attackers = bb_pawn_attacks_to(sq, oside)&pos->bb_pieces[oside+PAWN];
+        defenders = bb_pawn_attacks_to(sq, side)&pos->bb_pieces[side+PAWN];
+        if (!ISBITSET(item->passers[side], sq) &&
+            ISEMPTY(front_span[side][sq]&pos->bb_pieces[oside+PAWN]) &&
+            (BITCOUNT(helpers) >= BITCOUNT(sentries)) &&
+            (BITCOUNT(defenders) >= BITCOUNT(attackers))) {
+            item->score[MIDDLEGAME][side] +=
+                                    candidate_passed_pawn_scores_mg[rel_rank];
+            item->score[ENDGAME][side] +=
+                                    candidate_passed_pawn_scores_eg[rel_rank];
+            TRACE_OM(TP_CANDIDATE_PASSED_PAWN_RANK2_MG,
+                     TP_CANDIDATE_PASSED_PAWN_RANK2_EG, rel_rank-1, 1);
         }
 
         /* Update pawn coverage */
@@ -782,6 +811,24 @@ void eval_reset(void)
     passed_pawn_scores_eg[RANK_6] = PASSED_PAWN_RANK6_EG;
     passed_pawn_scores_eg[RANK_7] = PASSED_PAWN_RANK7_EG;
     passed_pawn_scores_eg[RANK_8] = 0;
+
+    /* Initialize the candidate pawns table */
+    candidate_passed_pawn_scores_mg[RANK_1] = 0;
+    candidate_passed_pawn_scores_mg[RANK_2] = CANDIDATE_PASSED_PAWN_RANK2_MG;
+    candidate_passed_pawn_scores_mg[RANK_3] = CANDIDATE_PASSED_PAWN_RANK3_MG;
+    candidate_passed_pawn_scores_mg[RANK_4] = CANDIDATE_PASSED_PAWN_RANK4_MG;
+    candidate_passed_pawn_scores_mg[RANK_5] = CANDIDATE_PASSED_PAWN_RANK5_MG;
+    candidate_passed_pawn_scores_mg[RANK_6] = CANDIDATE_PASSED_PAWN_RANK6_MG;
+    candidate_passed_pawn_scores_mg[RANK_7] = 0;
+    candidate_passed_pawn_scores_mg[RANK_8] = 0;
+    candidate_passed_pawn_scores_eg[RANK_1] = 0;
+    candidate_passed_pawn_scores_eg[RANK_2] = CANDIDATE_PASSED_PAWN_RANK2_EG;
+    candidate_passed_pawn_scores_eg[RANK_3] = CANDIDATE_PASSED_PAWN_RANK3_EG;
+    candidate_passed_pawn_scores_eg[RANK_4] = CANDIDATE_PASSED_PAWN_RANK4_EG;
+    candidate_passed_pawn_scores_eg[RANK_5] = CANDIDATE_PASSED_PAWN_RANK5_EG;
+    candidate_passed_pawn_scores_eg[RANK_6] = CANDIDATE_PASSED_PAWN_RANK6_EG;
+    candidate_passed_pawn_scores_eg[RANK_7] = 0;
+    candidate_passed_pawn_scores_eg[RANK_8] = 0;
 
     /* Initialize the material table */
     material_values_mg[WHITE_PAWN] = PAWN_BASE_VALUE;
