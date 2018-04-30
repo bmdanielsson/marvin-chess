@@ -63,15 +63,6 @@ static mutex_t tx_lock;
 
 /*
  * Custom command
- * Syntax: bench
- */
-static void cmd_bench(void)
-{
-    test_run_benchmark();
-}
-
-/*
- * Custom command
  * Syntax: browse
  */
 static void cmd_browse(struct gamestate *state)
@@ -121,32 +112,6 @@ static void cmd_eval(struct gamestate *state)
 
 /*
  * Custom command
- * Syntax: info
- */
-static void cmd_info(void)
-{
-    char str[256];
-
-    str[0] = '\0';
-    sprintf(str, "%s %s (%s", APP_NAME, APP_VERSION,
-            is64bit()?"64-bit":"32-bit");
-#ifdef HAS_POPCNT
-    strcat(str, ", popcnt");
-#endif
-#ifdef HAS_ALIGNED_MALLOC
-    strcat(str, ", memalign");
-#endif
-#ifdef HAS_PREFETCH
-    strcat(str, ", prefetch");
-#endif
-    strcat(str, ")");
-    printf("%s\n", str);
-
-    printf("%s\n", APP_AUTHOR);
-}
-
-/*
- * Custom command
  * Syntax: perft <depth>
  */
 static void cmd_perft(char *cmd, struct gamestate *state)
@@ -191,9 +156,7 @@ void engine_loop(struct gamestate *state)
 
         /* Custom commands */
         handled = true;
-        if (!strncmp(cmd, "bench", 5)) {
-            cmd_bench();
-        } else if (!strncmp(cmd, "browse", 6)) {
+        if (!strncmp(cmd, "browse", 6)) {
             cmd_browse(state);
         } else if (!strncmp(cmd, "display", 7)) {
             cmd_display(state);
@@ -201,8 +164,6 @@ void engine_loop(struct gamestate *state)
             cmd_divide(cmd, state);
         } else if (!strncmp(cmd, "eval", 4)) {
             cmd_eval(state);
-        } else if (!strncmp(cmd, "info", 4)) {
-            cmd_info();
         } else if (!strncmp(cmd, "perft", 5)) {
             cmd_perft(cmd, state);
         } else {

@@ -132,6 +132,8 @@ void test_run_benchmark(void)
 
     hash_tt_destroy_table();
     hash_tt_create_table(DEFAULT_MAIN_HASH_SIZE);
+    smp_destroy_workers();
+    smp_create_workers(1);
 
     state = create_game_state();
     nodes = 0ULL;

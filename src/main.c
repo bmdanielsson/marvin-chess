@@ -81,6 +81,28 @@ static void read_config_file(void)
 	fclose(fp);
 }
 
+static void print_version(void)
+{
+    char str[256];
+
+    str[0] = '\0';
+    sprintf(str, "%s %s (%s", APP_NAME, APP_VERSION,
+            is64bit()?"64-bit":"32-bit");
+#ifdef HAS_POPCNT
+    strcat(str, ", popcnt");
+#endif
+#ifdef HAS_ALIGNED_MALLOC
+    strcat(str, ", memalign");
+#endif
+#ifdef HAS_PREFETCH
+    strcat(str, ", prefetch");
+#endif
+    strcat(str, ")");
+    printf("%s\n", str);
+
+    printf("%s\n", APP_AUTHOR);
+}
+
 int main(int argc, char *argv[])
 {
     struct gamestate *state;
@@ -110,9 +132,15 @@ int main(int argc, char *argv[])
     smp_init();
     smp_create_workers(engine_default_num_threads);
 
-    /* Handle specific benchmark command line option */
-    if ((argc == 2) && !strncmp(argv[1], "-b", 2)) {
+    /* Handle command line options */
+    if ((argc == 2) &&
+        (!strncmp(argv[1], "-b", 2) || !strncmp(argv[1], "--bench", 6))) {
         test_run_benchmark();
+        return 0;
+    } else if ((argc == 2) &&
+               (!strncmp(argv[1], "-v", 2) ||
+                !strncmp(argv[1], "--version", 9))) {
+        print_version();
         return 0;
     }
 
