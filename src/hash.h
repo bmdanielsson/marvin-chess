@@ -60,13 +60,6 @@ void hash_tt_clear_table(void);
 void hash_tt_age_table(void);
 
 /*
- * Get the transposition table usage.
- *
- * @return Returns how many percent of the transposition table that is used.
- */
-double hash_tt_usage(void);
-
-/*
  * Store a new position in the main transposition table.
  *
  * @param pos The board structure.

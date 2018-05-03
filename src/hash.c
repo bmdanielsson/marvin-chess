@@ -39,7 +39,6 @@
 /* Main transposition table */
 static struct tt_bucket *transposition_table = NULL;
 static uint64_t tt_size = 0ULL;
-static uint64_t tt_used = 0ULL;
 static uint8_t tt_date = 0;
 
 static int largest_power_of_2(uint64_t size, int item_size)
@@ -141,7 +140,6 @@ void hash_tt_destroy_table(void)
     aligned_free(transposition_table);
     transposition_table = NULL;
     tt_size = 0ULL;
-    tt_used = 0ULL;
     tt_date = 0;
 }
 
@@ -150,17 +148,11 @@ void hash_tt_clear_table(void)
     assert(transposition_table != NULL);
 
     memset(transposition_table, 0, tt_size*sizeof(struct tt_bucket));
-    tt_used = 0ULL;
 }
 
 void hash_tt_age_table(void)
 {
     tt_date++;
-}
-
-double hash_tt_usage(void)
-{
-    return ((double)(tt_used)/(double)(tt_size*TT_BUCKET_SIZE))*100.0;
 }
 
 void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
@@ -272,9 +264,6 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
     assert(worst_item != NULL);
 
     /* Replace the worst item */
-    if (KEY_IS_ZERO(worst_item)) {
-        tt_used++;
-    }
     worst_item->key_high = KEY_HIGH(pos->key);
     worst_item->key_low = KEY_LOW(pos->key);
     worst_item->move = move;
