@@ -354,7 +354,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     int             futility_pruning;
     bool            in_check;
     int             tt_flag;
-    bool            found_pv;
     bool            pv_node;
     bool            pawn_push;
     bool            killer;
@@ -539,7 +538,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     tt_flag = TT_ALPHA;
     movenumber = 0;
     found_move = false;
-    found_pv = false;
     while (select_get_move(worker, &move, &see_score)) {
         pawn_push = is_pawn_push(pos, move);
         killer = is_killer_move(worker, move);
@@ -593,7 +591,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         }
 
         /* Recursivly search the move */
-        if (!found_pv) {
+        if (best_score == -INFINITE_SCORE) {
             /*
              * Perform a full search until a pv move is found. Usually
              * this is the first move.
@@ -623,7 +621,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         if (score > best_score) {
             best_score = score;
             best_move = move;
-            found_pv = true;
 
             /*
              * Check if the score is above the lower bound. In that
