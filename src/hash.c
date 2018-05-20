@@ -101,13 +101,11 @@ static bool check_tt_cutoff(struct position *pos, struct tt_item *item,
             break;
         case TT_ALPHA:
             if (adj_score <= alpha) {
-                *score = alpha;
                 cutoff = true;
             }
             break;
         case TT_BETA:
             if (adj_score >= beta) {
-                *score = beta;
                 cutoff = true;
             }
             break;
