@@ -79,7 +79,7 @@ static int lmp_counts[LMP_DEPTH+1] = {0, 5, 10, 20, 35, 55};
 
 /* Configuration constants for probcut */
 #define PROBCUT_DEPTH 5
-#define PROBCUT_MARGIN 223
+#define PROBCUT_MARGIN 210
 
 static void update_history_table(struct search_worker *worker, uint32_t move,
                                  int depth)
