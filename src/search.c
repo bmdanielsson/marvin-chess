@@ -294,7 +294,9 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     /* Initialize the move selector for this node */
     tt_move = NOMOVE;
     select_init_node(worker, depth, true, false);
-    (void)hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score);
+    if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score)) {
+        return score;
+    }
     select_set_tt_move(worker, tt_move);
 
     /* Search all moves */
