@@ -156,16 +156,6 @@ static void init_workers(struct trainingset *trainingset,
     }
 }
 
-static void destroy_workers(void)
-{
-    int iter;
-
-    for (iter=0;iter<nworkerthreads;iter++) {
-        event_destroy(&workers[iter].ev_start);
-        event_destroy(&workers[iter].ev_done);
-    }
-}
-
 static struct term* setup_equation_terms(struct eval_trace *trace, int phase,
                                          int side, int *nterms)
 {
@@ -427,6 +417,8 @@ static void* calc_texel_error_func(void *data)
     }
 
     /* Clean up */
+    event_destroy(&workers->ev_start);
+    event_destroy(&workers->ev_done);
     destroy_game_state(state);
 
     return NULL;
@@ -838,7 +830,6 @@ void find_k(char *file, int nthreads)
            best_k, lowest_e, sqrt(lowest_e)*100.0);
 
     /* Clean up */
-    destroy_workers();
     free(workers);
     free_trainingset(trainingset);
     free_tuningset(tuningset);
@@ -921,7 +912,6 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     printf("\nTime: %02d:%02d:%02d\n", hh, mm, ss);
 
     /* Clean up */
-    destroy_workers();
     free(workers);
     free_tuningset(tuningset);
     free_trainingset(trainingset);

@@ -151,6 +151,11 @@ static void* worker_thread_func(void *data)
         event_set(&worker->ev_done);
     }
 
+    /* Clean up */
+    event_destroy(&worker->ev_start);
+    event_destroy(&worker->ev_done);
+    hash_pawntt_destroy_table(worker);
+
     return NULL;
 }
 
@@ -238,20 +243,12 @@ void smp_destroy_workers(void)
 {
     int k;
 
-    /* Close all existing workers */
     for (k=0;k<number_of_workers;k++) {
         workers[k].action = ACTION_EXIT;
         event_set(&workers[k].ev_start);
     }
     for (k=0;k<number_of_workers;k++) {
         thread_join(&workers[k].thread);
-    }
-
-    /* Destroy workers */
-    for (k=0;k<number_of_workers;k++) {
-        event_destroy(&workers[k].ev_start);
-        event_destroy(&workers[k].ev_done);
-        hash_pawntt_destroy_table(&workers[k]);
     }
     number_of_workers = 0;
 }
