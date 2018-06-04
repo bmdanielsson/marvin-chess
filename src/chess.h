@@ -244,8 +244,6 @@ struct movelist {
 struct moveinfo {
     /* The move */
     uint32_t move;
-    /* SEE score for captures, 0 for non-captures */
-    int see;
     /* Move ordering score */
     int score;
 };

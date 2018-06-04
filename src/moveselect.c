@@ -55,20 +55,33 @@ enum {
 #define BASE_SCORE_NORMAL       2*BASE_SCORE_DELTA
 #define BASE_SCORE_BAD_CAPS     BASE_SCORE_DELTA
 
-static int calculate_see_score(struct position *pos, uint32_t move)
+/*
+ * Table of MVV/LVA scores indexed by [victim, attacker]. For instance
+ * for QxP index by mvvlva_table[P][Q].
+ */
+static int mvvlva_table[NPIECES][NPIECES] = {
+    {160, 160, 150, 150, 140, 140, 130, 130, 120, 120, 110, 110},
+    {160, 160, 150, 150, 140, 140, 130, 130, 120, 120, 110, 110},
+    {260, 260, 250, 250, 240, 240, 230, 230, 220, 220, 210, 210},
+    {260, 260, 250, 250, 240, 240, 230, 230, 220, 220, 210, 210},
+    {360, 360, 350, 350, 340, 340, 330, 330, 320, 320, 310, 310},
+    {360, 360, 350, 350, 340, 340, 330, 330, 320, 320, 310, 310},
+    {460, 460, 450, 450, 440, 440, 430, 430, 420, 420, 410, 410},
+    {460, 460, 450, 450, 440, 440, 430, 430, 420, 420, 410, 410},
+    {560, 560, 550, 550, 540, 540, 530, 530, 520, 520, 510, 510},
+    {560, 560, 550, 550, 540, 540, 530, 530, 520, 520, 510, 510},
+    {660, 660, 650, 650, 640, 640, 630, 630, 620, 620, 610, 610},
+    {660, 660, 650, 650, 640, 640, 630, 630, 620, 620, 610, 610}
+};
+
+static int mvvlva(struct position *pos, uint32_t move)
 {
-    /*
-     * En passant captures can never loose material (from the
-     * perspective of SEE), at worst the opponent just recaptures
-     * in which case material is even. Too simplify assume that
-     * on average we gain 1/2 of a pawn. This will cause en passant
-     * captures to be sorted after captures that gain material but
-     * before captures that trade evenly.
-     */
+    assert(ISCAPTURE(move) || ISENPASSANT(move));
+
     if (ISCAPTURE(move)) {
-        return see_calculate_score(pos, move);
+        return mvvlva_table[pos->pieces[TO(move)]][pos->pieces[FROM(move)]];
     } else if (ISENPASSANT(move)) {
-        return see_material[PAWN+FLIP_COLOR(pos->stm)]/2;
+        return mvvlva_table[PAWN+pos->stm][PAWN+pos->stm];
     }
     return 0;
 }
@@ -94,17 +107,17 @@ static void assign_root_score(struct search_worker *worker,
      */
     if (move == ms->ttmove) {
         info->score = BASE_SCORE_TT;
-    } else if ((ISCAPTURE(move) || ISENPASSANT(move)) && (info->see >= 0)) {
-        info->score = info->see + BASE_SCORE_GOOD_CAPS;
+    } else if ((ISCAPTURE(move) || ISENPASSANT(move)) && see_ge(pos, move, 0)) {
+        info->score = BASE_SCORE_GOOD_CAPS + mvvlva(pos, move);
     } else if (move == worker->killer_table[pos->sply][0]) {
         info->score = BASE_SCORE_KILLER1;
     } else if (move == worker->killer_table[pos->sply][1]) {
         info->score = BASE_SCORE_KILLER2;
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
         info->score =
-                    worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
+                worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
     } else {
-        info->score = info->see + BASE_SCORE_BAD_CAPS;
+        info->score = BASE_SCORE_BAD_CAPS + mvvlva(pos, move);
     }
 }
 
@@ -113,7 +126,6 @@ static void assign_score(struct search_worker *worker, struct moveselect *ms,
 {
     int             from;
     int             to;
-    int             see;
     uint32_t        move;
     struct moveinfo *info;
     struct position *pos;
@@ -131,23 +143,19 @@ static void assign_score(struct search_worker *worker, struct moveselect *ms,
         return;
     }
 
-    /* Calculate SEE score */
-    see = calculate_see_score(pos, move);
-
     /*
      * If the SEE score is positive (normal moves or good captures) then
      * the move is appended to the moveinfo list. If the SEE score is
      * negative (bad captures) the the move is added to be bead capture list.
      */
-    if (see >= 0) {
-        info = &ms->moveinfo[ms->nmoves];
-        ms->nmoves++;
-    } else {
+    if ((ISCAPTURE(move) || ISENPASSANT(move)) && !see_ge(pos, move, 0)) {
         info = &ms->badcapinfo[ms->nbadcaps];
         ms->nbadcaps++;
+    } else {
+        info = &ms->moveinfo[ms->nmoves];
+        ms->nmoves++;
     }
     info->move = move;
-    info->see = see;
 
     /*
      * Assign a score to each move. Normal moves are scored based
@@ -157,13 +165,13 @@ static void assign_score(struct search_worker *worker, struct moveselect *ms,
      */
     from = FROM(move);
     to = TO(move);
-    if ((ISCAPTURE(move) || ISENPASSANT(move)) && (info->see >= 0)) {
-        info->score = info->see + BASE_SCORE_GOOD_CAPS;
+    if ((ISCAPTURE(move) || ISENPASSANT(move)) && see_ge(pos, move, 0)) {
+        info->score = BASE_SCORE_GOOD_CAPS + mvvlva(pos, move);
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
         info->score =
                 worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
     } else {
-        info->score = info->see + BASE_SCORE_BAD_CAPS;
+        info->score = BASE_SCORE_BAD_CAPS + mvvlva(pos, move);
     }
 }
 
@@ -189,9 +197,6 @@ static void assign_quiscence_score(struct search_worker *worker,
     ms->nmoves++;
     info->move = move;
 
-    /* Calculate a SEE score for all captures */
-    info->see = calculate_see_score(pos, move);
-
     /*
      * Assign a score to each move. Normal moves are scored based
      * on history heuristic and capture moves based on SEE.
@@ -200,8 +205,8 @@ static void assign_quiscence_score(struct search_worker *worker,
     to = TO(move);
     if (move == ms->ttmove) {
         info->score = BASE_SCORE_TT;
-    } else if ((ISCAPTURE(move) || ISENPASSANT(move)) && (info->see >= 0)) {
-        info->score = info->see + BASE_SCORE_GOOD_CAPS;
+    } else if ((ISCAPTURE(move) || ISENPASSANT(move)) && see_ge(pos, move, 0)) {
+        info->score = BASE_SCORE_GOOD_CAPS + mvvlva(pos, move);
     } else if (move == worker->killer_table[pos->sply][0]) {
         info->score = BASE_SCORE_KILLER1;
     } else if (move == worker->killer_table[pos->sply][1]) {
@@ -210,7 +215,7 @@ static void assign_quiscence_score(struct search_worker *worker,
         info->score =
                 worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
     } else {
-        info->score = info->see + BASE_SCORE_BAD_CAPS;
+        info->score = BASE_SCORE_BAD_CAPS + mvvlva(pos, move);
     }
 }
 
@@ -236,9 +241,6 @@ static void assign_evasion_score(struct search_worker *worker,
     ms->nmoves++;
     info->move = move;
 
-    /* Calculate a SEE score for all captures */
-    info->see = calculate_see_score(pos, move);
-
     /*
      * Assign a score to each move. Normal moves are scored based
      * on history heuristic and capture moves based on SEE.
@@ -247,8 +249,8 @@ static void assign_evasion_score(struct search_worker *worker,
     to = TO(move);
     if (move == ms->ttmove) {
         info->score = BASE_SCORE_TT;
-    } else if ((ISCAPTURE(move) || ISENPASSANT(move)) && (info->see >= 0)) {
-        info->score = info->see + BASE_SCORE_GOOD_CAPS;
+    } else if ((ISCAPTURE(move) || ISENPASSANT(move)) && see_ge(pos, move, 0)) {
+        info->score = BASE_SCORE_GOOD_CAPS + mvvlva(pos, move);
     } else if (move == worker->killer_table[pos->sply][0]) {
         info->score = BASE_SCORE_KILLER1;
     } else if (move == worker->killer_table[pos->sply][1]) {
@@ -257,11 +259,11 @@ static void assign_evasion_score(struct search_worker *worker,
         info->score =
                 worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
     } else {
-        info->score = info->see + BASE_SCORE_BAD_CAPS;
+        info->score = BASE_SCORE_BAD_CAPS + mvvlva(pos, move);
     }
 }
 
-static uint32_t select_move(struct moveselect *ms, int *see_score)
+static uint32_t select_move(struct moveselect *ms)
 {
     int             iter;
     int             best;
@@ -297,9 +299,6 @@ static uint32_t select_move(struct moveselect *ms, int *see_score)
         ms->moveinfo[start] = temp;
     }
 
-    if (see_score != NULL) {
-        *see_score = ms->moveinfo[start].see;
-    }
     return ms->moveinfo[start].move;
 }
 
@@ -337,7 +336,6 @@ void select_init_node(struct search_worker *worker, bool qnode, bool root,
             move = worker->root_moves.moves[k];
             ms->moveinfo[k].move = move;
             ms->moveinfo[k].score = 0;
-            ms->moveinfo[k].see = calculate_see_score(pos, move);
         }
     }
 }
@@ -357,8 +355,7 @@ void select_set_tt_move(struct search_worker *worker, uint32_t move)
     ms->ttmove = move;
 }
 
-bool select_get_root_move(struct search_worker *worker, uint32_t *move,
-                          int *see_score)
+bool select_get_root_move(struct search_worker *worker, uint32_t *move)
 {
     struct moveselect *ms;
 
@@ -367,13 +364,12 @@ bool select_get_root_move(struct search_worker *worker, uint32_t *move,
 
     /* Select the next move to search */
     ms = &worker->ppms[0];
-    *move = select_move(ms, see_score);
+    *move = select_move(ms);
     ms->idx++;
     return *move != NOMOVE;
 }
 
-bool select_get_move(struct search_worker *worker, uint32_t *move,
-                     int *see_score)
+bool select_get_move(struct search_worker *worker, uint32_t *move)
 {
     struct moveselect *ms;
     struct movelist   list;
@@ -392,9 +388,6 @@ bool select_get_move(struct search_worker *worker, uint32_t *move,
     case PHASE_TT:
         ms->phase++;
         if (ms->ttmove != NOMOVE) {
-            if (see_score != NULL) {
-                *see_score = calculate_see_score(pos, ms->ttmove);
-            }
             *move = ms->ttmove;
             return true;
         }
@@ -420,9 +413,6 @@ bool select_get_move(struct search_worker *worker, uint32_t *move,
         killer = worker->killer_table[pos->sply][0];
         if ((killer != NOMOVE) && (killer != ms->ttmove) &&
             board_is_move_pseudo_legal(pos, killer)) {
-            if (see_score != NULL) {
-                *see_score = calculate_see_score(pos, killer);
-            }
             *move = killer;
             return true;
         }
@@ -433,9 +423,6 @@ bool select_get_move(struct search_worker *worker, uint32_t *move,
         if ((killer != NOMOVE) && (killer != ms->ttmove) &&
             (killer != worker->killer_table[pos->sply][0]) &&
             board_is_move_pseudo_legal(pos, killer)) {
-            if (see_score != NULL) {
-                *see_score = calculate_see_score(pos, killer);
-            }
             *move = killer;
             return true;
         }
@@ -490,14 +477,13 @@ bool select_get_move(struct search_worker *worker, uint32_t *move,
     }
 
     /* Select the next move to search */
-    *move = select_move(ms, see_score);
+    *move = select_move(ms);
     ms->idx++;
 
     return *move != NOMOVE;
 }
 
-bool select_get_quiscence_move(struct search_worker *worker, uint32_t *move,
-                               int *see_score)
+bool select_get_quiscence_move(struct search_worker *worker, uint32_t *move)
 {
     struct moveselect *ms;
     struct movelist   list;
@@ -547,7 +533,7 @@ bool select_get_quiscence_move(struct search_worker *worker, uint32_t *move,
     }
 
     /* Select the next move to search */
-    *move = select_move(ms, see_score);
+    *move = select_move(ms);
     ms->idx++;
 
     return *move != NOMOVE;

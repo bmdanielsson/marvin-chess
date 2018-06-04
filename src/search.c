@@ -38,6 +38,7 @@
 #include "bitboard.h"
 #include "tbprobe.h"
 #include "smp.h"
+#include "fen.h"
 
 /* Calculates if it is time to check the clock and poll for commands */
 #define CHECKUP(n) (((n)&1023)==0)
@@ -109,16 +110,14 @@ static void update_history_table(struct search_worker *worker, uint32_t move,
     }
 }
 
-static void add_killer_move(struct search_worker *worker, uint32_t move,
-                            int see_score)
+static void add_killer_move(struct search_worker *worker, uint32_t move)
 {
-    struct position *pos;
+    struct position *pos = &worker->pos;
 
-    if ((ISCAPTURE(move) || ISENPASSANT(move)) && (see_score >= 0)) {
+    if ((ISCAPTURE(move) || ISENPASSANT(move)) && see_ge(pos, move, 0)) {
         return;
     }
 
-    pos = &worker->pos;
     if (move == worker->killer_table[pos->sply][0]) {
         return;
     }
@@ -238,7 +237,6 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
                       int beta)
 {
     int             score;
-    int             see_score;
     int             best_score;
     int             static_score;
     uint32_t        move;
@@ -301,12 +299,12 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
 
     /* Search all moves */
     found_move = false;
-    while (select_get_quiscence_move(worker, &move, &see_score)) {
+    while (select_get_quiscence_move(worker, &move)) {
         /*
          * Don't bother searching captures that
          * lose material according to SEE.
          */
-        if (!in_check && ISCAPTURE(move) && (see_score < 0)) {
+        if (!in_check && ISCAPTURE(move) && !see_ge(pos, move, 0)) {
             continue;
         }
 
@@ -343,7 +341,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
 {
     int             score;
     int             tb_score;
-    int             see_score;
     int             best_score;
     int             static_score;
     int             threshold;
@@ -495,7 +492,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         select_set_tt_move(worker, tt_move);
         threshold = beta + PROBCUT_MARGIN;
 
-        while (select_get_quiscence_move(worker, &move, &see_score)) {
+        while (select_get_quiscence_move(worker, &move)) {
             /*
              * Skip non-captures and captures that are not
              * good enough (according to SEE).
@@ -503,7 +500,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
                 continue;
             }
-            if (see_score < (threshold-static_score)) {
+            if (!see_ge(pos, move, threshold-static_score)) {
                 continue;
             }
 
@@ -540,7 +537,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     tt_flag = TT_ALPHA;
     movenumber = 0;
     found_move = false;
-    while (select_get_move(worker, &move, &see_score)) {
+    while (select_get_move(worker, &move)) {
         pawn_push = is_pawn_push(pos, move);
         killer = is_killer_move(worker, move);
         hist = worker->history_table[pos->stm][FROM(move)][TO(move)];
@@ -643,7 +640,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                  * search this position further.
                  */
                 if (score >= beta) {
-                    add_killer_move(worker, move, see_score);
+                    add_killer_move(worker, move);
                     tt_flag = TT_BETA;
                     break;
                 }
@@ -683,7 +680,6 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                        int beta)
 {
     int             score;
-    int             see_score;
     int             best_score;
     uint32_t        move;
     uint32_t        best_move;
@@ -718,7 +714,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     tt_flag = TT_ALPHA;
     best_score = -INFINITE_SCORE;
     worker->currmovenumber = 0;
-    while (select_get_root_move(worker, &move, &see_score)) {
+    while (select_get_root_move(worker, &move)) {
         /* Send stats for the first worker */
         worker->currmovenumber++;
         worker->currmove = move;
@@ -755,7 +751,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                  * save some time.
                  */
                 if (score >= beta) {
-                    add_killer_move(worker, move, see_score);
+                    add_killer_move(worker, move);
                     tt_flag = TT_BETA;
                     break;
                 }

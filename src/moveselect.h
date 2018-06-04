@@ -52,11 +52,9 @@ void select_set_tt_move(struct search_worker *worker, uint32_t move);
  *
  * @param worker The worker.
  * @param move Location to store the move at.
- * @param see_score Location to store the SEE score of the move at.
  * @return Returns true if a move was available, false otherwise.
  */
-bool select_get_root_move(struct search_worker *worker, uint32_t *move,
-                          int *see_score);
+bool select_get_root_move(struct search_worker *worker, uint32_t *move);
 
 /*
  * Get the next move to search. Should not be called
@@ -64,22 +62,18 @@ bool select_get_root_move(struct search_worker *worker, uint32_t *move,
  *
  * @param worker The worker.
  * @param move Location to store the move at.
- * @param see_score Location to store the SEE score of the move at.
  * @return Returns true if a move was available, false otherwise.
  */
-bool select_get_move(struct search_worker *worker, uint32_t *move,
-                     int *see_score);
+bool select_get_move(struct search_worker *worker, uint32_t *move);
 
 /*
  * Get the next quiscence move to search.
  *
  * @param worker The worker.
  * @param move Location to store the move at.
- * @param see_score Location to store the SEE score of the move at.
  * @return Returns true if a move was available, false otherwise.
  */
-bool select_get_quiscence_move(struct search_worker *worker, uint32_t *move,
-                               int *see_score);
+bool select_get_quiscence_move(struct search_worker *worker, uint32_t *move);
 
 /*
  * Updated the move ordering score for the root moves.

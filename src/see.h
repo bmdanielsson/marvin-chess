@@ -37,5 +37,16 @@ void see_init(void);
  */
 int see_calculate_score(struct position *pos, uint32_t move);
 
+/*
+ * Check if the Static Exchange Evaluation (SEE) score of a capturer
+ * is equal to or above a certain threshold.
+ *
+ * @param pos The chess position.
+ * @param move The move to evaluate.
+ * @param threshold The threshold.
+ * @return The calculated score.
+ */
+bool see_ge(struct position *pos, uint32_t move, int threshold);
+
 #endif
 
