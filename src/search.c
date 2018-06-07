@@ -64,7 +64,7 @@ static int futility_margin[FUTILITY_DEPTH] = {300, 500, 900};
  * indexed by depth-1.
  */
 #define RAZORING_DEPTH 3
-static int razoring_margin[RAZORING_DEPTH] = {100, 200, 300};
+static int razoring_margin[RAZORING_DEPTH] = {100, 200, 400};
 
 /*
  * Aspiration window sizes. If the search fails low or high
@@ -457,7 +457,12 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         if (depth == 1) {
             return quiescence(worker, 0, alpha, beta);
         }
-        depth--;
+
+        threshold = alpha - razoring_margin[depth-1];
+        score = quiescence(worker, 0, threshold, threshold+1);
+        if (score <= threshold) {
+            return score;
+        }
     }
 
     /*
