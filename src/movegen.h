@@ -48,6 +48,15 @@ void gen_quiscence_moves(struct position *pos, struct movelist *list,
                          bool checks);
 
 /*
+ * Generate all check evasions.
+ *
+ * @param pos The board structure.
+ * @param list The list to store the moves in. Moves are appended to the list
+ * so it must be initialized before first use.
+ */
+void gen_check_evasions(struct position *pos, struct movelist *list);
+
+/*
  * Generate all normal moves. Normal moves are all moves except captures,
  * en-passant and promotions.
  *

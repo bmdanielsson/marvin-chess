@@ -41,7 +41,10 @@ enum {
     PHASE_BAD_CAPS,
     /* Quiscence search */
     PHASE_GEN_QUISCENCE,
-    PHASE_QUISCENCE
+    PHASE_QUISCENCE,
+    /* Check evasions */
+    PHASE_GEN_EVASIONS,
+    PHASE_EVASIONS
 };
 
 /* Base scores for move ordering */
@@ -211,6 +214,53 @@ static void assign_quiscence_score(struct search_worker *worker,
     }
 }
 
+static void assign_evasion_score(struct search_worker *worker,
+                                 struct moveselect *ms, struct movelist *list,
+                                 int iter)
+{
+    int             from;
+    int             to;
+    uint32_t        move;
+    struct moveinfo *info;
+    struct position *pos;
+
+    pos = &worker->pos;
+
+    /*
+     * Copy the move to the move info list. The move from
+     * the transposition table is skipped since it has
+     * already been searched.
+     */
+    move = list->moves[iter];
+    info = &ms->moveinfo[ms->nmoves];
+    ms->nmoves++;
+    info->move = move;
+
+    /* Calculate a SEE score for all captures */
+    info->see = calculate_see_score(pos, move);
+
+    /*
+     * Assign a score to each move. Normal moves are scored based
+     * on history heuristic and capture moves based on SEE.
+     */
+    from = FROM(move);
+    to = TO(move);
+    if (move == ms->ttmove) {
+        info->score = BASE_SCORE_TT;
+    } else if ((ISCAPTURE(move) || ISENPASSANT(move)) && (info->see >= 0)) {
+        info->score = info->see + BASE_SCORE_GOOD_CAPS;
+    } else if (move == worker->killer_table[pos->sply][0]) {
+        info->score = BASE_SCORE_KILLER1;
+    } else if (move == worker->killer_table[pos->sply][1]) {
+        info->score = BASE_SCORE_KILLER2;
+    } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
+        info->score =
+                worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
+    } else {
+        info->score = info->see + BASE_SCORE_BAD_CAPS;
+    }
+}
+
 static uint32_t select_move(struct moveselect *ms, int *see_score)
 {
     int             iter;
@@ -254,7 +304,7 @@ static uint32_t select_move(struct moveselect *ms, int *see_score)
 }
 
 void select_init_node(struct search_worker *worker, int depth, bool qnode,
-                      bool root)
+                      bool root, bool in_check)
 {
     struct moveselect *ms;
     uint32_t          move;
@@ -263,7 +313,11 @@ void select_init_node(struct search_worker *worker, int depth, bool qnode,
 
     pos = &worker->pos;
     ms = &worker->ppms[pos->sply];
-    ms->phase = !qnode?PHASE_TT:PHASE_GEN_QUISCENCE;
+    if (qnode) {
+        ms->phase = PHASE_GEN_QUISCENCE;
+    } else {
+        ms->phase = !in_check?PHASE_TT:PHASE_GEN_EVASIONS;
+    }
     ms->depth = depth;
     ms->qnode = qnode;
     ms->root = root;
@@ -411,6 +465,21 @@ bool select_get_move(struct search_worker *worker, uint32_t *move,
         ms->phase++;
         /* Fall through */
     case PHASE_BAD_CAPS:
+        if (ms->idx < ms->nmoves) {
+            break;
+        }
+        ms->phase++;
+        return false;
+    case PHASE_GEN_EVASIONS:
+        /* Generate check evasions for this position */
+        gen_check_evasions(pos, &list);
+        for (k=0;k<list.nmoves;k++) {
+            assign_evasion_score(worker, ms, &list, k);
+        }
+        ms->phase++;
+        ms->idx = 0;
+        /* Fall through */
+    case PHASE_EVASIONS:
         if (ms->idx < ms->nmoves) {
             break;
         }

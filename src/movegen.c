@@ -572,159 +572,6 @@ static void gen_discovered_checks(struct position *pos, struct movelist *list)
     }
 }
 
-static void gen_check_evasions(struct position *pos, struct movelist *list)
-{
-    int      kingsq;
-    int      to;
-    uint64_t moves;
-    uint64_t attackers;
-    uint64_t slide;
-    uint64_t temp;
-    uint64_t blockers;
-    uint64_t occ;
-    int      attacksq;
-    int      attacker;
-    int      from;
-    int      piece;
-    int      rdelta;
-    int      fdelta;
-    int      blocksq;
-
-    /* Find the location of our king */
-    kingsq = LSB(pos->bb_pieces[KING+pos->stm]);
-
-    /*
-     * First try to move the king. Find all
-     * moves to a safe square.
-     */
-    moves = bb_king_moves(kingsq)&(~pos->bb_sides[pos->stm]);
-    while (moves != 0ULL) {
-        to = POPBIT(&moves);
-        occ = pos->bb_all&(~pos->bb_pieces[KING+pos->stm]);
-        if (bb_attacks_to(pos, occ, to, FLIP_COLOR(pos->stm)) == 0ULL) {
-            add_moves(pos, list, kingsq, sq_mask[to]);
-        }
-    }
-
-    /*
-     * If there is more than one attacker there is nothing
-     * more to try. But if there is only one attacker
-     * then also try to capture the attacking piece. If
-     * the attacker is a slider then also try to block it.
-     */
-    attackers = bb_attacks_to(pos, pos->bb_all, kingsq, FLIP_COLOR(pos->stm));
-    if (BITCOUNT(attackers) > 1) {
-        return;
-    }
-    attacksq = LSB(attackers);
-    attacker = pos->pieces[attacksq];
-
-    /*
-     * Find all captures of the attacking piece. Captures with
-     * the king are excluded since they have already been counted
-     * above.
-     */
-    moves = bb_attacks_to(pos, pos->bb_all, attacksq, pos->stm)&
-                                            (~pos->bb_pieces[KING+pos->stm]);
-    while (moves != 0ULL) {
-        from = POPBIT(&moves);
-        piece = pos->pieces[from];
-        if (VALUE(piece) == PAWN) {
-            add_pawn_moves(pos, list, from, sq_mask[attacksq], PROMOTE_ALL);
-        } else {
-            add_moves(pos, list, from, sq_mask[attacksq]);
-        }
-    }
-
-    /*
-     * If the attacking piece is a pawn then also have to check
-     * if it can be captured en-passant.
-     */
-    if ((VALUE(attacker) == PAWN) && (pos->stm == WHITE) &&
-        (attacksq == (pos->ep_sq-8))) {
-        gen_en_passant_moves(pos, list);
-    } else if ((VALUE(attacker) == PAWN) && (pos->stm == BLACK) &&
-               (attacksq == (pos->ep_sq+8))) {
-        gen_en_passant_moves(pos, list);
-    }
-
-    /*
-     * If the attacking piece is a slider then
-     * also try to block it.
-     */
-    fdelta = 0;
-    rdelta = 0;
-    switch (attacker) {
-    case WHITE_BISHOP:
-    case BLACK_BISHOP:
-        rdelta = (RANKNR(attacksq) > RANKNR(kingsq))?-1:1;
-        fdelta = (FILENR(attacksq) > FILENR(kingsq))?-1:1;
-        break;
-    case WHITE_ROOK:
-    case BLACK_ROOK:
-        if (RANKNR(attacksq) == RANKNR(kingsq)) {
-            rdelta = 0;
-            fdelta = (FILENR(attacksq) > FILENR(kingsq))?-1:1;
-        } else if (FILENR(attacksq) == FILENR(kingsq)) {
-            rdelta = (RANKNR(attacksq) > RANKNR(kingsq))?-1:1;
-            fdelta = 0;
-        }
-        break;
-    case WHITE_QUEEN:
-    case BLACK_QUEEN:
-        if (A1H8(attacksq) == A1H8(kingsq)) {
-            rdelta = (RANKNR(attacksq) > RANKNR(kingsq))?-1:1;
-            fdelta = (FILENR(attacksq) > FILENR(kingsq))?-1:1;
-        } else if (A8H1(attacksq) == A8H1(kingsq)) {
-            rdelta = (RANKNR(attacksq) > RANKNR(kingsq))?-1:1;
-            fdelta = (FILENR(attacksq) > FILENR(kingsq))?-1:1;
-        } else if (RANKNR(attacksq) == RANKNR(kingsq)) {
-            rdelta = 0;
-            fdelta = (FILENR(attacksq) > FILENR(kingsq))?-1:1;
-        } else if (FILENR(attacksq) == FILENR(kingsq)) {
-            rdelta = (RANKNR(attacksq) > RANKNR(kingsq))?-1:1;
-            fdelta = 0;
-        }
-        break;
-    default:
-        return;
-    }
-    if ((fdelta == 0) && (rdelta == 0)) {
-        return;
-    }
-    slide = bb_slider_moves(pos->bb_all, attacksq, fdelta, rdelta)&
-                                                            (~sq_mask[kingsq]);
-
-    /* Try to put a piece between the attacker and the king */
-    temp = slide;
-    while (slide != 0ULL) {
-        blocksq = POPBIT(&slide);
-
-        blockers = bb_attacks_to(pos, pos->bb_all, blocksq, pos->stm);
-        blockers &= (~pos->bb_pieces[KING+pos->stm]);
-        blockers &= (~pos->bb_pieces[PAWN+pos->stm]);
-        while (blockers != 0ULL) {
-            from = POPBIT(&blockers);
-            add_moves(pos, list, from, sq_mask[blocksq]);
-        }
-        blockers = bb_pawn_moves_to(pos->bb_all, blocksq, pos->stm)&
-                                                pos->bb_pieces[PAWN+pos->stm];
-        while (blockers != 0ULL) {
-            from = POPBIT(&blockers);
-            add_pawn_moves(pos, list, from, sq_mask[blocksq], PROMOTE_ALL);
-        }
-    }
-    slide = temp;
-
-    /*
-     * Finally see if the check can be blocked
-     * by doing an en-passant capture.
-     */
-    if ((pos->ep_sq != NO_SQUARE) && ISBITSET(slide, pos->ep_sq)) {
-        gen_en_passant_moves(pos, list);
-    }
-}
-
 static void gen_checks(struct position *pos, struct movelist *list)
 {
     gen_direct_checks(pos, list);
@@ -930,4 +777,162 @@ void gen_promotion_moves(struct position *pos, struct movelist *list)
     assert(list != NULL);
 
     gen_promotions(pos, list, false, true);
+}
+
+void gen_check_evasions(struct position *pos, struct movelist *list)
+{
+    int      kingsq;
+    int      to;
+    uint64_t moves;
+    uint64_t attackers;
+    uint64_t slide;
+    uint64_t temp;
+    uint64_t blockers;
+    uint64_t occ;
+    int      attacksq;
+    int      attacker;
+    int      from;
+    int      piece;
+    int      rdelta;
+    int      fdelta;
+    int      blocksq;
+
+    assert(valid_position(pos));
+    assert(list != NULL);
+
+    list->nmoves = 0;
+
+    /* Find the location of our king */
+    kingsq = LSB(pos->bb_pieces[KING+pos->stm]);
+
+    /*
+     * First try to move the king. Find all
+     * moves to a safe square.
+     */
+    moves = bb_king_moves(kingsq)&(~pos->bb_sides[pos->stm]);
+    while (moves != 0ULL) {
+        to = POPBIT(&moves);
+        occ = pos->bb_all&(~pos->bb_pieces[KING+pos->stm]);
+        if (bb_attacks_to(pos, occ, to, FLIP_COLOR(pos->stm)) == 0ULL) {
+            add_moves(pos, list, kingsq, sq_mask[to]);
+        }
+    }
+
+    /*
+     * If there is more than one attacker there is nothing
+     * more to try. But if there is only one attacker
+     * then also try to capture the attacking piece. If
+     * the attacker is a slider then also try to block it.
+     */
+    attackers = bb_attacks_to(pos, pos->bb_all, kingsq, FLIP_COLOR(pos->stm));
+    if (BITCOUNT(attackers) > 1) {
+        return;
+    }
+    attacksq = LSB(attackers);
+    attacker = pos->pieces[attacksq];
+
+    /*
+     * Find all captures of the attacking piece. Captures with
+     * the king are excluded since they have already been counted
+     * above.
+     */
+    moves = bb_attacks_to(pos, pos->bb_all, attacksq, pos->stm)&
+                                            (~pos->bb_pieces[KING+pos->stm]);
+    while (moves != 0ULL) {
+        from = POPBIT(&moves);
+        piece = pos->pieces[from];
+        if (VALUE(piece) == PAWN) {
+            add_pawn_moves(pos, list, from, sq_mask[attacksq], PROMOTE_ALL);
+        } else {
+            add_moves(pos, list, from, sq_mask[attacksq]);
+        }
+    }
+
+    /*
+     * If the attacking piece is a pawn then also have to check
+     * if it can be captured en-passant.
+     */
+    if ((VALUE(attacker) == PAWN) && (pos->stm == WHITE) &&
+        (attacksq == (pos->ep_sq-8))) {
+        gen_en_passant_moves(pos, list);
+    } else if ((VALUE(attacker) == PAWN) && (pos->stm == BLACK) &&
+               (attacksq == (pos->ep_sq+8))) {
+        gen_en_passant_moves(pos, list);
+    }
+
+    /*
+     * If the attacking piece is a slider then
+     * also try to block it.
+     */
+    fdelta = 0;
+    rdelta = 0;
+    switch (attacker) {
+    case WHITE_BISHOP:
+    case BLACK_BISHOP:
+        rdelta = (RANKNR(attacksq) > RANKNR(kingsq))?-1:1;
+        fdelta = (FILENR(attacksq) > FILENR(kingsq))?-1:1;
+        break;
+    case WHITE_ROOK:
+    case BLACK_ROOK:
+        if (RANKNR(attacksq) == RANKNR(kingsq)) {
+            rdelta = 0;
+            fdelta = (FILENR(attacksq) > FILENR(kingsq))?-1:1;
+        } else if (FILENR(attacksq) == FILENR(kingsq)) {
+            rdelta = (RANKNR(attacksq) > RANKNR(kingsq))?-1:1;
+            fdelta = 0;
+        }
+        break;
+    case WHITE_QUEEN:
+    case BLACK_QUEEN:
+        if (A1H8(attacksq) == A1H8(kingsq)) {
+            rdelta = (RANKNR(attacksq) > RANKNR(kingsq))?-1:1;
+            fdelta = (FILENR(attacksq) > FILENR(kingsq))?-1:1;
+        } else if (A8H1(attacksq) == A8H1(kingsq)) {
+            rdelta = (RANKNR(attacksq) > RANKNR(kingsq))?-1:1;
+            fdelta = (FILENR(attacksq) > FILENR(kingsq))?-1:1;
+        } else if (RANKNR(attacksq) == RANKNR(kingsq)) {
+            rdelta = 0;
+            fdelta = (FILENR(attacksq) > FILENR(kingsq))?-1:1;
+        } else if (FILENR(attacksq) == FILENR(kingsq)) {
+            rdelta = (RANKNR(attacksq) > RANKNR(kingsq))?-1:1;
+            fdelta = 0;
+        }
+        break;
+    default:
+        return;
+    }
+    if ((fdelta == 0) && (rdelta == 0)) {
+        return;
+    }
+    slide = bb_slider_moves(pos->bb_all, attacksq, fdelta, rdelta)&
+                                                            (~sq_mask[kingsq]);
+
+    /* Try to put a piece between the attacker and the king */
+    temp = slide;
+    while (slide != 0ULL) {
+        blocksq = POPBIT(&slide);
+
+        blockers = bb_attacks_to(pos, pos->bb_all, blocksq, pos->stm);
+        blockers &= (~pos->bb_pieces[KING+pos->stm]);
+        blockers &= (~pos->bb_pieces[PAWN+pos->stm]);
+        while (blockers != 0ULL) {
+            from = POPBIT(&blockers);
+            add_moves(pos, list, from, sq_mask[blocksq]);
+        }
+        blockers = bb_pawn_moves_to(pos->bb_all, blocksq, pos->stm)&
+                                                pos->bb_pieces[PAWN+pos->stm];
+        while (blockers != 0ULL) {
+            from = POPBIT(&blockers);
+            add_pawn_moves(pos, list, from, sq_mask[blocksq], PROMOTE_ALL);
+        }
+    }
+    slide = temp;
+
+    /*
+     * Finally see if the check can be blocked
+     * by doing an en-passant capture.
+     */
+    if ((pos->ep_sq != NO_SQUARE) && ISBITSET(slide, pos->ep_sq)) {
+        gen_en_passant_moves(pos, list);
+    }
 }

@@ -33,9 +33,10 @@
  * @param depth The current depth. For quiscenece nodes the depth is <= 0.
  * @param qnode Indicates if this is a quiscence node.
  * @param root Indicates if this is the root node.
+ * @param in_check Indicates if the side to move is in check.
  */
 void select_init_node(struct search_worker *worker, int depth, bool qnode,
-                      bool root);
+                      bool root, bool in_check);
 
 /*
  * Set a transposition table move for this position.
