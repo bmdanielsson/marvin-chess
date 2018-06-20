@@ -52,7 +52,7 @@ void gen_quiscence_moves(struct position *pos, struct movelist *list,
  *
  * @param pos The board structure.
  * @param list The list to store the moves in. Moves are appended to the list
- * so it must be initialized before first use.
+ *             so it must be initialized before first use.
  */
 void gen_check_evasions(struct position *pos, struct movelist *list);
 
@@ -62,7 +62,7 @@ void gen_check_evasions(struct position *pos, struct movelist *list);
  *
  * @param pos The board structure.
  * @param list The list to store the moves in. Moves are appended to the list
- * so it must be initialized before first use.
+ *             so it must be initialized before first use.
  */
 void gen_normal_moves(struct position *pos, struct movelist *list);
 
@@ -72,7 +72,7 @@ void gen_normal_moves(struct position *pos, struct movelist *list);
  *
  * @param pos The board structure.
  * @param list The list to store the moves in. Moves are appended to the list
- * so it must be initialized before first use.
+ *             so it must be initialized before first use.
  */
 void gen_capture_moves(struct position *pos, struct movelist *list);
 
@@ -81,7 +81,7 @@ void gen_capture_moves(struct position *pos, struct movelist *list);
  *
  * @param pos The board structure.
  * @param list The list to store the moves in. Moves are appended to the list
- * so it must be initialized before first use.
+ *             so it must be initialized before first use.
  */
 void gen_promotion_moves(struct position *pos, struct movelist *list);
 

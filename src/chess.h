@@ -255,8 +255,6 @@ struct moveinfo {
  * next move to search for a specific position.
  */
 struct moveselect {
-    /* The current depth. For quiescence nodes the depth is <= 0. */
-    int depth;
     /* Indicates if the position is a quiscence node */
     bool qnode;
     /* Indicates if the position is the root node */

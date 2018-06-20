@@ -293,7 +293,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
 
     /* Initialize the move selector for this node */
     tt_move = NOMOVE;
-    select_init_node(worker, depth, true, false, in_check);
+    select_init_node(worker, true, false, in_check);
     if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score)) {
         return score;
     }
@@ -404,7 +404,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Initialize the move selector for this node */
-    select_init_node(worker, depth, false, false, in_check);
+    select_init_node(worker, false, false, in_check);
 
     /*
      * Check the main transposition table to see if the positon
@@ -491,7 +491,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      */
     if (!pv_node && !in_check && (depth >= PROBCUT_DEPTH) &&
         board_has_non_pawn(&worker->pos, pos->stm)) {
-        select_init_node(worker, depth, true, false, in_check);
+        select_init_node(worker, true, false, in_check);
         select_set_tt_move(worker, tt_move);
         threshold = beta + PROBCUT_MARGIN;
 
@@ -519,7 +519,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             }
         }
     }
-    select_init_node(worker, depth, false, false, in_check);
+    select_init_node(worker, false, false, in_check);
     select_set_tt_move(worker, tt_move);
 
     /*
@@ -706,7 +706,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
      */
     tt_move = NOMOVE;
     in_check = board_in_check(pos, pos->stm);
-    select_init_node(worker, depth, false, true, in_check);
+    select_init_node(worker, false, true, in_check);
     (void)hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &score);
     select_set_tt_move(worker, tt_move);
     best_move = tt_move;

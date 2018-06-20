@@ -303,8 +303,8 @@ static uint32_t select_move(struct moveselect *ms, int *see_score)
     return ms->moveinfo[start].move;
 }
 
-void select_init_node(struct search_worker *worker, int depth, bool qnode,
-                      bool root, bool in_check)
+void select_init_node(struct search_worker *worker, bool qnode, bool root,
+                      bool in_check)
 {
     struct moveselect *ms;
     uint32_t          move;
@@ -318,7 +318,6 @@ void select_init_node(struct search_worker *worker, int depth, bool qnode,
     } else {
         ms->phase = !in_check?PHASE_TT:PHASE_GEN_EVASIONS;
     }
-    ms->depth = depth;
     ms->qnode = qnode;
     ms->root = root;
     ms->ttmove = NOMOVE;
