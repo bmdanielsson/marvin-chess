@@ -355,12 +355,14 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     int             reduction;
     int             futility_pruning;
     bool            in_check;
+    bool            gives_check;
     int             tt_flag;
     bool            pv_node;
     bool            pawn_push;
     bool            killer;
     int             hist;
     bool            tactical;
+    int             new_depth;
     struct position *pos;
 
     pos = &worker->pos;
@@ -370,6 +372,9 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
 
     /* Update search statistics */
     worker->nodes++;
+
+    /* Is the side to move in check */
+    in_check = board_in_check(pos, pos->stm);
 
     /* Check if we have reached the full depth of the search */
     if (depth <= 0) {
@@ -400,16 +405,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
 
     /* Initialize the move selector for this node */
     select_init_node(worker, depth, false, false, in_check);
-
-    /*
-     * Search one ply deeper if in check to
-     * easier detect checkmates after a repeated
-     * series of checks.
-     */
-    in_check = board_in_check(pos, pos->stm);
-    if (in_check) {
-        depth++;
-    }
 
     /*
      * Check the main transposition table to see if the positon
@@ -552,10 +547,11 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         if (!board_make_move(pos, move)) {
             continue;
         }
-        tactical = is_tactical_move(move) || in_check ||
-                    board_in_check(pos, pos->stm);
+        gives_check = board_in_check(pos, pos->stm);
+        tactical = is_tactical_move(move) || in_check || gives_check;
         movenumber++;
         found_move = true;
+        new_depth = depth;
 
         /*
          * If the futility pruning flag is set then prune all moves except
@@ -586,6 +582,11 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             continue;
         }
 
+        /* Extend checking moves */
+        if (gives_check) {
+            new_depth++;
+        }
+
         /*
          * LMR (Late Move Reduction). With good move ordering later moves
          * are unlikely to be good. Therefore search them to a reduced
@@ -603,14 +604,15 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
              * Perform a full search until a pv move is found. Usually
              * this is the first move.
              */
-            score = -search(worker, depth-1, -beta, -alpha, true);
+            score = -search(worker, new_depth-1, -beta, -alpha, true);
         } else {
             /* Perform a reduced depth search with a zero window */
-            score = -search(worker, depth-reduction-1, -alpha-1, -alpha, true);
+            score = -search(worker, new_depth-reduction-1, -alpha-1, -alpha,
+                            true);
 
             /* Re-search with full depth if the move improved alpha */
             if ((score > alpha) && (reduction > 0)) {
-                score = -search(worker, depth-1, -alpha-1, -alpha, true);
+                score = -search(worker, new_depth-1, -alpha-1, -alpha, true);
             }
 
             /*
@@ -619,7 +621,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
              * is actually a null window so there is no need to re-search.
              */
             if (pv_node && (score > alpha)) {
-                score = -search(worker, depth-1, -beta, -alpha, true);
+                score = -search(worker, new_depth-1, -beta, -alpha, true);
             }
         }
         board_unmake_move(pos);
@@ -689,6 +691,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     int             tt_flag;
     struct position *pos;
     int             in_check;
+    int             new_depth;
 
     pos = &worker->pos;
 
@@ -724,9 +727,17 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
             engine_send_move_info(worker);
         }
 
-        /* Recursivly search the move */
+        /* Make the move */
         (void)board_make_move(pos, move);
-        score = -search(worker, depth-1, -beta, -alpha, true);
+
+        /* Extend checking moves */
+        new_depth = depth;
+        if (board_in_check(pos, pos->stm)) {
+            new_depth++;
+        }
+
+        /* Recursivly search the move */
+        score = -search(worker, new_depth-1, -beta, -alpha, true);
         board_unmake_move(pos);
 
         /* Check if a new best move have been found */
