@@ -684,12 +684,6 @@ void gen_quiscence_moves(struct position *pos, struct movelist *list,
 
     list->nmoves = 0;
 
-    /* If the side to move is in check then generate evasions */
-    if (board_in_check(pos, pos->stm)) {
-        gen_check_evasions(pos, list);
-        return;
-    }
-
     gen_captures(pos, list);
     gen_promotions(pos, list, false, false);
     if (checks) {

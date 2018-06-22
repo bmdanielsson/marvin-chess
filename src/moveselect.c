@@ -313,10 +313,10 @@ void select_init_node(struct search_worker *worker, bool qnode, bool root,
 
     pos = &worker->pos;
     ms = &worker->ppms[pos->sply];
-    if (qnode) {
-        ms->phase = PHASE_GEN_QUISCENCE;
+    if (in_check) {
+        ms->phase = PHASE_GEN_EVASIONS;
     } else {
-        ms->phase = !in_check?PHASE_TT:PHASE_GEN_EVASIONS;
+        ms->phase = qnode?PHASE_GEN_QUISCENCE:PHASE_TT;
     }
     ms->qnode = qnode;
     ms->root = root;
@@ -521,6 +521,21 @@ bool select_get_quiscence_move(struct search_worker *worker, uint32_t *move,
         ms->idx = 0;
         /* Fall through */
     case PHASE_QUISCENCE:
+        if (ms->idx < ms->nmoves) {
+            break;
+        }
+        ms->phase++;
+        return false;
+    case PHASE_GEN_EVASIONS:
+        /* Generate check evasions for this position */
+        gen_check_evasions(pos, &list);
+        for (k=0;k<list.nmoves;k++) {
+            assign_evasion_score(worker, ms, &list, k);
+        }
+        ms->phase++;
+        ms->idx = 0;
+        /* Fall through */
+    case PHASE_EVASIONS:
         if (ms->idx < ms->nmoves) {
             break;
         }
