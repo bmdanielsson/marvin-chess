@@ -304,7 +304,8 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
          * Don't bother searching captures that
          * lose material according to SEE.
          */
-        if (!in_check && ISCAPTURE(move) && !see_ge(pos, move, 0)) {
+        if (!in_check && ISCAPTURE(move) &&
+            (select_get_phase(worker) == PHASE_BAD_CAPS)) {
             continue;
         }
 

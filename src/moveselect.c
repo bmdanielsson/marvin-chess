@@ -26,36 +26,6 @@
 #include "board.h"
 
 /*
- * Different move generation phases.
- */
-enum {
-    /* Normal search */
-    PHASE_TT,
-    PHASE_GEN_CAPS,
-    PHASE_GOOD_CAPS,
-    PHASE_KILLER1,
-    PHASE_KILLER2,
-    PHASE_GEN_MOVES,
-    PHASE_MOVES,
-    PHASE_ADD_BAD_CAPS,
-    PHASE_BAD_CAPS,
-    /* Quiscence search */
-    PHASE_GEN_QUISCENCE,
-    PHASE_QUISCENCE,
-    /* Check evasions */
-    PHASE_GEN_EVASIONS,
-    PHASE_EVASIONS
-};
-
-/* Base scores for move ordering */
-#define BASE_SCORE_TT           6*BASE_SCORE_DELTA
-#define BASE_SCORE_GOOD_CAPS    5*BASE_SCORE_DELTA
-#define BASE_SCORE_KILLER1      4*BASE_SCORE_DELTA
-#define BASE_SCORE_KILLER2      3*BASE_SCORE_DELTA
-#define BASE_SCORE_NORMAL       2*BASE_SCORE_DELTA
-#define BASE_SCORE_BAD_CAPS     BASE_SCORE_DELTA
-
-/*
  * Table of MVV/LVA scores indexed by [victim, attacker]. For instance
  * for QxP index by mvvlva_table[P][Q].
  */
@@ -103,7 +73,7 @@ static void assign_root_score(struct search_worker *worker,
 
     /*
      * Assign a score to each move. Normal moves are scored based
-     * on history heuristic and capture moves based on SEE.
+     * on history heuristic and capture moves based on MVV/LVA.
      */
     if (move == ms->ttmove) {
         info->score = BASE_SCORE_TT;
@@ -129,6 +99,7 @@ static void assign_score(struct search_worker *worker, struct moveselect *ms,
     uint32_t        move;
     struct moveinfo *info;
     struct position *pos;
+    bool            gez;
 
     pos = &worker->pos;
 
@@ -148,7 +119,8 @@ static void assign_score(struct search_worker *worker, struct moveselect *ms,
      * the move is appended to the moveinfo list. If the SEE score is
      * negative (bad captures) the the move is added to be bead capture list.
      */
-    if ((ISCAPTURE(move) || ISENPASSANT(move)) && !see_ge(pos, move, 0)) {
+    gez = (ISCAPTURE(move) || ISENPASSANT(move))?see_ge(pos, move, 0):true;
+    if ((ISCAPTURE(move) || ISENPASSANT(move)) && !gez) {
         info = &ms->badcapinfo[ms->nbadcaps];
         ms->nbadcaps++;
     } else {
@@ -165,7 +137,7 @@ static void assign_score(struct search_worker *worker, struct moveselect *ms,
      */
     from = FROM(move);
     to = TO(move);
-    if ((ISCAPTURE(move) || ISENPASSANT(move)) && see_ge(pos, move, 0)) {
+    if ((ISCAPTURE(move) || ISENPASSANT(move)) && gez) {
         info->score = BASE_SCORE_GOOD_CAPS + mvvlva(pos, move);
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
         info->score =
@@ -353,6 +325,33 @@ void select_set_tt_move(struct search_worker *worker, uint32_t move)
     }
 
     ms->ttmove = move;
+}
+
+int select_get_phase(struct search_worker *worker)
+{
+    struct moveselect *ms;
+    struct position   *pos;
+
+    pos = &worker->pos;
+    ms = &worker->ppms[pos->sply];
+
+    switch (ms->moveinfo[ms->idx-1].score/BASE_SCORE_DELTA) {
+    case 6:
+        return PHASE_TT;
+    case 5:
+        return PHASE_GOOD_CAPS;
+    case 4:
+        return PHASE_KILLER1;
+    case 3:
+        return PHASE_KILLER2;
+    case 2:
+        return PHASE_MOVES;
+    case 1:
+        return PHASE_BAD_CAPS;
+    default:
+        assert(false);
+        return PHASE_MOVES;
+    }
 }
 
 bool select_get_root_move(struct search_worker *worker, uint32_t *move)

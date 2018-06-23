@@ -20,8 +20,36 @@
 
 #include "chess.h"
 
-/* Delta between two different base scores */
-#define BASE_SCORE_DELTA 10000000
+/*
+ * Different move generation phases.
+ */
+enum {
+    /* Normal search */
+    PHASE_TT,
+    PHASE_GEN_CAPS,
+    PHASE_GOOD_CAPS,
+    PHASE_KILLER1,
+    PHASE_KILLER2,
+    PHASE_GEN_MOVES,
+    PHASE_MOVES,
+    PHASE_ADD_BAD_CAPS,
+    PHASE_BAD_CAPS,
+    /* Quiscence search */
+    PHASE_GEN_QUISCENCE,
+    PHASE_QUISCENCE,
+    /* Check evasions */
+    PHASE_GEN_EVASIONS,
+    PHASE_EVASIONS
+};
+
+/* Base scores for move ordering */
+#define BASE_SCORE_DELTA        10000000
+#define BASE_SCORE_TT           6*BASE_SCORE_DELTA
+#define BASE_SCORE_GOOD_CAPS    5*BASE_SCORE_DELTA
+#define BASE_SCORE_KILLER1      4*BASE_SCORE_DELTA
+#define BASE_SCORE_KILLER2      3*BASE_SCORE_DELTA
+#define BASE_SCORE_NORMAL       2*BASE_SCORE_DELTA
+#define BASE_SCORE_BAD_CAPS     BASE_SCORE_DELTA
 
 /* The maximum allowed history score */
 #define MAX_HISTORY_SCORE BASE_SCORE_DELTA
@@ -45,6 +73,14 @@ void select_init_node(struct search_worker *worker, bool qnode, bool root,
  * @param move The move.
  */
 void select_set_tt_move(struct search_worker *worker, uint32_t move);
+
+/*
+ * Get the current move selection phase.
+ *
+ * @param worker The worker.
+ * @return Returns the move selection phase.
+ */
+int select_get_phase(struct search_worker *worker);
 
 /*
  * Get the next root move to search. Should only be called
