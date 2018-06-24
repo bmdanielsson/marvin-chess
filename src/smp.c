@@ -143,6 +143,9 @@ static void* worker_thread_func(void *data)
         if (worker->action == ACTION_EXIT) {
             break;
         }
+		if (worker->action == ACTION_IDLE) {
+			continue;
+		}
 
         search_find_best_move(worker);
 
@@ -152,9 +155,11 @@ static void* worker_thread_func(void *data)
     }
 
     /* Clean up */
+#ifndef WINDOWS
     event_destroy(&worker->ev_start);
     event_destroy(&worker->ev_done);
     hash_pawntt_destroy_table(worker);
+#endif
 
     return NULL;
 }
@@ -250,6 +255,13 @@ void smp_destroy_workers(void)
     for (k=0;k<number_of_workers;k++) {
         thread_join(&workers[k].thread);
     }
+#ifdef WINDOWS
+	for (k=0;k<number_of_workers;k++) {
+		event_destroy(&workers[k].ev_start);
+		event_destroy(&workers[k].ev_done);
+		hash_pawntt_destroy_table(&workers[k]);
+	}
+#endif
     number_of_workers = 0;
 }
 
