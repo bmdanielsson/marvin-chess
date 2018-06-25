@@ -53,19 +53,13 @@
 #define NULLMOVE_BASE_REDUCTION 2
 #define NULLMOVE_DIVISOR 6
 
-/*
- * Margins used for futility pruning. The array should be
- * indexed by depth-1.
- */
+/* Margins used for futility pruning */
 #define FUTILITY_DEPTH 3
-static int futility_margin[FUTILITY_DEPTH] = {300, 500, 900};
+static int futility_margin[] = {0, 300, 500, 900};
 
-/*
- * Margins used for razoring. The array should be
- * indexed by depth-1.
- */
+/* Margins used for razoring */
 #define RAZORING_DEPTH 3
-static int razoring_margin[RAZORING_DEPTH] = {100, 200, 400};
+static int razoring_margin[] = {0, 100, 200, 400};
 
 /*
  * Aspiration window sizes. If the search fails low or high
@@ -76,7 +70,7 @@ static int aspiration_window[] = {25, 50, 100, 200, 400, INFINITE_SCORE};
 
 /* Move counts for the different depths to use for late move pruning */
 #define LMP_DEPTH 6
-static int lmp_counts[LMP_DEPTH+1] = {0, 5, 10, 20, 35, 55};
+static int lmp_counts[] = {0, 5, 10, 20, 35, 55};
 
 /* Configuration constants for probcut */
 #define PROBCUT_DEPTH 5
@@ -433,7 +427,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         !in_check &&
         !pv_node &&
         board_has_non_pawn(pos, pos->stm) &&
-        ((static_score-futility_margin[depth-1]) >= beta)) {
+        ((static_score-futility_margin[depth]) >= beta)) {
         return static_score;
     }
 
@@ -446,12 +440,12 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         !pv_node &&
         (tt_move == NOMOVE) &&
         (depth <= RAZORING_DEPTH) &&
-        ((static_score+razoring_margin[depth-1]) <= alpha)) {
+        ((static_score+razoring_margin[depth]) <= alpha)) {
         if (depth == 1) {
             return quiescence(worker, 0, alpha, beta);
         }
 
-        threshold = alpha - razoring_margin[depth-1];
+        threshold = alpha - razoring_margin[depth];
         score = quiescence(worker, 0, threshold, threshold+1);
         if (score <= threshold) {
             return score;
@@ -528,7 +522,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      */
     futility_pruning = false;
     if ((depth <= FUTILITY_DEPTH) &&
-        ((static_score+futility_margin[depth-1]) <= alpha)) {
+        ((static_score+futility_margin[depth]) <= alpha)) {
         futility_pruning = true;
     }
 
