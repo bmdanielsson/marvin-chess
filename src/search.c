@@ -76,6 +76,10 @@ static int lmp_counts[] = {0, 5, 10, 20, 35, 55};
 #define PROBCUT_DEPTH 5
 #define PROBCUT_MARGIN 210
 
+/* Margins for SEE pruning in the main search */
+#define SEE_PRUNE_DEPTH 5
+static int see_prune_margin[] = {0, -100, -200, -300, -400};
+
 static void update_history_table(struct search_worker *worker, uint32_t move,
                                  int depth)
 {
@@ -570,6 +574,17 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             !killer &&
             (abs(alpha) < KNOWN_WIN) &&
             (hist == 0)) {
+            board_unmake_move(pos);
+            continue;
+        }
+
+        /* Prune moves that lose material according to SEE */
+        if (!pv_node &&
+            move != tt_move &&
+            !in_check &&
+            !gives_check &&
+            depth < SEE_PRUNE_DEPTH &&
+            !see_post_ge(pos, move, see_prune_margin[depth])) {
             board_unmake_move(pos);
             continue;
         }

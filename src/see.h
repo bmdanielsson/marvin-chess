@@ -44,9 +44,19 @@ int see_calculate_score(struct position *pos, uint32_t move);
  * @param pos The chess position.
  * @param move The move to evaluate.
  * @param threshold The threshold.
- * @return The calculated score.
+ * @return Returns true if the score is greater than the threahold.
  */
 bool see_ge(struct position *pos, uint32_t move, int threshold);
+
+/*
+ * Version of see_ge that should be called after the move has been made.
+ *
+ * @param pos The chess position.
+ * @param move The move to evaluate.
+ * @param threshold The threshold.
+ * @return Returns true if the score is greater than the threahold.
+ */
+bool see_post_ge(struct position *pos, uint32_t move, int threshold);
 
 #endif
 

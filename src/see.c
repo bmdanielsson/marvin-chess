@@ -282,3 +282,97 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
 
     return see_score >= threshold;
 }
+
+bool see_post_ge(struct position *pos, uint32_t move, int threshold)
+{
+    int      see_score;
+    int      sq;
+    int      maximizer;
+    int      stm;
+    int      piece;
+    int      victim;
+    uint64_t attackers;
+    uint64_t attacker;
+    uint64_t occ;
+
+    assert(valid_position(pos));
+    assert(valid_move(move));
+
+    /*
+     * In order for the castling to be legal the destination
+     * square of the rook cannot be attacked so the see score
+     * is always zero.
+     */
+    if (ISKINGSIDECASTLE(move) || ISQUEENSIDECASTLE(move)) {
+       return threshold < 0;
+    }
+
+    /* Find the score of the move */
+    maximizer = FLIP_COLOR(pos->stm);
+    stm = maximizer;
+    sq = TO(move);
+    piece = pos->pieces[sq];
+    if (ISENPASSANT(move)) {
+        see_score = see_material[PAWN+FLIP_COLOR(stm)];
+    } else if (ISCAPTURE(move)) {
+        see_score = see_material[pos->history[pos->ply-1].capture];
+    } else {
+        see_score = 0;
+    }
+    if (ISPROMOTION(move)) {
+        see_score += see_material[PROMOTION(move)+stm];
+        see_score -= see_material[PAWN+stm];
+    }
+
+    /* Find all pieces that attacks the target square */
+    occ = pos->bb_all;
+    attackers = bb_attacks_to(pos, occ, sq, WHITE) |
+                                            bb_attacks_to(pos, occ, sq, BLACK);
+    attackers &= ~sq_mask[FROM(move)];
+
+    /* Iterate until there are no more attackers */
+    victim = ISPROMOTION(move)?PROMOTION(move)+stm:piece;
+    stm = FLIP_COLOR(stm);
+    while (!ISEMPTY(attackers)) {
+        /*
+         * Before recapturing compare the current score against the
+         * threshold. If the side to move is the initial side to move
+         * and the score is alreeady above the threshold then there is
+         * no need to continue, same thing if it is the oppenents turn
+         * to move and the score is below the threshold.
+         */
+        if ((stm == maximizer) && (see_score >= threshold)) {
+            break;
+        } else if ((stm != maximizer) && (see_score < threshold)) {
+            break;
+        }
+
+        /* Find the next attacker to consider */
+        attacker = find_next_attacker(pos, attackers, stm, &piece);
+        if (attacker == 0ULL) {
+            break;
+        }
+
+        /* Update the score based on the move */
+        if (stm == maximizer) {
+            see_score += move_score(sq, piece, stm, victim);
+        } else {
+            see_score -= move_score(sq, piece, stm, victim);
+        }
+
+        /*
+         * Apply the move. The current piece becomes the next victim
+         * unless it's a promotion in which case the next victim is
+         * a queen.
+         */
+        attackers &= ~attacker;
+        occ &= ~attacker;
+        victim = ((VALUE(piece) == PAWN) && ISPROMOTION(move))?QUEEN+stm:piece;
+        stm = FLIP_COLOR(stm);
+
+        /* Find xray attackers and add them to the set of attackers */
+        attackers |= find_xray_attackers(pos, occ, sq, attacker);
+    }
+
+    return see_score >= threshold;
+}
