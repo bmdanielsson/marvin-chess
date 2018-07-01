@@ -589,8 +589,11 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             continue;
         }
 
-        /* Extend checking moves */
-        if (gives_check) {
+        /*
+         * Extend checking moves unless SEE indicates
+         * that the move is losing material.
+         */
+        if (gives_check && see_post_ge(pos, move, 0)) {
             new_depth++;
         }
 
