@@ -111,4 +111,12 @@ bool board_has_non_pawn(struct position *pos, int side);
  */
 bool board_is_move_pseudo_legal(struct position *pos, uint32_t move);
 
+/*
+ * Check if a move is a checking move.
+ *
+ * @param pos The chess board.
+ * @param move The move to check.
+ */
+bool board_move_gives_check(struct position *pos, uint32_t move);
+
 #endif

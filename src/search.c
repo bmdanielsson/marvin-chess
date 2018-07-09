@@ -80,6 +80,9 @@ static int lmp_counts[] = {0, 5, 10, 20, 35, 55};
 #define SEE_PRUNE_DEPTH 5
 static int see_prune_margin[] = {0, -100, -200, -300, -400};
 
+/* Margin used for delta pruning */
+#define DELTA_MARGIN 200
+
 static void update_history_table(struct search_worker *worker, uint32_t move,
                                  int depth)
 {
@@ -231,6 +234,28 @@ static void checkup(struct search_worker *worker)
     }
 }
 
+static int material_gain(struct position *pos, uint32_t move)
+{
+    int gain;
+
+    gain = 0;
+
+    /* Consider gain from capture moves */
+    if (ISCAPTURE(move)) {
+        gain += see_material[pos->pieces[TO(move)]];
+    } else if (ISENPASSANT(move)) {
+        gain += see_material[PAWN+FLIP_COLOR(pos->stm)];
+    }
+
+    /* Consider additional gain from promotion moves */
+    if (ISPROMOTION(move)) {
+        gain += see_material[PROMOTION(move)+pos->stm];
+        gain -= see_material[PAWN+pos->stm];
+    }
+
+    return gain;
+}
+
 static int quiescence(struct search_worker *worker, int depth, int alpha,
                       int beta)
 {
@@ -305,6 +330,21 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
         if (!in_check && ISCAPTURE(move) &&
             (select_get_phase(worker) == PHASE_BAD_CAPS)) {
             continue;
+        }
+
+        /*
+         * Futility pruning for the quiescence search (also known as delta
+         * pruning). If the capture, even without a recapture, can't raise
+         * alpha (with a certain margin) then it's probably not worth the
+         * effort to search the move.
+         */
+        if (!in_check &&
+            board_has_non_pawn(pos, FLIP_COLOR(pos->stm)) &&
+            !is_pawn_push(pos, move) &&
+            !board_move_gives_check(pos, move)) {
+            if ((static_score+material_gain(pos, move)+DELTA_MARGIN) < alpha) {
+                continue;
+            }
         }
 
         /* Recursivly search the move */

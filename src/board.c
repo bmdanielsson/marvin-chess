@@ -616,3 +616,83 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
 
     return (bb&sq_mask[to]) != 0ULL;
 }
+
+bool board_move_gives_check(struct position *pos, uint32_t move)
+{
+    bool gives_check;
+    int  from;
+    int  to;
+    int  src_piece;
+    int  dest_piece;
+    int  capture;
+
+    assert(valid_board(pos));
+    assert(valid_move(move));
+    assert(move != NOMOVE);
+
+    /* Handle special moves separatly to simplify the rest of the code */
+    if (ISENPASSANT(move) ||
+        ISKINGSIDECASTLE(move) ||
+        ISQUEENSIDECASTLE(move)) {
+        if (!board_make_move(pos, move)) {
+            return false;
+        }
+        gives_check = board_in_check(pos, pos->stm);
+        board_unmake_move(pos);
+        return gives_check;
+    }
+
+    /* Extract move information */
+    from = FROM(move);
+    to = TO(move);
+    src_piece = pos->pieces[from];
+    dest_piece = ISPROMOTION(move)?PROMOTION(move):src_piece;
+    capture = pos->pieces[to];
+
+    /* Remove piece from the source square */
+    CLEARBIT(pos->bb_pieces[src_piece], from);
+    CLEARBIT(pos->bb_sides[pos->stm], from);
+    CLEARBIT(pos->bb_all, from);
+    pos->pieces[from] = NO_PIECE;
+
+    /* Remove captured piece from the destination square */
+    if (capture != NO_PIECE) {
+        CLEARBIT(pos->bb_pieces[capture], to);
+        CLEARBIT(pos->bb_sides[FLIP_COLOR(pos->stm)], to);
+        CLEARBIT(pos->bb_all, to);
+        pos->pieces[to] = NO_PIECE;
+    }
+
+    /* Add piece to the destination square */
+    SETBIT(pos->bb_pieces[dest_piece], to);
+    SETBIT(pos->bb_sides[pos->stm], to);
+    SETBIT(pos->bb_all, to);
+    pos->pieces[to] = dest_piece;
+
+    /* Check if opponent king is attacked */
+    gives_check = bb_is_attacked(pos,
+                                 LSB(pos->bb_pieces[KING+FLIP_COLOR(pos->stm)]),
+                                 pos->stm);
+
+    /* Remove piece from the desination square */
+    CLEARBIT(pos->bb_pieces[dest_piece], to);
+    CLEARBIT(pos->bb_sides[pos->stm], to);
+    CLEARBIT(pos->bb_all, to);
+    pos->pieces[to] = NO_PIECE;
+
+    /* Put captured piece back on destination square */
+    if (capture != NO_PIECE) {
+        SETBIT(pos->bb_pieces[capture], to);
+        SETBIT(pos->bb_sides[FLIP_COLOR(pos->stm)], to);
+        SETBIT(pos->bb_all, to);
+        pos->pieces[to] = capture;
+    }
+
+    /* Put the piece back on source square */
+    SETBIT(pos->bb_pieces[src_piece], from);
+    SETBIT(pos->bb_sides[pos->stm], from);
+    SETBIT(pos->bb_all, from);
+    pos->pieces[from] = src_piece;
+
+    return gives_check;
+}
