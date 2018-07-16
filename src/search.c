@@ -577,33 +577,27 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     movenumber = 0;
     found_move = false;
     while (select_get_move(worker, &move)) {
+        /* Various move properties */
         pawn_push = is_pawn_push(pos, move);
         killer = is_killer_move(worker, move);
         hist = worker->history_table[pos->stm][FROM(move)][TO(move)];
-        if (!board_make_move(pos, move)) {
-            continue;
-        }
-        gives_check = board_in_check(pos, pos->stm);
+        gives_check = board_move_gives_check(pos, move);
         tactical = is_tactical_move(move) || in_check || gives_check;
-        movenumber++;
-        found_move = true;
-        new_depth = depth;
 
         /*
          * If the futility pruning flag is set then prune all moves except
-         * tactical ones. Also make sure to search at least one move.
+         * tactical ones.
          */
         if (futility_pruning &&
             (movenumber > 1) &&
             !tactical) {
-            board_unmake_move(pos);
             continue;
         }
 
         /*
          * LMP (Late Move Pruning). If a move is sorted late in the list and
          * it has not been good in the past then prune it unless there are
-         * obvious tactics. Also make sure to search at least one move.
+         * obvious tactics.
          */
         if (!pv_node &&
             (depth < LMP_DEPTH) &&
@@ -614,7 +608,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             !killer &&
             (abs(alpha) < KNOWN_WIN) &&
             (hist == 0)) {
-            board_unmake_move(pos);
             continue;
         }
 
@@ -624,10 +617,18 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             !in_check &&
             !gives_check &&
             depth < SEE_PRUNE_DEPTH &&
-            !see_post_ge(pos, move, see_prune_margin[depth])) {
-            board_unmake_move(pos);
+            (movenumber > 1) &&
+            !see_ge(pos, move, see_prune_margin[depth])) {
             continue;
         }
+
+        /* Make the move */
+        if (!board_make_move(pos, move)) {
+            continue;
+        }
+        movenumber++;
+        found_move = true;
+        new_depth = depth;
 
         /*
          * Extend checking moves unless SEE indicates
