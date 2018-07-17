@@ -626,7 +626,7 @@ bool board_move_gives_check(struct position *pos, uint32_t move)
     int  dest_piece;
     int  capture;
 
-    assert(valid_board(pos));
+    assert(valid_position(pos));
     assert(valid_move(move));
     assert(move != NOMOVE);
 

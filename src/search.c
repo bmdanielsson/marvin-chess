@@ -83,6 +83,9 @@ static int see_prune_margin[] = {0, -100, -200, -300, -400};
 /* Margin used for delta pruning */
 #define DELTA_MARGIN 200
 
+/* Configuration constants for singular extensions */
+#define SE_DEPTH 8
+
 static void update_history_table(struct search_worker *worker, uint32_t move,
                                  int depth)
 {
@@ -315,7 +318,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     /* Initialize the move selector for this node */
     tt_move = NOMOVE;
     select_init_node(worker, true, false, in_check);
-    if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score)) {
+    if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score, NULL)) {
         return score;
     }
     select_set_tt_move(worker, tt_move);
@@ -376,9 +379,10 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
 }
 
 static int search(struct search_worker *worker, int depth, int alpha, int beta,
-                  bool try_null)
+                  bool try_null, uint32_t exclude_move)
 {
     int             score;
+    int             tt_score;
     int             tb_score;
     int             best_score;
     int             static_score;
@@ -398,8 +402,11 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     bool            killer;
     int             hist;
     bool            tactical;
+    bool            extended;
     int             new_depth;
+    struct tt_item  *tt_item;
     struct position *pos;
+    bool            is_singular;
 
     pos = &worker->pos;
 
@@ -444,11 +451,15 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
 
     /*
      * Check the main transposition table to see if the positon
-     * have been searched before.
+     * have been searched before. If this a singular extension
+     * search then a search is required so a cutoff should not
+     * be done for this node.
      */
     tt_move = NOMOVE;
-    if (hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &score)) {
-        return score;
+    tt_item = NULL;
+    if (hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &tt_score,
+                       &tt_item) && (tt_move != exclude_move)) {
+        return tt_score;
     }
     select_set_tt_move(worker, tt_move);
 
@@ -508,7 +519,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         board_has_non_pawn(pos, pos->stm)) {
         reduction = NULLMOVE_BASE_REDUCTION + depth/NULLMOVE_DIVISOR;
         board_make_null_move(pos);
-        score = -search(worker, depth-reduction-1, -beta, -beta+1, false);
+        score = -search(worker, depth-reduction-1, -beta, -beta+1, false,
+                        NOMOVE);
         board_unmake_null_move(pos);
         if (score >= beta) {
             /*
@@ -542,13 +554,16 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             if (!see_ge(pos, move, threshold-static_score)) {
                 continue;
             }
+            if (move == exclude_move) {
+                continue;
+            }
 
             /* Search the move */
             if (!board_make_move(pos, move)) {
                 continue;
             }
             score = -search(worker, depth-PROBCUT_DEPTH+1, -threshold,
-                            -threshold+1, true);
+                            -threshold+1, true, NOMOVE);
             board_unmake_move(pos);
             if (score >= threshold) {
                 return score;
@@ -557,6 +572,26 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
     select_init_node(worker, false, false, in_check);
     select_set_tt_move(worker, tt_move);
+
+    /* Check if the move from the transposition table is singular */
+    is_singular = false;
+    if (depth >= SE_DEPTH &&
+        (exclude_move == NOMOVE) &&
+        (tt_move != NOMOVE) &&
+        (tt_item->type == TT_BETA) &&
+        (tt_item->depth >= (depth-3)) &&
+        (abs(beta) < FORCED_MATE) &&
+        board_is_move_pseudo_legal(pos, tt_move)) {
+        threshold = tt_score-2*depth;
+
+        score = search(worker, depth/2, threshold-1, threshold, true, tt_move);
+        if (score < threshold) {
+            is_singular = true;
+        }
+
+        select_init_node(worker, false, false, in_check);
+        select_set_tt_move(worker, tt_move);
+    }
 
     /*
      * Decide if futility pruning should be tried for this node. The
@@ -577,6 +612,14 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     movenumber = 0;
     found_move = false;
     while (select_get_move(worker, &move)) {
+        /*
+         * If this a singular extension search then skip the move
+         * that is expected to be singular.
+         */
+        if (move == exclude_move) {
+            continue;
+        }
+
         /* Various move properties */
         pawn_push = is_pawn_push(pos, move);
         killer = is_killer_move(worker, move);
@@ -629,13 +672,21 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         movenumber++;
         found_move = true;
         new_depth = depth;
+        extended = false;
+
+        /* Singular extension */
+        if (!extended && (move == tt_move) && is_singular) {
+            new_depth++;
+            extended = true;
+        }
 
         /*
          * Extend checking moves unless SEE indicates
          * that the move is losing material.
          */
-        if (gives_check && see_post_ge(pos, move, 0)) {
+        if (!extended && gives_check && see_post_ge(pos, move, 0)) {
             new_depth++;
+            extended = true;
         }
 
         /*
@@ -644,7 +695,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
          * depth. Exceptions are made for tactical moves, like captures and
          * promotions.
          */
-        reduction = ((movenumber > 3) && (depth > 3) && !tactical)?1:0;
+        reduction =
+                (!extended && (movenumber > 3) && (depth > 3) && !tactical)?1:0;
         if ((reduction > 0) && (movenumber > 6)) {
             reduction++;
         }
@@ -655,15 +707,16 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
              * Perform a full search until a pv move is found. Usually
              * this is the first move.
              */
-            score = -search(worker, new_depth-1, -beta, -alpha, true);
+            score = -search(worker, new_depth-1, -beta, -alpha, true, NOMOVE);
         } else {
             /* Perform a reduced depth search with a zero window */
             score = -search(worker, new_depth-reduction-1, -alpha-1, -alpha,
-                            true);
+                            true, NOMOVE);
 
             /* Re-search with full depth if the move improved alpha */
             if ((score > alpha) && (reduction > 0)) {
-                score = -search(worker, new_depth-1, -alpha-1, -alpha, true);
+                score = -search(worker, new_depth-1, -alpha-1, -alpha, true,
+                                NOMOVE);
             }
 
             /*
@@ -672,7 +725,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
              * is actually a null window so there is no need to re-search.
              */
             if (pv_node && (score > alpha)) {
-                score = -search(worker, new_depth-1, -beta, -alpha, true);
+                score = -search(worker, new_depth-1, -beta, -alpha, true,
+                                NOMOVE);
             }
         }
         board_unmake_move(pos);
@@ -757,7 +811,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     tt_move = NOMOVE;
     in_check = board_in_check(pos, pos->stm);
     select_init_node(worker, false, true, in_check);
-    (void)hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &score);
+    (void)hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &score, NULL);
     select_set_tt_move(worker, tt_move);
     best_move = tt_move;
 
@@ -787,7 +841,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
         }
 
         /* Recursivly search the move */
-        score = -search(worker, new_depth-1, -beta, -alpha, true);
+        score = -search(worker, new_depth-1, -beta, -alpha, true, NOMOVE);
         board_unmake_move(pos);
 
         /* Check if a new best move have been found */

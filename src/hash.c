@@ -272,11 +272,11 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
 }
 
 bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
-                    uint32_t *move, int *score)
+                    uint32_t *move, int *score, struct tt_item **item)
 {
     uint64_t         idx;
     struct tt_bucket *bucket;
-    struct tt_item   *item;
+    struct tt_item   *tmp;
     bool             cutoff;
     int              k;
 
@@ -303,11 +303,14 @@ bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
     *score = 0;
     cutoff = false;
     for (k=0;k<TT_BUCKET_SIZE;k++) {
-        item = &bucket->items[k];
+        tmp = &bucket->items[k];
 
-        if (KEY_EQUALS(pos->key, item)) {
-            *move = item->move;
-            cutoff = check_tt_cutoff(pos, item, depth, alpha, beta, score);
+        if (KEY_EQUALS(pos->key, tmp)) {
+            *move = tmp->move;
+            if (item != NULL) {
+                *item = tmp;
+            }
+            cutoff = check_tt_cutoff(pos, tmp, depth, alpha, beta, score);
             break;
         }
     }
