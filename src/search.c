@@ -66,7 +66,8 @@ static int razoring_margin[] = {0, 100, 200, 400};
  * then the window is set to the next size in order. The
  * last entry in the array should always be INFINITE_SCORE.
  */
-static int aspiration_window[] = {25, 50, 100, 200, 400, INFINITE_SCORE};
+static int aspiration_window[] = {10, 20, 40, 80, 160, 320, 640,
+                                  INFINITE_SCORE};
 
 /* Move counts for the different depths to use for late move pruning */
 #define LMP_DEPTH 6
