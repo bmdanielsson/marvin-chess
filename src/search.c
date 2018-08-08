@@ -169,10 +169,12 @@ static bool is_tactical_move(uint32_t move)
     return ISCAPTURE(move) || ISENPASSANT(move) || ISPROMOTION(move);
 }
 
-static bool probe_wdl_tables(struct search_worker *worker, int *score)
+static bool probe_wdl_tables(struct search_worker *worker, int alpha, int beta,
+                             int *score)
 {
     unsigned int    res;
     struct position *pos;
+    bool            cutoff;
 
     pos = &worker->pos;
     res = tb_probe_wdl(pos->bb_sides[WHITE], pos->bb_sides[BLACK],
@@ -190,10 +192,23 @@ static bool probe_wdl_tables(struct search_worker *worker, int *score)
         return false;
     }
 
-    *score = (res == TB_WIN)?TABLEBASE_WIN-pos->sply:
-             (res == TB_LOSS)?-TABLEBASE_WIN+pos->sply:0;
+    switch (res) {
+    case TB_WIN:
+        *score = TABLEBASE_WIN-pos->sply;
+        cutoff = (*score >= beta);
+        break;
+    case TB_LOSS:
+        *score = TABLEBASE_LOSS+pos->sply;
+        cutoff = (*score <= alpha);
+        break;
+    default:
+        /* Draw */
+        *score = 0;
+        cutoff = true;
+        break;
+    }
 
-    return true;
+    return cutoff;
 }
 
 static void update_pv(struct search_worker *worker, uint32_t move)
@@ -467,7 +482,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     /* Probe tablebases */
     if (worker->state->probe_wdl &&
         (BITCOUNT(pos->bb_all) <= (int)TB_LARGEST)) {
-        if (probe_wdl_tables(worker, &tb_score)) {
+        if (probe_wdl_tables(worker, alpha, beta, &tb_score)) {
             return tb_score;
         }
     }
@@ -529,7 +544,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
              * score doesn't necessarilly indicate a forced mate. So
              * return beta instead in this case.
              */
-            return score < FORCED_MATE?score:beta;
+            return score < KNOWN_WIN?score:beta;
         }
     }
 
@@ -581,7 +596,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         (tt_move != NOMOVE) &&
         (tt_item->type == TT_BETA) &&
         (tt_item->depth >= (depth-3)) &&
-        (abs(beta) < FORCED_MATE) &&
+        (abs(beta) < KNOWN_WIN) &&
         board_is_move_pseudo_legal(pos, tt_move)) {
         threshold = tt_score-2*depth;
 
@@ -634,7 +649,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
          */
         if (futility_pruning &&
             (movenumber > 1) &&
-            !tactical) {
+            !tactical &&
+            (best_score > KNOWN_LOSS)) {
             continue;
         }
 
@@ -651,7 +667,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             !pawn_push &&
             !killer &&
             (abs(alpha) < KNOWN_WIN) &&
-            (hist == 0)) {
+            (hist == 0) &&
+            (best_score > KNOWN_LOSS)) {
             continue;
         }
 
@@ -662,6 +679,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             !gives_check &&
             depth < SEE_PRUNE_DEPTH &&
             (movenumber > 1) &&
+            (best_score > KNOWN_LOSS) &&
             !see_ge(pos, move, see_prune_margin[depth])) {
             continue;
         }

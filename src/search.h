@@ -38,10 +38,12 @@
 #define FORCED_MATE (CHECKMATE - MAX_SEARCH_DEPTH)
 
 /* Scores assigned to tablebase wins/losses */
-#define TABLEBASE_WIN 19000
+#define TABLEBASE_WIN   19000
+#define TABLEBASE_LOSS  -19000
 
-/* Score indicating a known win, either checkmate or based on tablebases */
-#define KNOWN_WIN (TABLEBASE_WIN - MAX_SEARCH_DEPTH)
+/* Score indicating a known win/loss */
+#define KNOWN_WIN   (TABLEBASE_WIN - MAX_SEARCH_DEPTH)
+#define KNOWN_LOSS  (-KNOWN_WIN)
 
 /*
  * Reset the search data to prepare for a new search.
