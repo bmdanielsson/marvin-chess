@@ -34,8 +34,8 @@ endif
 .PHONY : variant
 ifeq ($(variant), release)
     CPPFLAGS += -DNDEBUG
-    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer -flto
-    LDFLAGS += $(ARCH) -flto
+    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer
+    LDFLAGS += $(ARCH)
 else
 ifeq ($(variant), debug)
     CFLAGS += -g
@@ -55,7 +55,7 @@ CFLAGS += -DWINDOWS
 endif
 
 # Configure warnings
-CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
+CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -Wno-cast-function-type
 
 # Extra include directories
 CFLAGS += -Iimport/fathom -Isrc
