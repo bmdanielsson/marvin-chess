@@ -55,7 +55,7 @@ CFLAGS += -DWINDOWS
 endif
 
 # Configure warnings
-CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast -Wno-cast-function-type
+CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
 
 # Extra include directories
 CFLAGS += -Iimport/fathom -Isrc

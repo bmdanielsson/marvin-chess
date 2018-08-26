@@ -171,7 +171,7 @@ void dbg_set_log_level(int level)
 
         home = getenv("HOME");
         if (home != NULL) {
-            sprintf(path, "%s/%s", home, name);
+            snprintf(path, sizeof(path), "%s/%s", home, name);
             logfp = fopen(path, "w");
         }
     }

@@ -18,10 +18,9 @@
 #include "thread.h"
 
 #ifdef WINDOWS
-void thread_create(thread_t *thread, void *(*func)(void *), void *data)
+void thread_create(thread_t *thread, thread_func_t func, void *data)
 {
-    *thread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)func, data, 0,
-                           NULL);
+    *thread = CreateThread(NULL, 0, func, data, 0, NULL);
 }
 
 void thread_join(thread_t *thread)
@@ -76,7 +75,7 @@ void event_wait(event_t *event)
     WaitForSingleObject(*event, INFINITE);
 }
 #else
-void thread_create(thread_t *thread, void *(*func)(void *), void *data)
+void thread_create(thread_t *thread, thread_func_t func, void *data)
 {
     (void)pthread_create(thread, NULL, func, data);
 }

@@ -42,21 +42,21 @@
 
 /* Global engine variables */
 enum protocol engine_protocol = PROTOCOL_UNSPECIFIED;
-char engine_syzygy_path[1024] = {'\0'};
+char engine_syzygy_path[MAX_PATH_LENGTH+1] = {'\0'};
 int engine_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
 int engine_default_num_threads = 1;
 
 /* Buffer used for receiving commands */
-static char rx_buffer[RX_BUFFER_SIZE];
+static char rx_buffer[RX_BUFFER_SIZE+1];
 
 /* Buffer used for sending commands */
-static char tx_buffer[TX_BUFFER_SIZE];
+static char tx_buffer[TX_BUFFER_SIZE+1];
 
 /*
  * Command received during search that should be
  * executed when the search finishes.
  */
-static char pending_cmd_buffer[RX_BUFFER_SIZE];
+static char pending_cmd_buffer[RX_BUFFER_SIZE+1];
 
 /* Lock used to synchronize command output */
 static mutex_t tx_lock;
@@ -228,7 +228,7 @@ void engine_set_pending_command(char *cmd)
 {
     assert(cmd != NULL);
 
-    strncpy(pending_cmd_buffer, cmd, sizeof(pending_cmd_buffer));
+    strncpy(pending_cmd_buffer, cmd, RX_BUFFER_SIZE);
 }
 
 char* engine_get_pending_command(void)

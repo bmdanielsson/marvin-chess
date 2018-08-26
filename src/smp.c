@@ -132,7 +132,11 @@ static bool probe_dtz_tables(struct gamestate *state, int *score)
     return true;
 }
 
+#ifdef WINDOWS
+static DWORD worker_thread_func(void *data)
+#else
 static void* worker_thread_func(void *data)
+#endif
 {
     struct search_worker *worker = data;
 
@@ -161,7 +165,7 @@ static void* worker_thread_func(void *data)
     hash_pawntt_destroy_table(worker);
 #endif
 
-    return NULL;
+    return 0;
 }
 
 static void prepare_worker(struct search_worker *worker,
@@ -236,7 +240,7 @@ void smp_create_workers(int nthreads)
         memset(&workers[k], 0, sizeof(struct search_worker));
         event_init(&workers[k].ev_start);
         event_init(&workers[k].ev_done);
-        thread_create(&workers[k].thread, worker_thread_func, &workers[k]);
+        thread_create(&workers[k].thread, (thread_func_t)worker_thread_func, &workers[k]);
 
         hash_pawntt_create_table(&workers[k], PAWN_HASH_SIZE);
         workers[k].state = NULL;

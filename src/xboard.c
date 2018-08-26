@@ -388,7 +388,7 @@ static void xboard_cmd_egtpath(char *cmd)
     iter += strlen("syzygy");
     iter = skip_whitespace(iter);
 
-    strncpy(engine_syzygy_path, iter, sizeof(engine_syzygy_path));
+    strncpy(engine_syzygy_path, iter, MAX_PATH_LENGTH);
     tb_init(engine_syzygy_path);
     tablebase_mode = TB_LARGEST > 0;
 }

@@ -28,10 +28,12 @@
 /* Portable multi-threading primitives */
 #ifdef WINDOWS
 typedef HANDLE thread_t;
+typedef LPTHREAD_START_ROUTINE thread_func_t;
 typedef CRITICAL_SECTION mutex_t;
 typedef HANDLE event_t;
 #else
 typedef pthread_t thread_t;
+typedef void* (*thread_func_t)(void*);;  
 typedef pthread_mutex_t mutex_t;
 typedef struct {
     pthread_mutex_t mutex;
@@ -47,7 +49,7 @@ typedef struct {
  * @param func The start function of the thread.
  * @param data Data passed to the thread function.
  */
-void thread_create(thread_t *thread, void *(*func)(void *), void *data);
+void thread_create(thread_t *thread, thread_func_t func, void *data);
 
 /*
  * Wait for a thread to exit.

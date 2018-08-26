@@ -22,6 +22,9 @@
 
 #include "chess.h"
 
+/* Maximum length accepted for file paths */
+#define MAX_PATH_LENGTH 1024
+
 /* Enum for different chess protocols */
 enum protocol {
     PROTOCOL_UNSPECIFIED,
@@ -31,7 +34,7 @@ enum protocol {
 
 /* Global engine variables */
 extern enum protocol engine_protocol;
-extern char engine_syzygy_path[1024];
+extern char engine_syzygy_path[MAX_PATH_LENGTH+1];
 extern int engine_default_hash_size;
 extern int engine_default_num_threads;
 

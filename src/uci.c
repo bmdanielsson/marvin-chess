@@ -341,7 +341,7 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
             iter += strlen("value");
             iter = skip_whitespace(iter);
 
-            strncpy(engine_syzygy_path, iter, sizeof(engine_syzygy_path));
+            strncpy(engine_syzygy_path, iter, MAX_PATH_LENGTH);
             tb_init(engine_syzygy_path);
             tablebase_mode = TB_LARGEST > 0;
         } else if (!strncmp(iter, "Threads", 7)) {
