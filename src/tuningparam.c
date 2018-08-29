@@ -141,6 +141,8 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"candidate_passed_pawn_rank4_eg", 826, 826, 0, 200},
     {"candidate_passed_pawn_rank5_eg", 827, 827, 0, 200},
     {"candidate_passed_pawn_rank6_eg", 828, 828, 0, 200},
+    {"friendly_king_passer_dist", 829, 829, -30, 0},
+    {"opponent_king_passer_dist", 830, 830, 0, 30}
 };
 
 void tuning_param_assign_current(struct tuning_param *params)
@@ -222,6 +224,8 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN(TP_CANDIDATE_PASSED_PAWN_RANK4_EG, CANDIDATE_PASSED_PAWN_RANK4_EG)
     ASSIGN(TP_CANDIDATE_PASSED_PAWN_RANK5_EG, CANDIDATE_PASSED_PAWN_RANK5_EG)
     ASSIGN(TP_CANDIDATE_PASSED_PAWN_RANK6_EG, CANDIDATE_PASSED_PAWN_RANK6_EG)
+    ASSIGN(TP_FRIENDLY_KING_PASSER_DIST, FRIENDLY_KING_PASSER_DIST)
+    ASSIGN(TP_OPPONENT_KING_PASSER_DIST, OPPONENT_KING_PASSER_DIST)
 
     eval_reset();
 }
@@ -308,6 +312,8 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE(TP_CANDIDATE_PASSED_PAWN_RANK4_EG, CANDIDATE_PASSED_PAWN_RANK4_EG)
     DEFINE(TP_CANDIDATE_PASSED_PAWN_RANK5_EG, CANDIDATE_PASSED_PAWN_RANK5_EG)
     DEFINE(TP_CANDIDATE_PASSED_PAWN_RANK6_EG, CANDIDATE_PASSED_PAWN_RANK6_EG)
+    DEFINE(TP_FRIENDLY_KING_PASSER_DIST, FRIENDLY_KING_PASSER_DIST)
+    DEFINE(TP_OPPONENT_KING_PASSER_DIST, OPPONENT_KING_PASSER_DIST)
 
     return params;
 }

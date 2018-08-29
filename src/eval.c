@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "eval.h"
 #include "evalparams.h"
@@ -138,6 +139,27 @@ static int calculate_game_phase(struct position *pos)
 static int calculate_tapered_eval(int phase, int score_mg, int score_eg)
 {
     return ((score_mg*(256 - phase)) + (score_eg*phase))/256;
+}
+
+/*
+ * The number of moves it takes for a king to move
+ * from one square to another.
+ */
+static int king_distance(int from, int to)
+{
+    int file_delta;
+    int rank_delta;
+    int nmoves;
+
+    file_delta = abs(FILENR(to) - FILENR(from));
+    rank_delta = abs(RANKNR(to) - RANKNR(from));
+
+    nmoves = file_delta > rank_delta?rank_delta:file_delta;
+    file_delta -= nmoves;
+    rank_delta -= nmoves;
+    nmoves += (file_delta + rank_delta);
+
+    return nmoves;
 }
 
 static void evaluate_pawn_shield(struct position *pos, struct eval *eval,
@@ -325,6 +347,44 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
      * later when evaluating king safety.
      */
     evaluate_pawn_shield(pos, eval, side);
+}
+
+/*
+ * Evaluate interaction between passed pawns and other pieces. The parts that
+ * only depend on other pawns are evaluated by evaluate_pawn_structure.
+ *
+ * - king distance
+ */
+static void evaluate_passers(struct position *pos, struct eval *eval, int side)
+{
+    struct pawntt_item *item;
+    uint64_t           passers;
+    int                sq;
+    int                to;
+    int                dist;
+    int                odist;
+
+    item = &eval->pawntt;
+
+    /* Iterate over all passers */
+    passers = item->passers[side];
+    while (passers != 0ULL) {
+        sq = POPBIT(&passers);
+
+        /*
+         * Find the distance from each king to the square
+         * directly in front of the pawn.
+         */
+        to = (side == WHITE)?sq+8:sq-8;
+        dist = king_distance(LSB(pos->bb_pieces[KING+side]), to);
+        odist = king_distance(LSB(pos->bb_pieces[KING+FLIP_COLOR(side)]), to);
+
+        /* Calculate a score based on the distance to each king */
+        eval->positional[ENDGAME][side] += OPPONENT_KING_PASSER_DIST*odist;
+        eval->positional[ENDGAME][side] += FRIENDLY_KING_PASSER_DIST*dist;
+        TRACE_M(-1, TP_FRIENDLY_KING_PASSER_DIST, dist);
+        TRACE_M(-1, TP_OPPONENT_KING_PASSER_DIST, odist);
+    }
 }
 
 /*
@@ -748,6 +808,8 @@ static void do_eval(struct search_worker *worker, struct position *pos,
     evaluate_queens(pos, eval, BLACK);
     evaluate_king(pos, eval, WHITE);
     evaluate_king(pos, eval, BLACK);
+    evaluate_passers(pos, eval, WHITE);
+    evaluate_passers(pos, eval, BLACK);
 
     /*
      * Update the evaluation scores with information from
@@ -1273,5 +1335,7 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
     evaluate_queens(pos, &eval, BLACK);
     evaluate_king(pos, &eval, WHITE);
     evaluate_king(pos, &eval, BLACK);
+    evaluate_passers(pos, &eval, WHITE);
+    evaluate_passers(pos, &eval, BLACK);
 }
 #endif
