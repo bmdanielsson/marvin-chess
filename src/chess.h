@@ -359,8 +359,10 @@ struct tt_bucket {
 struct pawntt_item {
     /* The pawn key */
     uint64_t pawnkey;
-    /* Bitboards of all passed pawns */
-    uint64_t passers[NSIDES];
+    /* Bitboard of all passed pawns (for both sides) */
+    uint64_t passers;
+    /* Bitboard of all candidate passed pawns (for both sides) */
+    uint64_t candidates;
     /* Bitboard of all squares covered by pawns */
     uint64_t coverage[NSIDES];
     /* The score of pawn related terms for each side */

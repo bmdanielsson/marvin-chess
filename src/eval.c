@@ -305,7 +305,7 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
         /* Look for passed pawns */
         if (ISEMPTY(front_attackspan[side][sq]&pos->bb_pieces[oside+PAWN]) &&
             ISEMPTY(front_span[side][sq]&pos->bb_pieces[oside+PAWN])) {
-            SETBIT(item->passers[side], sq);
+            SETBIT(item->passers, sq);
             item->score[MIDDLEGAME][side] += passed_pawn_scores_mg[rel_rank];
             item->score[ENDGAME][side] += passed_pawn_scores_eg[rel_rank];
             TRACE_OM(TP_PASSED_PAWN_RANK2_MG, TP_PASSED_PAWN_RANK2_EG,
@@ -317,10 +317,11 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
         helpers = rear_attackspan[side][sq]&pos->bb_pieces[side+PAWN];
         attackers = bb_pawn_attacks_to(sq, oside)&pos->bb_pieces[oside+PAWN];
         defenders = bb_pawn_attacks_to(sq, side)&pos->bb_pieces[side+PAWN];
-        if (!ISBITSET(item->passers[side], sq) &&
+        if (!ISBITSET(item->passers&pos->bb_pieces[side], sq) &&
             ISEMPTY(front_span[side][sq]&pos->bb_pieces[oside+PAWN]) &&
             (BITCOUNT(helpers) >= BITCOUNT(sentries)) &&
             (BITCOUNT(defenders) >= BITCOUNT(attackers))) {
+            SETBIT(item->candidates, sq);
             item->score[MIDDLEGAME][side] +=
                                     candidate_passed_pawn_scores_mg[rel_rank];
             item->score[ENDGAME][side] +=
@@ -367,7 +368,7 @@ static void evaluate_passers(struct position *pos, struct eval *eval, int side)
     item = &eval->pawntt;
 
     /* Iterate over all passers */
-    passers = item->passers[side];
+    passers = item->passers&pos->bb_pieces[side];
     while (passers != 0ULL) {
         sq = POPBIT(&passers);
 
