@@ -87,6 +87,44 @@ int bitscan_forward(uint64_t v)
 }
 #endif
 
+#ifdef __GNUC__
+int bitscan_reverse(uint64_t v)
+{
+    assert(v != 0);
+
+    return 63 - __builtin_clzll(v);
+}
+#else
+/*
+ * This function is taken from http://chessprogramming.net . Initial
+ * implementation by Gerd Isenberg.
+ */
+int bitscan_reverse(uint64_t v)
+{
+    unsigned int l;
+    unsigned int h;
+    unsigned int i;
+    unsigned int m;
+
+    assert(v != 0);
+
+    h = (unsigned int)(v >> 32);
+    l = (unsigned int)v;
+    m = h != 0;
+    i = m << 5;
+    l = (h & -m) | (l & (m-1));
+    m = (l > 0xffff) << 4;
+    i += m;
+    l >>= m;
+    m = ((0xff-l)>>16) & 8;
+    i += m;
+    l >>= m;
+    m = ((0x0f-l)>> 8) & 4;
+    l >>= m;
+    return (int)(i + m + ((0xffffaa50U >> (2*l)) & 3));
+}
+#endif
+
 int pop_bit(uint64_t *v)
 {
     int index;

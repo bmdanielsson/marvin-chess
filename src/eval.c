@@ -165,102 +165,34 @@ static int king_distance(int from, int to)
 static void evaluate_pawn_shield(struct position *pos, struct eval *eval,
                                  int side)
 {
-    const uint64_t     rank1[NSIDES] = {rank_mask[RANK_2], rank_mask[RANK_7]};
-    const uint64_t     rank2[NSIDES] = {rank_mask[RANK_3], rank_mask[RANK_6]};
     uint64_t           pawns;
-    uint64_t           shield1;
-    uint64_t           shield2;
-    int                score;
     struct pawntt_item *item;
+    int                delta;
+    int                k;
 
     item = &eval->pawntt;
-    pawns = pos->bb_pieces[PAWN+side];
 
     /* Queenside pawn shield */
-    score = 0;
-    shield1 = pawns&file_mask[FILE_A]&rank1[side];
-    shield2 = pawns&file_mask[FILE_A]&rank2[side];
-    if (shield1 != 0ULL) {
-        score += PAWN_SHIELD_RANK1;
-        TRACE_TRACK_PAWN_SHIELD(FILE_A, TP_PAWN_SHIELD_RANK1);
-    } else if (shield2 != 0ULL) {
-        score += PAWN_SHIELD_RANK2;
-        TRACE_TRACK_PAWN_SHIELD(FILE_A, TP_PAWN_SHIELD_RANK2);
+    for (k=0;k<3;k++) {
+        pawns = pos->bb_pieces[PAWN+side]&file_mask[FILE_A+k];
+        if (pawns != 0ULL) {
+            delta = (side==WHITE)?RANKNR(LSB(pawns)):7-RANKNR(MSB(pawns));
+        } else {
+            delta = 0;
+        }
+        item->pawn_shield[side][QUEENSIDE][k] = delta;
     }
-    shield1 = pawns&file_mask[FILE_B]&rank1[side];
-    shield2 = pawns&file_mask[FILE_B]&rank2[side];
-    if (shield1 != 0ULL) {
-        score += PAWN_SHIELD_RANK1;
-        TRACE_TRACK_PAWN_SHIELD(FILE_B, TP_PAWN_SHIELD_RANK1);
-    } else if (shield2 != 0ULL) {
-        score += PAWN_SHIELD_RANK2;
-        TRACE_TRACK_PAWN_SHIELD(FILE_B, TP_PAWN_SHIELD_RANK2);
-    }
-    shield1 = pawns&file_mask[FILE_C]&rank1[side];
-    shield2 = pawns&file_mask[FILE_C]&rank2[side];
-    if (shield1 != 0ULL) {
-        score += PAWN_SHIELD_RANK1;
-        TRACE_TRACK_PAWN_SHIELD(FILE_C, TP_PAWN_SHIELD_RANK1);
-    } else if (shield2 != 0ULL) {
-        score += PAWN_SHIELD_RANK2;
-        TRACE_TRACK_PAWN_SHIELD(FILE_C, TP_PAWN_SHIELD_RANK2);
-    }
-    if ((file_mask[FILE_A]&pos->bb_pieces[PAWN+side]) == 0ULL) {
-        score += PAWN_SHIELD_HOLE;
-        TRACE_TRACK_PAWN_SHIELD(FILE_A, TP_PAWN_SHIELD_HOLE);
-    }
-    if ((file_mask[FILE_B]&pos->bb_pieces[PAWN+side]) == 0ULL) {
-        score += PAWN_SHIELD_HOLE;
-        TRACE_TRACK_PAWN_SHIELD(FILE_B, TP_PAWN_SHIELD_HOLE);
-    }
-    if ((file_mask[FILE_C]&pos->bb_pieces[PAWN+side]) == 0ULL) {
-        score += PAWN_SHIELD_HOLE;
-        TRACE_TRACK_PAWN_SHIELD(FILE_C, TP_PAWN_SHIELD_HOLE);
-    }
-    item->pawn_shield[side][QUEENSIDE] = MAX(score, 0);
 
     /* Kingside pawn shield */
-    score = 0;
-    shield1 = pawns&file_mask[FILE_F]&rank1[side];
-    shield2 = pawns&file_mask[FILE_F]&rank2[side];
-    if (shield1 != 0ULL) {
-        score += PAWN_SHIELD_RANK1;
-        TRACE_TRACK_PAWN_SHIELD(FILE_F, TP_PAWN_SHIELD_RANK1);
-    } else if (shield2 != 0ULL) {
-        score += PAWN_SHIELD_RANK2;
-        TRACE_TRACK_PAWN_SHIELD(FILE_F, TP_PAWN_SHIELD_RANK2);
+    for (k=0;k<3;k++) {
+        pawns = pos->bb_pieces[PAWN+side]&file_mask[FILE_F+k];
+        if (pawns != 0ULL) {
+            delta = (side==WHITE)?RANKNR(LSB(pawns)):7-RANKNR(MSB(pawns));
+        } else {
+            delta = 0;
+        }
+        item->pawn_shield[side][KINGSIDE][k] = delta;
     }
-    shield1 = pawns&file_mask[FILE_G]&rank1[side];
-    shield2 = pawns&file_mask[FILE_G]&rank2[side];
-    if (shield1 != 0ULL) {
-        score += PAWN_SHIELD_RANK1;
-        TRACE_TRACK_PAWN_SHIELD(FILE_G, TP_PAWN_SHIELD_RANK1);
-    } else if (shield2 != 0ULL) {
-        score += PAWN_SHIELD_RANK2;
-        TRACE_TRACK_PAWN_SHIELD(FILE_G, TP_PAWN_SHIELD_RANK2);
-    }
-    shield1 = pawns&file_mask[FILE_H]&rank1[side];
-    shield2 = pawns&file_mask[FILE_H]&rank2[side];
-    if (shield1 != 0ULL) {
-        score += PAWN_SHIELD_RANK1;
-        TRACE_TRACK_PAWN_SHIELD(FILE_H, TP_PAWN_SHIELD_RANK1);
-    } else if (shield2 != 0ULL) {
-        score += PAWN_SHIELD_RANK2;
-        TRACE_TRACK_PAWN_SHIELD(FILE_H, TP_PAWN_SHIELD_RANK2);
-    }
-    if ((file_mask[FILE_F]&pos->bb_pieces[PAWN+side]) == 0ULL) {
-        score += PAWN_SHIELD_HOLE;
-        TRACE_TRACK_PAWN_SHIELD(FILE_F, TP_PAWN_SHIELD_HOLE);
-    }
-    if ((file_mask[FILE_G]&pos->bb_pieces[PAWN+side]) == 0ULL) {
-        score += PAWN_SHIELD_HOLE;
-        TRACE_TRACK_PAWN_SHIELD(FILE_G, TP_PAWN_SHIELD_HOLE);
-    }
-    if ((file_mask[FILE_H]&pos->bb_pieces[PAWN+side]) == 0ULL) {
-        score += PAWN_SHIELD_HOLE;
-        TRACE_TRACK_PAWN_SHIELD(FILE_H, TP_PAWN_SHIELD_HOLE);
-    }
-    item->pawn_shield[side][KINGSIDE] = MAX(score, 0);
 }
 
 /*
@@ -633,16 +565,22 @@ static void evaluate_queens(struct position *pos, struct eval *eval, int side)
  */
 static void evaluate_king(struct position *pos, struct eval *eval, int side)
 {
-    const uint64_t      queenside[NSIDES] = {
+    uint64_t            queenside[NSIDES] = {
                                         sq_mask[A1]|sq_mask[B1]|sq_mask[C1],
                                         sq_mask[A8]|sq_mask[B8]|sq_mask[C8]};
-    const uint64_t      kingside[NSIDES] = {
+    uint64_t            kingside[NSIDES] = {
                                         sq_mask[F1]|sq_mask[G1]|sq_mask[H1],
                                         sq_mask[F8]|sq_mask[G8]|sq_mask[H8]};
+    int                 scores[] = {PAWN_SHIELD_HOLE, PAWN_SHIELD_RANK1,
+                                    PAWN_SHIELD_RANK2};
     struct pawntt_item  *item;
     int                 piece;
     int                 nattackers;
     int                 score;
+    bool                shield;
+    int                 castling_side;
+    int                 type;
+    int                 k;
 
     /*
      * If the king has moved to the side then it is good to keep a
@@ -650,22 +588,39 @@ static void evaluate_king(struct position *pos, struct eval *eval, int side)
      * there is a rook between the king and the corner. In this case
      * keeping a pawn shield will get the rook trapped.
      */
+    shield = false;
     item = &eval->pawntt;
     if (queenside[side]&pos->bb_pieces[KING+side]) {
         if (!((pos->bb_pieces[ROOK+side]&queenside[side]) &&
               (LSB(pos->bb_pieces[ROOK+side]&queenside[side]) <
                LSB(pos->bb_pieces[KING+side])))) {
-            eval->king_safety[MIDDLEGAME][side] =
-                                            item->pawn_shield[side][QUEENSIDE];
-            TRACE_PAWN_SHIELD(QUEENSIDE);
+            shield = true;
+            castling_side = QUEENSIDE;
         }
     } else if (kingside[side]&pos->bb_pieces[KING+side]) {
         if (!((pos->bb_pieces[ROOK+side]&kingside[side]) &&
               (LSB(pos->bb_pieces[ROOK+side]&kingside[side]) >
                LSB(pos->bb_pieces[KING+side])))) {
-            eval->king_safety[MIDDLEGAME][side] =
-                                            item->pawn_shield[side][KINGSIDE];
-            TRACE_PAWN_SHIELD(KINGSIDE);
+            shield = true;
+            castling_side = KINGSIDE;
+        }
+    }
+    if (shield) {
+        for (k=0;k<3;k++) {
+            type = item->pawn_shield[side][castling_side][k];
+            switch (type) {
+            case 0:
+                eval->king_safety[MIDDLEGAME][side] += scores[type];
+                TRACE_M(TP_PAWN_SHIELD_HOLE, -1, 1);
+                break;
+            case 1:
+            case 2:
+                eval->king_safety[MIDDLEGAME][side] += scores[type];
+                TRACE_OM(TP_PAWN_SHIELD_RANK1, -1, type-1, 1);
+                break;
+            default:
+                break;
+            }
         }
     }
 

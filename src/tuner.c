@@ -218,32 +218,6 @@ static int summarize_term(struct term *term, struct tuningset *tuningset)
     return val;
 }
 
-static int summarize_pawn_shield_terms(struct eval_equation *equation,
-                                       struct tuningset *tuningset, int phase,
-                                       int side, int *index)
-{
-    struct term *term;
-    int         val;
-
-    term = &equation->terms[phase][side][*index];
-    val = summarize_term(term, tuningset);
-
-    term = &equation->terms[phase][side][*index+1];
-    if ((term->param == TP_PAWN_SHIELD_RANK2) ||
-        (term->param == TP_PAWN_SHIELD_HOLE)) {
-        (*index)++;
-        val += summarize_term(term, tuningset);
-
-        term = &equation->terms[phase][side][*index+1];
-        if (term->param == TP_PAWN_SHIELD_HOLE) {
-            (*index)++;
-            val += summarize_term(term, tuningset);
-        }
-    }
-
-    return MAX(val, 0);
-}
-
 static int evaluate_equation(struct position *pos, struct tuningset *tuningset,
                              struct trainingpos  *trainingpos)
 {
@@ -262,16 +236,7 @@ static int evaluate_equation(struct position *pos, struct tuningset *tuningset,
             score[phase][side] = equation->base[phase][side];
             for (k=0;k<equation->nterms[phase][side];k++) {
                 term = &equation->terms[phase][side][k];
-                if ((term->param == TP_PAWN_SHIELD_RANK1) ||
-                    (term->param == TP_PAWN_SHIELD_RANK2) ||
-                    (term->param == TP_PAWN_SHIELD_HOLE)) {
-                    score[phase][side] += summarize_pawn_shield_terms(equation,
-                                                                      tuningset,
-                                                                      phase,
-                                                                      side, &k);
-                } else {
-                    score[phase][side] += summarize_term(term, tuningset);
-                }
+                score[phase][side] += summarize_term(term, tuningset);
             }
         }
     }

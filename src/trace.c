@@ -22,39 +22,6 @@
 #include "trace.h"
 #include "eval.h"
 
-void trace_track_pawn_shield(struct eval_trace *trace, int side, int file,
-                             int tp)
-{
-    if (trace == NULL) {
-        return;
-    }
-
-    trace->pawn_shield_trace[side][file] = tp;
-}
-
-void trace_pawn_shield(struct eval_trace *trace, int side, int castle_side)
-{
-    int file;
-    int idx;
-    int start;
-    int stop;
-    int tp;
-
-    if (trace == NULL) {
-        return;
-    }
-
-    start = (castle_side == QUEENSIDE)?0:FILE_F;
-    stop = (castle_side == QUEENSIDE)?FILE_C:FILE_H;
-    for (file=start;file<=stop;file++) {
-        tp = trace->pawn_shield_trace[side][file];
-        if (tp != 0) {
-            idx = tuning_param_index(tp);
-            trace->params[idx].multiplier[MIDDLEGAME][side] += 1;
-        }
-    }
-}
-
 void trace_material(struct eval_trace *trace, int side, int piece, bool endgame,
                     int count)
 {

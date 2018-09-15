@@ -49,10 +49,19 @@ int pop_count(uint64_t v);
  * Find the least significant bit.
  *
  * @param v The value to scan. At least one bit must be set for the
- *           function to work.
+ *          function to work.
  * @return Returns the index (0..63) of the least significant bit.
  */
 int bitscan_forward(uint64_t v);
+
+/*
+ * Find the most significant bit.
+ *
+ * @param v The value to scan. At least one bit must be set for the
+ *          function to work.
+ * @return Returns the index (0..63) of the most significant bit.
+ */
+int bitscan_reverse(uint64_t v);
 
 /*
  * Return the index of a set bit from a value a then clear it.

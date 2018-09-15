@@ -51,6 +51,12 @@
  */
 #define LSB(bb) bitscan_forward((bb))
 
+/*
+ * Gets the most significant bit of a bitboard. The macro does not
+ * work if the bitboard is zero.
+ */
+#define MSB(bb) bitscan_reverse((bb))
+
 /* Initialize the bitboard component */
 void bb_init(void);
 

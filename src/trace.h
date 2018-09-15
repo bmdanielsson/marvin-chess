@@ -20,8 +20,6 @@
 
 #ifndef TRACE
 
-#define TRACE_TRACK_PAWN_SHIELD(f, t)
-#define TRACE_PAWN_SHIELD(c)
 #define TRACE_MATERIAL(p, e, a)
 #define TRACE_PSQ(p, s, e)
 #define TRACE_M(t1, t2, m)
@@ -44,13 +42,9 @@ struct trace_param {
 struct eval_trace {
     int                 phase;
     int                 base[NPHASES][NSIDES];
-    int                 pawn_shield_trace[NSIDES][NFILES];
     struct trace_param  params[NUM_TUNING_PARAMS];
 };
 
-#define TRACE_TRACK_PAWN_SHIELD(f, t) \
-                    trace_track_pawn_shield(eval->trace, side, (f), (t))
-#define TRACE_PAWN_SHIELD(c) trace_pawn_shield(eval->trace, side, (c))
 #define TRACE_MATERIAL(p, e, c) \
                     trace_material(eval->trace, side, (p), (e), (c));
 #define TRACE_PSQ(p, s, e) trace_psq(eval->trace, side, (p), (s), (e))
@@ -60,26 +54,6 @@ struct eval_trace {
                    trace_param(eval->trace, side, (t1), (t2), 0, (m), (d))
 #define TRACE_OM(t1, t2, o, m) \
                    trace_param(eval->trace, side, (t1), (t2), (o), (m), 0)
-
-/*
- * Track a pawn shield structure.
- *
- * @param trace The evaluation trace.
- * @param side The side.
- * @param file The file.
- * @param tp The tuning parameter.
- */
-void trace_track_pawn_shield(struct eval_trace *trace, int side, int file,
-                             int tp);
-
-/*
- * Add a pawn shield trace.
- *
- * @param trace The evaluation trace.
- * @param side The side.
- * @param castle_side The castling side.
- */
-void trace_pawn_shield(struct eval_trace *trace, int side, int castle_side);
 
 /*
  * Add a material trace for a piece.
