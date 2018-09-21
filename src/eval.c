@@ -195,11 +195,103 @@ static void evaluate_pawn_shield(struct position *pos, struct eval *eval,
     }
 }
 
+static bool is_backward_pawn(struct position *pos, int side, int sq)
+{
+    int      oside;
+    int      file;
+    int      rank;
+    int      rank1;
+    int      rank2;
+    int      stop_sq;
+    int      pass_sq;
+    bool     home;
+    uint64_t neighbours;
+    uint64_t all_pawns;
+
+    /* Setup set helper variables */
+    oside = FLIP_COLOR(side);
+    file = FILENR(sq);
+    rank = RANKNR(sq);
+    rank1 = (side == WHITE)?rank+1:rank-1;
+    rank2 = (side == WHITE)?rank+2:rank-2;
+    home = ((side == WHITE) && (rank == RANK_2)) ||
+           ((side == BLACK) && (rank == RANK_7));
+    all_pawns = pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN];
+
+    /* Find friendly pawns on neighbouring files */
+    neighbours = 0ULL;
+    if (file != FILE_A) {
+        neighbours |= file_mask[file-1];
+    }
+    if (file != FILE_H) {
+        neighbours |= file_mask[file+1];
+    }
+    neighbours &= pos->bb_pieces[PAWN+side];
+
+    /* Check if all neighbours are more advanced */
+    if (!ISEMPTY(neighbours&rear_attackspan[side][sq])) {
+        return false;
+    }
+
+    /*
+     * Check if the pawn can be captured by another pawn. If it can
+     * then it is considered backward because it can only get to
+     * safety if it gets to move right now.
+     */
+    if (!ISEMPTY(bb_pawn_attacks_to(sq, oside)&pos->bb_pieces[PAWN+oside])) {
+        return true;
+    }
+
+    /* Check if there is a friendly pawn that it can catch up to in one move */
+    if (!ISEMPTY(neighbours&rank_mask[rank1])) {
+        pass_sq = NO_SQUARE;
+        stop_sq = (side==WHITE)?sq+8:sq-8;
+    } else if (home && !ISEMPTY(neighbours&rank_mask[rank2])) {
+        pass_sq = (side==WHITE)?sq+8:sq-8;
+        stop_sq = (side==WHITE)?sq+16:sq-16;
+    } else {
+        return true;
+    }
+
+    /*
+     * If there are pawns to catch up with then check if is
+     * safe to do so. First step is to check that there are
+     * no other pawns blocking the way.
+     */
+    if ((pass_sq != NO_SQUARE) && !ISEMPTY(all_pawns&sq_mask[pass_sq])) {
+        return true;
+    } else if (!ISEMPTY(all_pawns&sq_mask[stop_sq])) {
+        return true;
+    }
+
+    /*
+     * If there are no pawns blocking the way then verify that
+     * there is no opposing pawn attacking the destination
+     * square.
+     */
+    if (!ISEMPTY(bb_pawn_attacks_to(stop_sq, oside)&
+                                                pos->bb_pieces[PAWN+oside])) {
+        return true;
+    } else if ((pass_sq != NO_SQUARE) &&
+               !ISEMPTY(bb_pawn_attacks_to(pass_sq, oside)&
+                                                pos->bb_pieces[PAWN+oside])) {
+        /*
+         * If the square that pawn jumps over is attacked then
+         * it means that it can be captured en-passant on the
+         * destination square.
+         */
+        return true;
+    }
+
+    return false;
+}
+
 /*
  * - double pawns
  * - isolated pawns
  * - passed pawns
  * - candidate passed pawns
+ * - backward pawn
  * - pawn shield
  */
 static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
@@ -211,6 +303,7 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
     int                 rank;
     int                 rel_rank;
     int                 oside;
+    bool                isolated;
     uint64_t            attackspan;
     uint64_t            attackers;
     uint64_t            defenders;
@@ -222,6 +315,7 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
     oside = FLIP_COLOR(side);
     pieces = pos->bb_pieces[PAWN+side];
     while (pieces != 0ULL) {
+        isolated = false;
         sq = POPBIT(&pieces);
         rank = RANKNR(sq);
         rel_rank = (side==WHITE)?rank:7-rank;
@@ -229,6 +323,7 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
 
         /* Look for isolated pawns */
         if ((attackspan&pos->bb_pieces[side+PAWN]) == 0ULL) {
+            isolated = true;
             item->score[MIDDLEGAME][side] += ISOLATED_PAWN_MG;
             item->score[ENDGAME][side] += ISOLATED_PAWN_EG;
             TRACE_M(TP_ISOLATED_PAWN_MG, TP_ISOLATED_PAWN_EG, 1);
@@ -260,6 +355,13 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
                                     candidate_passed_pawn_scores_eg[rel_rank];
             TRACE_OM(TP_CANDIDATE_PASSED_PAWN_RANK2_MG,
                      TP_CANDIDATE_PASSED_PAWN_RANK2_EG, rel_rank-1, 1);
+        }
+
+        /* Check if the pawn is considered backward */
+        if (!isolated && is_backward_pawn(pos, side, sq)) {
+            item->score[MIDDLEGAME][side] += BACKWARD_PAWN_MG;
+            item->score[ENDGAME][side] += BACKWARD_PAWN_EG;
+            TRACE_M(TP_BACKWARD_PAWN_MG, TP_BACKWARD_PAWN_EG, 1);
         }
 
         /* Update pawn coverage */
