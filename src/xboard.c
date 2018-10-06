@@ -599,7 +599,7 @@ static void xboard_cmd_protover(void)
 	engine_write_command("feature myname=\"%s %s\"", APP_NAME, APP_VERSION);
 	engine_write_command("feature variants=\"normal\"");
 	engine_write_command("feature colors=0");
-	engine_write_command("feature name=0");
+	engine_write_command("feature name=1");
 	engine_write_command("feature nps=0");
 	engine_write_command("feature memory=1");
 	engine_write_command("feature smp=1");
@@ -779,6 +779,8 @@ bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop)
         xboard_cmd_level(cmd);
     } else if (!strncmp(cmd, "memory", 6)) {
         xboard_cmd_memory(cmd);
+    } else if (!strncmp(cmd, "name", 4)) {
+        /* Ignore */
     } else if (!strncmp(cmd, "new", 3)) {
         xboard_cmd_new(state);
     } else if (!strncmp(cmd, "nopost", 6)) {
