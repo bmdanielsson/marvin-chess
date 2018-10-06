@@ -253,19 +253,20 @@ static void make_engine_move(struct gamestate *state)
 
         /* Check if a ponder search should be started */
         if (ponder_mode && (ponder_move != NOMOVE)) {
-			/*
-			 * Make the pondering move. If the move causes
-			 * the game to finish then cancel pondering.
-			 */
-			(void)board_make_move(&state->pos, ponder_move);
-			if (is_game_over(&state->pos) != RESULT_UNDETERMINED) {
-				board_unmake_move(&state->pos);
-				break;
-			}
+            /*
+             * Make the pondering move. If the move causes
+             * the game to finish then cancel pondering.
+            */
+            (void)board_make_move(&state->pos, ponder_move);
+            if (is_game_over(&state->pos) != RESULT_UNDETERMINED) {
+                board_unmake_move(&state->pos);
+                break;
+            }
 
-			search_reset_data(state);
+            search_reset_data(state);
             ponder = true;
             pondering_on = ponder_move;
+            tc_start_clock();
         } else {
             break;
         }
@@ -901,10 +902,10 @@ bool xboard_check_input(struct search_worker *worker)
             } else {
                 engine_set_pending_command(cmd);
                 stop = true;
+                tc_start_clock();
             }
-		    tc_start_clock();
-		    tc_allocate_time();
-		    worker->state->pondering = false;
+            tc_allocate_time();
+            worker->state->pondering = false;
         }
     } else if (!strncmp(cmd, "bk", 2) ||
                !strncmp(cmd, "force", 5) ||
