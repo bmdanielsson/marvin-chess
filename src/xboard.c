@@ -797,6 +797,8 @@ bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop)
         xboard_cmd_protover();
     } else if (!strncmp(cmd, "quit", 4)) {
         *stop = true;
+    } else if (!strncmp(cmd, "rating", 6)) {
+        /* Ignore */
     } else if (!strncmp(cmd, "random", 6)) {
         /* Ignore */
     } else if (!strncmp(cmd, "rejected", 8)) {
