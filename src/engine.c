@@ -278,7 +278,7 @@ void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
 
     (void)seldepth;
 
-    if (worker->state->silent || worker->state->pondering) {
+    if (worker->state->silent) {
         return;
     }
 
@@ -311,7 +311,7 @@ void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
 
 void engine_send_move_info(struct search_worker *worker)
 {
-    if (worker->state->silent || worker->state->pondering) {
+    if (worker->state->silent) {
         return;
     }
 
