@@ -345,7 +345,7 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
         helpers = rear_attackspan[side][sq]&pos->bb_pieces[side+PAWN];
         attackers = bb_pawn_attacks_to(sq, oside)&pos->bb_pieces[oside+PAWN];
         defenders = bb_pawn_attacks_to(sq, side)&pos->bb_pieces[side+PAWN];
-        if (!ISBITSET(item->passers&pos->bb_pieces[side], sq) &&
+        if (!ISBITSET(item->passers&pos->bb_sides[side], sq) &&
             ISEMPTY(front_span[side][sq]&pos->bb_pieces[oside+PAWN]) &&
             (BITCOUNT(helpers) >= BITCOUNT(sentries)) &&
             (BITCOUNT(defenders) >= BITCOUNT(attackers))) {
@@ -403,7 +403,7 @@ static void evaluate_passers(struct position *pos, struct eval *eval, int side)
     item = &eval->pawntt;
 
     /* Iterate over all passers */
-    passers = item->passers&pos->bb_pieces[side];
+    passers = item->passers&pos->bb_sides[side];
     while (passers != 0ULL) {
         sq = POPBIT(&passers);
 
