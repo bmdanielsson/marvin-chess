@@ -164,10 +164,18 @@ struct param_decl* tuning_param_lookup(char *name);
  * @param params The tuning parameters to write.
  * @param active_only Flag indicating if only actice parameters should be
  *                    printed.
+ * @param zero Print parameters with a value of zero instead of the
+ *             current value.
  */
 void tuning_param_write_parameters(FILE *fp, struct tuning_param *params,
-                                   bool active_only);
+                                   bool active_only, bool zero);
 
+/*
+ * Get the index of a specific parameter.
+ *
+ * @param decl The parameter.
+ * @return Returns the index of the parameter.
+ */
 int tuning_param_index(int decl);
 
 #endif

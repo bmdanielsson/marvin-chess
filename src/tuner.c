@@ -860,10 +860,10 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     /* Write tuning result */
     printf("\n");
     printf("Parameter values:\n");
-    tuning_param_write_parameters(stdout, tuningset->params, true);
+    tuning_param_write_parameters(stdout, tuningset->params, true, false);
     fp = fopen(TUNING_FINAL_RESULT_FILE, "w");
     if (fp != NULL) {
-        tuning_param_write_parameters(fp, tuningset->params, true);
+        tuning_param_write_parameters(fp, tuningset->params, true, false);
         fclose(fp);
     }
 
@@ -883,7 +883,7 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     destroy_game_state(state);
 }
 
-static void print_parameters(char *output_file)
+static void print_parameters(char *output_file, bool zero)
 {
     FILE                *fp;
     struct tuning_param *params;
@@ -895,7 +895,7 @@ static void print_parameters(char *output_file)
     }
 
     params = tuning_param_create_list();
-    tuning_param_write_parameters(fp, params, false);
+    tuning_param_write_parameters(fp, params, false, zero);
 
     tuning_param_destroy_list(params);
     fclose(fp);
@@ -979,6 +979,7 @@ static void print_usage(void)
     printf("\t-p <output file>\n\tPrint all tunable parameters\n\n");
     printf("\t-n <nthreads>\n\tThe number of threads to use\n\n");
     printf("\t-s <stepsize>\n\tStep size for first iteration\n\n");
+    printf("\t-z\n\tPrint tuning parameters with all values set to zero\n\n");
     printf("\t-h\n\tDisplay this message\n\n");
 }
 
@@ -992,6 +993,7 @@ int main(int argc, char *argv[])
     int  nthreads;
     int  command;
     int  stepsize;
+    bool zero_params;
 
     /* Turn off buffering for I/O */
     setbuf(stdout, NULL);
@@ -1012,6 +1014,7 @@ int main(int argc, char *argv[])
     output_file = NULL;
     nthreads = 1;
     stepsize = 1;
+    zero_params = false;
 
     /* Parse command line arguments */
     iter = 1;
@@ -1089,7 +1092,8 @@ int main(int argc, char *argv[])
                 exit(1);
             }
             training_file = argv[iter];
-
+        } else if (!strcmp(argv[iter], "-z")) {
+            zero_params = true;
         } else {
             printf("Invalid argument\n");
             print_usage();
@@ -1107,7 +1111,7 @@ int main(int argc, char *argv[])
         tune_parameters(training_file, parameter_file, nthreads, stepsize);
         break;
     case 2:
-        print_parameters(output_file);
+        print_parameters(output_file, zero_params);
         break;
     case 3:
         verify_trace(training_file);
