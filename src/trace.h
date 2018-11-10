@@ -22,14 +22,19 @@
 
 #define TRACE_MATERIAL(p, e, a)
 #define TRACE_PSQ(p, s, e)
-#define TRACE_M(t1, t2, m)
-#define TRACE_MD(t1, t2, m, d)
-#define TRACE_OM(t1, t2, o, m)
+#define TRACE_M(tm, te, m)
+#define TRACE_M_M(tm, m)
+#define TRACE_M_E(te, m)
+#define TRACE_MD(tm, te, m, d)
+#define TRACE_MD_M(tm, m, d)
+#define TRACE_MD_E(te, m, d)
+#define TRACE_OM(tm, te, o, m)
+#define TRACE_OM_M(tm, o, m)
+#define TRACE_OM_E(te, o, m)
 
 #else
 
 #include "chess.h"
-
 #include "tuningparam.h"
 
 /* Parameter of an evaluation trace */
@@ -48,12 +53,27 @@ struct eval_trace {
 #define TRACE_MATERIAL(p, e, c) \
                     trace_material(eval->trace, side, (p), (e), (c));
 #define TRACE_PSQ(p, s, e) trace_psq(eval->trace, side, (p), (s), (e))
-#define TRACE_M(t1, t2, m) \
-                    trace_param(eval->trace, side, (t1), (t2), 0, (m), 0)
-#define TRACE_MD(t1, t2, m, d) \
-                   trace_param(eval->trace, side, (t1), (t2), 0, (m), (d))
-#define TRACE_OM(t1, t2, o, m) \
-                   trace_param(eval->trace, side, (t1), (t2), (o), (m), 0)
+
+#define TRACE_M(tm, te, m) \
+            trace_param(eval->trace, side, (TP_ ## tm), (TP_ ## te), 0, (m), 0)
+#define TRACE_M_M(tm, m) \
+            trace_param(eval->trace, side, (TP_ ## tm), -1, 0, (m), 0)
+#define TRACE_M_E(te, m) \
+            trace_param(eval->trace, side, -1, (TP_ ## te), 0, (m), 0)
+
+#define TRACE_MD(tm, te, m, d) \
+        trace_param(eval->trace, side, (TP_ ## tm), (TP_ ## te), 0, (m), (d))
+#define TRACE_MD_M(tm, m, d) \
+        trace_param(eval->trace, side, (TP_ ## tm), 0, (m), (d))
+#define TRACE_MD_E(te, m, d) \
+        trace_param(eval->trace, side, (TP_ ## te), 0, (m), (d))
+
+#define TRACE_OM(tm, te, o, m) \
+        trace_param(eval->trace, side, (TP_ ## tm), (TP_ ## te), (o), (m), 0)
+#define TRACE_OM_M(tm, o, m) \
+        trace_param(eval->trace, side, (TP_ ## tm), -1, (o), (m), 0)
+#define TRACE_OM_E(te, o, m) \
+        trace_param(eval->trace, side, -1, (TP_ ## te), (o), (m), 0)
 
 /*
  * Add a material trace for a piece.
