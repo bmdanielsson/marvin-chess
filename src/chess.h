@@ -252,17 +252,18 @@ struct moveinfo {
  * Move selector struct. Holds information for finding the
  * next move to search for a specific position.
  */
-struct moveselect {
-    /* Indicates if the position is a quiscence node */
-    bool qnode;
-    /* Indicates if the position is the root node */
-    bool root;
+struct moveselector {
+    /* Flags related to the position */
+    uint32_t flags;
     /* Move fetched from the transposition table for this position */
     uint32_t ttmove;
+    /* Killer moves for this position */
+    uint32_t killer1;
+    uint32_t killer2;
     /* Additional information for the availables moves */
     struct moveinfo moveinfo[MAX_MOVES+MAX_CAPTURES];
-    /* The number of moves */
-    int nmoves;
+    /* Index of the last move plus one */
+    int last_idx;
     /* The number of bad captures */
     int nbadcaps;
     /* Index of the move currently being searched */
@@ -433,7 +434,7 @@ struct search_worker {
     /* List of moves to search */
     struct movelist root_moves;
     /* Move selector struct for each ply in the search tree */
-    struct moveselect ppms[MAX_PLY];
+    struct moveselector ppms[MAX_PLY];
     /*
      * Parameter used during the search to keep track of the current
      * principle variation at a certain depth. After the search the

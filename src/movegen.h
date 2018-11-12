@@ -39,15 +39,6 @@ void gen_moves(struct position *pos, struct movelist *list);
 void gen_legal_moves(struct position *pos, struct movelist *list);
 
 /*
- * Generate moves for the quiscence search.
- *
- * @param pos The board structure.
- * @param list The list to store the moves in.
- */
-void gen_quiscence_moves(struct position *pos, struct movelist *list,
-                         bool checks);
-
-/*
  * Generate all check evasions.
  *
  * @param pos The board structure.
@@ -64,7 +55,7 @@ void gen_check_evasions(struct position *pos, struct movelist *list);
  * @param list The list to store the moves in. Moves are appended to the list
  *             so it must be initialized before first use.
  */
-void gen_normal_moves(struct position *pos, struct movelist *list);
+void gen_quiet_moves(struct position *pos, struct movelist *list);
 
 /*
  * Generate all capture moves (including en-passant). Promotions with
@@ -82,7 +73,10 @@ void gen_capture_moves(struct position *pos, struct movelist *list);
  * @param pos The board structure.
  * @param list The list to store the moves in. Moves are appended to the list
  *             so it must be initialized before first use.
+ * @param capture Flag indicating if captures should be included.
+ * @param underpromote Flag indicating if under promotions should be included.
  */
-void gen_promotion_moves(struct position *pos, struct movelist *list);
+void gen_promotion_moves(struct position *pos, struct movelist *list,
+                         bool capture, bool underpromote);
 
 #endif

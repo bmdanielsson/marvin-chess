@@ -20,81 +20,27 @@
 
 #include "chess.h"
 
-/*
- * Different move generation phases.
- */
-enum {
-    /* Normal search */
-    PHASE_TT,
-    PHASE_GEN_CAPS,
-    PHASE_GOOD_CAPS,
-    PHASE_KILLER1,
-    PHASE_KILLER2,
-    PHASE_GEN_MOVES,
-    PHASE_MOVES,
-    PHASE_ADD_BAD_CAPS,
-    PHASE_BAD_CAPS,
-    /* Quiscence search */
-    PHASE_GEN_QUISCENCE,
-    PHASE_QUISCENCE,
-    /* Check evasions */
-    PHASE_GEN_EVASIONS,
-    PHASE_EVASIONS
-};
-
-/* Base scores for move ordering */
-#define BASE_SCORE_DELTA        10000000
-#define BASE_SCORE_TT           6*BASE_SCORE_DELTA
-#define BASE_SCORE_GOOD_CAPS    5*BASE_SCORE_DELTA
-#define BASE_SCORE_KILLER1      4*BASE_SCORE_DELTA
-#define BASE_SCORE_KILLER2      3*BASE_SCORE_DELTA
-#define BASE_SCORE_NORMAL       2*BASE_SCORE_DELTA
-#define BASE_SCORE_BAD_CAPS     BASE_SCORE_DELTA
-
 /* The maximum allowed history score */
-#define MAX_HISTORY_SCORE BASE_SCORE_DELTA
+#define MAX_HISTORY_SCORE 10000000
+
+/* Flags describing the position */
+#define FLAG_ROOT_NODE          0x00000001
+#define FLAG_QUIESCENCE_NODE    0x00000002
+#define FLAG_PROBCUT            0x00000004
 
 /*
  * Initialize the move selector a node.
  *
  * @param worker The worker.
- * @param depth The current depth. For quiscenece nodes the depth is <= 0.
- * @param qnode Indicates if this is a quiscence node.
- * @param root Indicates if this is the root node.
- * @param in_check Indicates if the side to move is in check.
+ * @param flags Flags describing the position.
+ * @param in_check Is the side to move in check.
+ * @param ttmove Transposition table move for this position.
  */
-void select_init_node(struct search_worker *worker, bool qnode, bool root,
-                      bool in_check);
+void select_init_node(struct search_worker *worker, uint32_t flags,
+                      bool in_check, uint32_t ttmove);
 
 /*
- * Set a transposition table move for this position.
- *
- * @param worker The worker.
- * @param move The move.
- */
-void select_set_tt_move(struct search_worker *worker, uint32_t move);
-
-/*
- * Get the current move selection phase.
- *
- * @param worker The worker.
- * @return Returns the move selection phase.
- */
-int select_get_phase(struct search_worker *worker);
-
-/*
- * Get the next root move to search. Should only be called
- * from the root node.
- *
- * @param worker The worker.
- * @param move Location to store the move at.
- * @return Returns true if a move was available, false otherwise.
- */
-bool select_get_root_move(struct search_worker *worker, uint32_t *move);
-
-/*
- * Get the next move to search. Should not be called
- * from the root node.
+ * Get the next move to search.
  *
  * @param worker The worker.
  * @param move Location to store the move at.
@@ -103,20 +49,12 @@ bool select_get_root_move(struct search_worker *worker, uint32_t *move);
 bool select_get_move(struct search_worker *worker, uint32_t *move);
 
 /*
- * Get the next quiscence move to search.
+ * Check if the current phase is the bad capture phase.
  *
  * @param worker The worker.
- * @param move Location to store the move at.
- * @return Returns true if a move was available, false otherwise.
+ * @return Returns the true if it is the bad capture phase.
  */
-bool select_get_quiscence_move(struct search_worker *worker, uint32_t *move);
-
-/*
- * Updated the move ordering score for the root moves.
- *
- * @param worker The worker.
- */
-void select_update_root_move_scores(struct search_worker *worker);
+bool select_is_bad_capture_phase(struct search_worker *worker);
 
 #endif
 

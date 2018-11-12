@@ -63,17 +63,6 @@ bool valid_piece(int piece);
 bool valid_move(uint32_t move);
 
 /*
- * Check if correct number of quiscence moves were generated.
- *
- * @param pos The chess position.
- * @param checks Indicates if checking moves  were included or not.
- * @param list List of generated moves.
- * @return Returns true if the correct number of captures were generated.
- */
-bool valid_gen_quiscenece_moves(struct position *pos, bool checks,
-                                struct movelist *list);
-
-/*
  * Check if incrementally updated score are correct.
  *
  * @param pos The chess position.

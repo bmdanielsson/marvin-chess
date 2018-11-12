@@ -198,386 +198,6 @@ static void add_moves(struct position *pos, struct movelist *list, int from,
     }
 }
 
-static void gen_captures(struct position *pos, struct movelist *list)
-{
-    int      sq;
-    int      piece;
-    uint64_t moves;
-    uint64_t pieces;
-
-    assert(valid_position(pos));
-    assert(list != NULL);
-
-    pieces = pos->bb_sides[pos->stm];
-    while (pieces != 0ULL) {
-        sq = POPBIT(&pieces);
-        piece = pos->pieces[sq];
-
-        moves = 0ULL;
-        switch (piece) {
-        case WHITE_PAWN:
-        case BLACK_PAWN:
-            moves |= bb_pawn_attacks_from(sq, pos->stm);
-            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
-            add_pawn_moves(pos, list, sq, moves, PROMOTE_ALL);
-            break;
-        case WHITE_KNIGHT:
-        case BLACK_KNIGHT:
-            moves |= bb_knight_moves(sq);
-            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
-            add_moves(pos, list, sq, moves);
-            break;
-        case WHITE_BISHOP:
-        case BLACK_BISHOP:
-            moves |= bb_bishop_moves(pos->bb_all, sq);
-            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
-            add_moves(pos, list, sq, moves);
-            break;
-        case WHITE_ROOK:
-        case BLACK_ROOK:
-            moves |= bb_rook_moves(pos->bb_all, sq);
-            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
-            add_moves(pos, list, sq, moves);
-            break;
-        case WHITE_QUEEN:
-        case BLACK_QUEEN:
-            moves |= bb_queen_moves(pos->bb_all, sq);
-            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
-            add_moves(pos, list, sq, moves);
-            break;
-        case WHITE_KING:
-        case BLACK_KING:
-            moves |= bb_king_moves(sq);
-            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
-            add_moves(pos, list, sq, moves);
-            break;
-        case NO_PIECE:
-            break;
-        default:
-            assert(false);
-            break;
-        }
-    }
-
-    gen_en_passant_moves(pos, list);
-}
-
-static void gen_promotions(struct position *pos, struct movelist *list,
-                           bool capture, bool underpromote)
-{
-    uint64_t pieces;
-    uint64_t moves;
-    int      from;
-    uint8_t  promotion;
-
-    assert(valid_position(pos));
-    assert(list != NULL);
-
-    promotion = PROMOTE_QUEEN;
-    if (underpromote) {
-        promotion |= PROMOTE_UNDER;
-    }
-
-    pieces = pos->bb_pieces[PAWN+pos->stm];
-    while (pieces != 0ULL) {
-        from = POPBIT(&pieces);
-        moves = 0ULL;
-        if (capture) {
-            moves |= bb_pawn_attacks_from(from, pos->stm);
-            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
-        }
-        moves |= bb_pawn_moves(pos->bb_all, from, pos->stm);
-
-        /* Mask off moves where the destination is not on the 1st or 8th rank */
-        moves &= (rank_mask[RANK_1]|rank_mask[RANK_8]);
-
-        add_pawn_moves(pos, list, from, moves, promotion);
-    }
-}
-
-/*
- * Catures are assumed to be handled elsewhere so capturing
- * moves that gives check are excluded. The same goes for
- * queen promotions.
- */
-static void gen_direct_checks(struct position *pos, struct movelist *list)
-{
-    int      kingsq;
-    int      from;
-    int      to;
-    uint64_t attacks;
-    uint64_t moves;
-
-    /* Find the opponent king */
-    kingsq = LSB(pos->bb_pieces[KING+FLIP_COLOR(pos->stm)]);
-
-    /*
-     * Find all squares from which pawns can attack the king. Then
-     * for each of those squares find the pawns that can move there.
-     */
-    attacks = bb_pawn_attacks_to(kingsq, pos->stm);
-    attacks &= (~pos->bb_all);
-    while (attacks != 0ULL) {
-        to = POPBIT(&attacks);
-        moves = bb_pawn_moves_to(pos->bb_all, to, pos->stm);
-        moves &= pos->bb_pieces[PAWN+pos->stm];
-
-        while (moves != 0ULL) {
-            from = POPBIT(&moves);
-            add_pawn_moves(pos, list, from, sq_mask[to], PROMOTE_NONE);
-        }
-    }
-
-    /*
-     * Find all squares from which knights can attack the king. Then
-     * for each of those squares find the knights that can move there.
-     */
-    attacks = bb_knight_moves(kingsq);
-    attacks &= (~pos->bb_all);
-    while (attacks != 0ULL) {
-        to = POPBIT(&attacks);
-        moves = bb_knight_moves(to);
-        moves &= pos->bb_pieces[KNIGHT+pos->stm];
-
-        while (moves != 0ULL) {
-            from = POPBIT(&moves);
-            add_moves(pos, list, from, sq_mask[to]);
-        }
-    }
-
-    /*
-     * Find all squares from which bishops can attack the king. Then
-     * for each of those squares find the bishops and queens that can
-     * move there.
-     */
-    attacks = bb_bishop_moves(pos->bb_all, kingsq);
-    attacks &= (~pos->bb_all);
-    while (attacks != 0ULL) {
-        to = POPBIT(&attacks);
-        moves = bb_bishop_moves(pos->bb_all, to)&
-        pos->bb_pieces[BISHOP+pos->stm];
-        moves |= (bb_queen_moves(pos->bb_all, to)&
-                  pos->bb_pieces[QUEEN+pos->stm]);
-
-        while (moves != 0ULL) {
-            from = POPBIT(&moves);
-            add_moves(pos, list, from, sq_mask[to]);
-        }
-    }
-
-    /*
-     * Find all squares from which rooks can attack the king. Then
-     * for each of those squares find the rooks and queens that can
-     * move there.
-     */
-    attacks = bb_rook_moves(pos->bb_all, kingsq);
-    attacks &= (~pos->bb_all);
-    while (attacks != 0ULL) {
-        to = POPBIT(&attacks);
-        moves = bb_rook_moves(pos->bb_all, to)&pos->bb_pieces[ROOK+pos->stm];
-        moves |= (bb_queen_moves(pos->bb_all, to)&
-                  pos->bb_pieces[QUEEN+pos->stm]);
-
-        while (moves != 0ULL) {
-            from = POPBIT(&moves);
-            add_moves(pos, list, from, sq_mask[to]);
-        }
-    }
-
-    /*
-     * Queen promotions are handled elsewhere and should therefore
-     * not be included. Since all squares that can be attacked by
-     * bishops and rooks also can be attacked by queens we can also
-     * exclude. those promotions. So what remains is promotions to
-     * knight.
-     *
-     * Find all squares on the back rank from which knights can attack
-     * the king. Then for each of those squares find the pawns that can
-     * move there.
-     */
-    attacks = bb_knight_moves(kingsq);
-    attacks &= (~pos->bb_all);
-    attacks &= rank_mask[pos->stm == WHITE?RANK_8:RANK_1];
-    while (attacks != 0ULL) {
-        to = POPBIT(&attacks);
-        moves = bb_pawn_moves_to(pos->bb_all, to, pos->stm);
-        moves &= pos->bb_pieces[PAWN+pos->stm];
-
-        while (moves != 0ULL) {
-            from = POPBIT(&moves);
-            add_pawn_moves(pos, list, from, sq_mask[to], PROMOTE_KNIGHT);
-        }
-    }
-
-    /*
-     * If the rook end square after a castling is one of the squares
-     * from which a rook can attack the king then also consider
-     * castling moves.
-     */
-    attacks = bb_rook_moves(pos->bb_all, kingsq);
-    if (attacks&sq_mask[pos->stm == WHITE?F1:F8]) {
-        gen_kingside_castling_moves(pos, list);
-    }
-    if (attacks&sq_mask[pos->stm == WHITE?D1:D8]) {
-        gen_queenside_castling_moves(pos, list);
-    }
-}
-
-/*
- * Catures are assumed to be handled elsewhere so capturing
- * moves that finds a discovered check are excluded. The same
- * goes for queen promotions.
- */
-static void gen_discovered_checks(struct position *pos, struct movelist *list)
-{
-    uint64_t pieces;
-    uint64_t ray;
-    uint64_t slide;
-    uint64_t moves1;
-    uint64_t moves2;
-    uint64_t checkers;
-    uint64_t occ;
-    int      piece;
-    int      from;
-    int      kingsq;
-    int      rdelta;
-    int      fdelta;
-
-    /* Find the opponent king */
-    kingsq = LSB(pos->bb_pieces[KING+FLIP_COLOR(pos->stm)]);
-
-    /*
-     * Only sliding pieces can generate a discovered check
-     * so loop over all bishops, rooks and queens.
-     */
-    pieces = pos->bb_pieces[QUEEN+pos->stm]|pos->bb_pieces[ROOK+pos->stm]|
-                                                pos->bb_pieces[BISHOP+pos->stm];
-    while (pieces != 0ULL) {
-        from = POPBIT(&pieces);
-        piece = pos->pieces[from];
-
-        /*
-         * Check if the sliding piece is located on the same ray as
-         * the enemy king. If it is then generate all sliding moves
-         * for that piece that is in the direction of the king.
-         */
-        slide = 0ULL;
-        ray = 0ULL;
-        rdelta = 0;
-        fdelta = 0;
-        switch (piece) {
-        case WHITE_BISHOP:
-        case BLACK_BISHOP:
-            if (A1H8(from) == A1H8(kingsq)) {
-                ray = A1H8(from);
-            } else if (A8H1(from) == A8H1(kingsq)) {
-                ray = A8H1(from);
-            }
-            rdelta = (RANKNR(from) > RANKNR(kingsq))?-1:1;
-            fdelta = (FILENR(from) > FILENR(kingsq))?-1:1;
-            break;
-        case WHITE_ROOK:
-        case BLACK_ROOK:
-            if (RANKNR(from) == RANKNR(kingsq)) {
-                ray = rank_mask[RANKNR(from)];
-                rdelta = 0;
-                fdelta = (FILENR(from) > FILENR(kingsq))?-1:1;
-            } else if (FILENR(from) == FILENR(kingsq)) {
-                ray = file_mask[FILENR(from)];
-                rdelta = (RANKNR(from) > RANKNR(kingsq))?-1:1;
-                fdelta = 0;
-            }
-            break;
-        case WHITE_QUEEN:
-        case BLACK_QUEEN:
-            if (A1H8(from) == A1H8(kingsq)) {
-                ray = A1H8(from);
-                rdelta = (RANKNR(from) > RANKNR(kingsq))?-1:1;
-                fdelta = (FILENR(from) > FILENR(kingsq))?-1:1;
-            } else if (A8H1(from) == A8H1(kingsq)) {
-                ray = A8H1(from);
-                rdelta = (RANKNR(from) > RANKNR(kingsq))?-1:1;
-                fdelta = (FILENR(from) > FILENR(kingsq))?-1:1;
-            } else if (RANKNR(from) == RANKNR(kingsq)) {
-                ray = rank_mask[RANKNR(from)];
-                rdelta = 0;
-                fdelta = (FILENR(from) > FILENR(kingsq))?-1:1;
-            } else if (FILENR(from) == FILENR(kingsq)) {
-                ray = file_mask[FILENR(from)];
-                rdelta = (RANKNR(from) > RANKNR(kingsq))?-1:1;
-                fdelta = 0;
-            }
-            break;
-        default:
-            assert(false);
-            continue;
-        }
-        if ((fdelta == 0) && (rdelta == 0)) {
-            continue;
-        }
-        slide = bb_slider_moves(pos->bb_all, from, fdelta, rdelta);
-
-        /*
-         * Limit the slider moves to squares that are occupied by a
-         * friendly pieces. There should be at most one such square.
-         * The piece on that square is candidate to be moved in order
-         * to find a discovered check.
-         */
-        slide &= pos->bb_sides[pos->stm];
-        assert(BITCOUNT(slide) <= 1);
-        if (slide == 0ULL) {
-            continue;
-        }
-
-        /*
-         * If a friendly piece is found that is a candidate to
-         * be moved then remove that piece and check if the
-         * king can be attacked. If the king can be attacked
-         * then generate all moves for the piece that is not
-         * along the relevant ray.
-         */
-        occ = pos->bb_all&(~slide);
-        moves1 = bb_slider_moves(occ, from, fdelta, rdelta);
-        if (moves1&sq_mask[kingsq]) {
-            from = LSB(slide);
-            piece = pos->pieces[from];
-            moves2 = bb_moves_for_piece(pos->bb_all, from, piece)&(~ray);
-            moves2 &= (~pos->bb_all);
-            if (VALUE(piece) == PAWN) {
-                /*
-                 * Since direct checks are handled separately exclude
-                 * all checking moves. The only case where this
-                 * can happen for pawns is with promotion. Queen
-                 * promotions are handled elsewhere so they don't need
-                 * to be considered. Additionally don't consider
-                 * promotion to rook and bishop since they are pointless.
-                 * That leaves promotion to knight.
-                 */
-                if (moves2&(rank_mask[RANK_1]|rank_mask[RANK_8])) {
-                    checkers = bb_moves_for_piece(pos->bb_all, kingsq,
-                                                  KNIGHT+pos->stm);
-                    moves2 &= (~checkers);
-                }
-                add_pawn_moves(pos, list, from, moves2, PROMOTE_KNIGHT);
-            } else {
-                /*
-                 * Since direct checks are handled separately we need
-                 * to exclude checking moves.
-                 */
-                checkers = bb_moves_for_piece(pos->bb_all, kingsq, piece);
-                moves2 &= (~checkers);
-                add_moves(pos, list, from, moves2);
-            }
-        }
-    }
-}
-
-static void gen_checks(struct position *pos, struct movelist *list)
-{
-    gen_direct_checks(pos, list);
-    gen_discovered_checks(pos, list);
-}
-
 void gen_moves(struct position *pos, struct movelist *list)
 {
     int      sq;
@@ -676,24 +296,7 @@ void gen_legal_moves(struct position *pos, struct movelist *list)
     }
 }
 
-void gen_quiscence_moves(struct position *pos, struct movelist *list,
-                         bool checks)
-{
-    assert(valid_position(pos));
-    assert(list != NULL);
-
-    list->nmoves = 0;
-
-    gen_captures(pos, list);
-    gen_promotions(pos, list, false, false);
-    if (checks) {
-        gen_checks(pos, list);
-    }
-
-    assert(valid_gen_quiscenece_moves(pos, checks, list));
-}
-
-void gen_normal_moves(struct position *pos, struct movelist *list)
+void gen_quiet_moves(struct position *pos, struct movelist *list)
 {
     int      sq;
     int      piece;
@@ -759,18 +362,99 @@ void gen_normal_moves(struct position *pos, struct movelist *list)
 
 void gen_capture_moves(struct position *pos, struct movelist *list)
 {
+    int      sq;
+    int      piece;
+    uint64_t moves;
+    uint64_t pieces;
+
     assert(valid_position(pos));
     assert(list != NULL);
 
-    gen_captures(pos, list);
+    pieces = pos->bb_sides[pos->stm];
+    while (pieces != 0ULL) {
+        sq = POPBIT(&pieces);
+        piece = pos->pieces[sq];
+
+        moves = 0ULL;
+        switch (piece) {
+        case WHITE_PAWN:
+        case BLACK_PAWN:
+            moves |= bb_pawn_attacks_from(sq, pos->stm);
+            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
+            add_pawn_moves(pos, list, sq, moves, PROMOTE_ALL);
+            break;
+        case WHITE_KNIGHT:
+        case BLACK_KNIGHT:
+            moves |= bb_knight_moves(sq);
+            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
+            add_moves(pos, list, sq, moves);
+            break;
+        case WHITE_BISHOP:
+        case BLACK_BISHOP:
+            moves |= bb_bishop_moves(pos->bb_all, sq);
+            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
+            add_moves(pos, list, sq, moves);
+            break;
+        case WHITE_ROOK:
+        case BLACK_ROOK:
+            moves |= bb_rook_moves(pos->bb_all, sq);
+            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
+            add_moves(pos, list, sq, moves);
+            break;
+        case WHITE_QUEEN:
+        case BLACK_QUEEN:
+            moves |= bb_queen_moves(pos->bb_all, sq);
+            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
+            add_moves(pos, list, sq, moves);
+            break;
+        case WHITE_KING:
+        case BLACK_KING:
+            moves |= bb_king_moves(sq);
+            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
+            add_moves(pos, list, sq, moves);
+            break;
+        case NO_PIECE:
+            break;
+        default:
+            assert(false);
+            break;
+        }
+    }
+
+    gen_en_passant_moves(pos, list);
 }
 
-void gen_promotion_moves(struct position *pos, struct movelist *list)
+void gen_promotion_moves(struct position *pos, struct movelist *list,
+                         bool capture, bool underpromote)
 {
+    uint64_t pieces;
+    uint64_t moves;
+    int      from;
+    uint8_t  promotion;
+
     assert(valid_position(pos));
     assert(list != NULL);
 
-    gen_promotions(pos, list, false, true);
+    promotion = PROMOTE_QUEEN;
+    if (underpromote) {
+        promotion |= PROMOTE_UNDER;
+    }
+
+    pieces = pos->bb_pieces[PAWN+pos->stm];
+    while (pieces != 0ULL) {
+        from = POPBIT(&pieces);
+        moves = 0ULL;
+        if (capture) {
+            moves |= bb_pawn_attacks_from(from, pos->stm);
+            moves &= pos->bb_sides[FLIP_COLOR(pos->stm)];
+        }
+        moves |= bb_pawn_moves(pos->bb_all, from, pos->stm);
+
+        /* Mask off moves where the destination is not on the 1st or 8th rank */
+        moves &= (rank_mask[RANK_1]|rank_mask[RANK_8]);
+
+        add_pawn_moves(pos, list, from, moves, promotion);
+    }
 }
 
 void gen_check_evasions(struct position *pos, struct movelist *list)

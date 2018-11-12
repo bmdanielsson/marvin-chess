@@ -333,21 +333,20 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
 
     /* Initialize the move selector for this node */
     tt_move = NOMOVE;
-    select_init_node(worker, true, false, in_check);
     if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score, NULL)) {
         return score;
     }
-    select_set_tt_move(worker, tt_move);
+    select_init_node(worker, FLAG_QUIESCENCE_NODE, in_check, tt_move);
 
     /* Search all moves */
     found_move = false;
-    while (select_get_quiscence_move(worker, &move)) {
+    while (select_get_move(worker, &move)) {
         /*
          * Don't bother searching captures that
          * lose material according to SEE.
          */
         if (!in_check && ISCAPTURE(move) &&
-            (select_get_phase(worker) == PHASE_BAD_CAPS)) {
+            select_is_bad_capture_phase(worker)) {
             continue;
         }
 
@@ -462,9 +461,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         return 0;
     }
 
-    /* Initialize the move selector for this node */
-    select_init_node(worker, false, false, in_check);
-
     /*
      * Check the main transposition table to see if the positon
      * have been searched before. If this a singular extension
@@ -477,7 +473,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                        &tt_item) && (tt_move != exclude_move)) {
         return tt_score;
     }
-    select_set_tt_move(worker, tt_move);
+    select_init_node(worker, 0, in_check, tt_move);
 
     /* Probe tablebases */
     if (worker->state->probe_wdl &&
@@ -555,11 +551,10 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      */
     if (!pv_node && !in_check && (depth >= PROBCUT_DEPTH) &&
         board_has_non_pawn(&worker->pos, pos->stm)) {
-        select_init_node(worker, true, false, in_check);
-        select_set_tt_move(worker, tt_move);
+        select_init_node(worker, FLAG_PROBCUT, in_check, tt_move);
         threshold = beta + PROBCUT_MARGIN;
 
-        while (select_get_quiscence_move(worker, &move)) {
+        while (select_get_move(worker, &move)) {
             /*
              * Skip non-captures and captures that are not
              * good enough (according to SEE).
@@ -586,8 +581,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             }
         }
     }
-    select_init_node(worker, false, false, in_check);
-    select_set_tt_move(worker, tt_move);
+    select_init_node(worker, 0, in_check, tt_move);
 
     /* Check if the move from the transposition table is singular */
     is_singular = false;
@@ -605,8 +599,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             is_singular = true;
         }
 
-        select_init_node(worker, false, false, in_check);
-        select_set_tt_move(worker, tt_move);
+        select_init_node(worker, 0, in_check, tt_move);
     }
 
     /*
@@ -829,19 +822,15 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
      */
     tt_move = NOMOVE;
     in_check = board_in_check(pos, pos->stm);
-    select_init_node(worker, false, true, in_check);
     (void)hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &score, NULL);
-    select_set_tt_move(worker, tt_move);
+    select_init_node(worker, FLAG_ROOT_NODE, in_check, tt_move);
     best_move = tt_move;
-
-    /* Update score for root moves */
-    select_update_root_move_scores(worker);
 
     /* Search all moves */
     tt_flag = TT_ALPHA;
     best_score = -INFINITE_SCORE;
     worker->currmovenumber = 0;
-    while (select_get_root_move(worker, &move)) {
+    while (select_get_move(worker, &move)) {
         /* Send stats for the first worker */
         worker->currmovenumber++;
         worker->currmove = move;
@@ -1062,7 +1051,7 @@ int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
     worker->nodes = 0;
     worker->id = 0;
     worker->resolving_root_fail = false;
-    worker->ppms[0].nmoves = 0;
+    worker->ppms[0].last_idx = 0;
     worker->pawntt = NULL;
     worker->pawntt_size = 0;
     worker->state = state;

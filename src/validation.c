@@ -173,60 +173,6 @@ bool valid_move(uint32_t move)
     return true;
 }
 
-bool valid_gen_quiscenece_moves(struct position *pos, bool checks,
-                                struct movelist *list)
-{
-    struct movelist list2;
-    int             nmoves2;
-    int             nmoves;
-    int             k;
-    uint32_t        move;
-
-    gen_moves(pos, &list2);
-    nmoves2 = 0;
-    for (k=0;k<list2.nmoves;k++) {
-        move = list2.moves[k];
-        if (ISCAPTURE(move) || ISENPASSANT(move)) {
-            nmoves2++;
-        } else if (ISPROMOTION(move) && (PROMOTION(move) == (QUEEN+pos->stm))) {
-            nmoves2++;
-        } else if (checks) {
-            if (board_make_move(pos, move)) {
-                if (board_in_check(pos, pos->stm)) {
-                    if (ISPROMOTION(move)) {
-                        if (PROMOTION(move) == (KNIGHT+FLIP_COLOR(pos->stm))) {
-                            nmoves2++;
-                        }
-                    } else {
-                        nmoves2++;
-                    }
-                }
-                board_unmake_move(pos);
-            }
-        }
-    }
-
-    nmoves = list->nmoves;
-    if (checks) {
-        for (k=0;k<list->nmoves;k++) {
-            move = list->moves[k];
-            if (ISCAPTURE(move) || ISENPASSANT(move)) {
-                continue;
-            }
-            if (ISPROMOTION(move) && (PROMOTION(move) == (QUEEN+pos->stm))) {
-                continue;
-            }
-            if (board_make_move(pos, move)) {
-                board_unmake_move(pos);
-            } else {
-                nmoves--;
-            }
-        }
-    }
-
-    return nmoves == nmoves2;
-}
-
 bool valid_scores(struct position *pos)
 {
     return
