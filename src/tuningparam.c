@@ -144,7 +144,9 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"friendly_king_passer_dist", 829, 829, -30, 0},
     {"opponent_king_passer_dist", 830, 830, 0, 30},
     {"backward_pawn_mg", 831, 831, -30, 0},
-    {"backward_pawn_eg", 832, 832, -30, 0}
+    {"backward_pawn_eg", 832, 832, -30, 0},
+    {"free_passed_pawn_mg", 833, 833, 0, 200},
+    {"free_passed_pawn_eg", 834, 834, 0, 200}
 };
 
 void tuning_param_assign_current(struct tuning_param *params)
@@ -230,6 +232,8 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN(OPPONENT_KING_PASSER_DIST)
     ASSIGN(BACKWARD_PAWN_MG)
     ASSIGN(BACKWARD_PAWN_EG)
+    ASSIGN(FREE_PASSED_PAWN_MG)
+    ASSIGN(FREE_PASSED_PAWN_EG)
 
     eval_reset();
 }
@@ -320,6 +324,8 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE(OPPONENT_KING_PASSER_DIST)
     DEFINE(BACKWARD_PAWN_MG)
     DEFINE(BACKWARD_PAWN_EG)
+    DEFINE(FREE_PASSED_PAWN_MG)
+    DEFINE(FREE_PASSED_PAWN_EG)
 
     return params;
 }

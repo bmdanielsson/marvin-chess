@@ -385,6 +385,30 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
     evaluate_pawn_shield(pos, eval, side);
 }
 
+static bool is_free_pawn(struct position *pos, struct eval *eval, int side,
+                         int sq)
+{
+    int stop_sq;
+    int rank;
+
+    rank = RANKNR(sq);
+    if ((side == WHITE && rank < RANK_6) ||
+        (side == BLACK && rank > RANK_3)) {
+        return false;
+    }
+
+    stop_sq = (side == WHITE)?sq+8:sq-8;
+    if (ISBITSET(pos->bb_all, stop_sq)) {
+        return false;
+    }
+
+    if (ISBITSET(eval->coverage[FLIP_COLOR(side)], stop_sq)) {
+        return false;
+    }
+
+    return true;
+}
+
 /*
  * Evaluate interaction between passed pawns and other pieces. The parts that
  * only depend on other pawns are evaluated by evaluate_pawn_structure.
@@ -420,6 +444,12 @@ static void evaluate_passers(struct position *pos, struct eval *eval, int side)
         eval->positional[ENDGAME][side] += FRIENDLY_KING_PASSER_DIST*dist;
         TRACE_M_E(FRIENDLY_KING_PASSER_DIST, dist);
         TRACE_M_E(OPPONENT_KING_PASSER_DIST, odist);
+
+        if (is_free_pawn(pos, eval, side, sq)) {
+            eval->positional[MIDDLEGAME][side] += FREE_PASSED_PAWN_MG;
+            eval->positional[ENDGAME][side] += FREE_PASSED_PAWN_EG;
+            TRACE_M(FREE_PASSED_PAWN_MG, FREE_PASSED_PAWN_MG, 1);
+        }
     }
 }
 

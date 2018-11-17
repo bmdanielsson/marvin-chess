@@ -97,5 +97,7 @@ extern int FRIENDLY_KING_PASSER_DIST;
 extern int OPPONENT_KING_PASSER_DIST;
 extern int BACKWARD_PAWN_MG;
 extern int BACKWARD_PAWN_EG;
+extern int FREE_PASSED_PAWN_MG;
+extern int FREE_PASSED_PAWN_EG;
 
 #endif
