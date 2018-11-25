@@ -117,11 +117,11 @@ static void assign_score(struct search_worker *worker, struct moveselect *ms,
     /*
      * If the SEE score is positive (normal moves or good captures) then
      * the move is appended to the moveinfo list. If the SEE score is
-     * negative (bad captures) the the move is added to be bead capture list.
+     * negative (bad captures) the the move is added to be bad capture list.
      */
     gez = (ISCAPTURE(move) || ISENPASSANT(move))?see_ge(pos, move, 0):true;
     if ((ISCAPTURE(move) || ISENPASSANT(move)) && !gez) {
-        info = &ms->badcapinfo[ms->nbadcaps];
+        info = &ms->moveinfo[MAX_MOVES+ms->nbadcaps];
         ms->nbadcaps++;
     } else {
         info = &ms->moveinfo[ms->nmoves];
@@ -443,10 +443,8 @@ bool select_get_move(struct search_worker *worker, uint32_t *move)
         ms->phase++;
         /* Fall through */
     case PHASE_ADD_BAD_CAPS:
-        for (k=0;k<ms->nbadcaps;k++) {
-            ms->moveinfo[ms->nmoves] = ms->badcapinfo[k];
-            ms->nmoves++;
-        }
+        ms->nmoves = MAX_MOVES + ms->nbadcaps;
+        ms->idx = MAX_MOVES;
         ms->phase++;
         /* Fall through */
     case PHASE_BAD_CAPS:

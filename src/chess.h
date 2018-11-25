@@ -204,7 +204,7 @@ enum {
 
 /* The maximum number of chess moves that can occur in a game */
 #define MAX_MOVES 250
-#define MAX_CAPTURES 16
+#define MAX_CAPTURES 80
 
 /* The maximum size of the game history */
 #define MAX_HISTORY_SIZE 2048
@@ -260,11 +260,9 @@ struct moveselect {
     /* Move fetched from the transposition table for this position */
     uint32_t ttmove;
     /* Additional information for the availables moves */
-    struct moveinfo moveinfo[MAX_MOVES];
+    struct moveinfo moveinfo[MAX_MOVES+MAX_CAPTURES];
     /* The number of moves */
     int nmoves;
-    /* Array for storing bad captures */
-    struct moveinfo badcapinfo[MAX_CAPTURES];
     /* The number of bad captures */
     int nbadcaps;
     /* Index of the move currently being searched */
