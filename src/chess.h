@@ -444,7 +444,7 @@ struct search_worker {
     /* Tables used for killer heuristics */
     uint32_t killer_table[MAX_PLY][2];
     /* Tables used for history heuristics */
-    int history_table[NSIDES][NSQUARES][NSQUARES];
+    int history_table[NPIECES][NSQUARES];
     /* Pawn transposition table */
     struct pawntt_item *pawntt;
     /* The number of entries in the pawn transposition table */

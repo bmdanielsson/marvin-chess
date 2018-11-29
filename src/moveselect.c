@@ -137,7 +137,8 @@ static void add_move(struct search_worker *worker, struct moveselector *ms,
         info->score = BASE_SCORE_GOOD_CAPS + mvvlva(pos, move);
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
         info->score =
-                worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
+            worker->history_table[pos->pieces[from]][to] + BASE_SCORE_NORMAL;
+
     } else {
         info->score = BASE_SCORE_BAD_CAPS + mvvlva(pos, move);
     }
@@ -160,7 +161,7 @@ static int get_move_score(struct search_worker *worker, struct position *pos,
     } else if (move == ms->killer2) {
         return BASE_SCORE_KILLER2;
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
-        return worker->history_table[pos->stm][from][to] + BASE_SCORE_NORMAL;
+        return worker->history_table[pos->pieces[from]][to] + BASE_SCORE_NORMAL;
     } else {
         return BASE_SCORE_BAD_CAPS + mvvlva(pos, move);
     }

@@ -90,9 +90,9 @@ static int see_prune_margin[] = {0, -100, -200, -300, -400};
 static void update_history_table(struct search_worker *worker, uint32_t move,
                                  int depth)
 {
-    int             side;
     int             from;
     int             to;
+    int             piece;
     struct position *pos;
 
     if (ISCAPTURE(move) || ISENPASSANT(move)) {
@@ -103,13 +103,11 @@ static void update_history_table(struct search_worker *worker, uint32_t move,
     pos = &worker->pos;
     from = FROM(move);
     to = TO(move);
-    worker->history_table[pos->stm][from][to] += depth;
-    if (worker->history_table[pos->stm][from][to] > MAX_HISTORY_SCORE) {
-        for (side=0;side<NSIDES;side++) {
-            for (from=0;from<NSQUARES;from++) {
-                for (to=0;to<NSQUARES;to++) {
-                    worker->history_table[side][from][to] /= 2;
-                }
+    worker->history_table[pos->pieces[from]][to] += depth*depth;
+    if (worker->history_table[pos->pieces[from]][to] > MAX_HISTORY_SCORE) {
+        for (piece=0;piece<NPIECES;piece++) {
+            for (to=0;to<NSQUARES;to++) {
+                worker->history_table[piece][to] /= 2;
             }
         }
     }
@@ -632,7 +630,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         /* Various move properties */
         pawn_push = is_pawn_push(pos, move);
         killer = is_killer_move(worker, move);
-        hist = worker->history_table[pos->stm][FROM(move)][TO(move)];
+        hist = worker->history_table[pos->pieces[FROM(move)]][TO(move)];
         gives_check = board_move_gives_check(pos, move);
         tactical = is_tactical_move(move) || in_check || gives_check;
 
@@ -1020,7 +1018,6 @@ int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
     struct search_worker *worker;
     int                  k;
     int                  l;
-    int                  m;
     int                  score;
 
     tc_configure_time_control(TC_INFINITE, 0, 0, 0);
@@ -1040,11 +1037,9 @@ int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
         worker->killer_table[k][0] = NOMOVE;
         worker->killer_table[k][1] = NOMOVE;
     }
-    for (k=0;k<NSIDES;k++) {
+    for (k=0;k<NPIECES;k++) {
         for (l=0;l<NSQUARES;l++) {
-            for (m=0;m<NSQUARES;m++) {
-                worker->history_table[k][l][m] = 0;
-            }
+            worker->history_table[k][l] = 0;
         }
     }
     worker->depth = 0;

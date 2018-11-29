@@ -173,7 +173,6 @@ static void prepare_worker(struct search_worker *worker,
 {
     int k;
     int l;
-    int m;
 
     /* Copy data from game state */
     worker->pos = state->pos;
@@ -186,11 +185,9 @@ static void prepare_worker(struct search_worker *worker,
     }
 
     /* Clear history table */
-    for (k=0;k<NSIDES;k++) {
+    for (k=0;k<NPIECES;k++) {
         for (l=0;l<NSQUARES;l++) {
-            for (m=0;m<NSQUARES;m++) {
-                worker->history_table[k][l][m] = 0;
-            }
+            worker->history_table[k][l] = 0;
         }
     }
 
