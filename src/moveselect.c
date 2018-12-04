@@ -35,6 +35,7 @@ enum {
     PHASE_GOOD_CAPS,
     PHASE_KILLER1,
     PHASE_KILLER2,
+    PHASE_COUNTER,
     PHASE_GEN_MOVES,
     PHASE_MOVES,
     PHASE_ADD_BAD_CAPS,
@@ -54,10 +55,11 @@ enum {
 
 /* Base scores for move ordering */
 #define BASE_SCORE_DELTA        MAX_HISTORY_SCORE
-#define BASE_SCORE_TT           5*BASE_SCORE_DELTA
-#define BASE_SCORE_GOOD_CAPS    4*BASE_SCORE_DELTA
-#define BASE_SCORE_KILLER1      3*BASE_SCORE_DELTA
-#define BASE_SCORE_KILLER2      2*BASE_SCORE_DELTA
+#define BASE_SCORE_TT           6*BASE_SCORE_DELTA
+#define BASE_SCORE_GOOD_CAPS    5*BASE_SCORE_DELTA
+#define BASE_SCORE_KILLER1      4*BASE_SCORE_DELTA
+#define BASE_SCORE_KILLER2      3*BASE_SCORE_DELTA
+#define BASE_SCORE_COUNTER      2*BASE_SCORE_DELTA
 #define BASE_SCORE_NORMAL       BASE_SCORE_DELTA
 #define BASE_SCORE_BAD_CAPS     0
 
@@ -105,13 +107,14 @@ static void add_move(struct search_worker *worker, struct moveselector *ms,
     pos = &worker->pos;
 
     /*
-     * Moves in the transposition table and killer moves are
-     * handled separately and should not be considered here.
+     * Moves in the transposition table, killer moves and counter moves
+     * are handled separately and should not be considered here.
      */
     move = list->moves[iter];
     if ((move == ms->ttmove) ||
         (move == ms->killer1) ||
-        (move == ms->killer2)) {
+        (move == ms->killer2) ||
+        (move == ms->counter)) {
         return;
     }
 
@@ -138,7 +141,6 @@ static void add_move(struct search_worker *worker, struct moveselector *ms,
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
         info->score =
             worker->history_table[pos->pieces[from]][to] + BASE_SCORE_NORMAL;
-
     } else {
         info->score = BASE_SCORE_BAD_CAPS + mvvlva(pos, move);
     }
@@ -160,6 +162,8 @@ static int get_move_score(struct search_worker *worker, struct position *pos,
         return BASE_SCORE_KILLER1;
     } else if (move == ms->killer2) {
         return BASE_SCORE_KILLER2;
+    } else if (move == ms->counter) {
+        return BASE_SCORE_COUNTER;
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
         return worker->history_table[pos->pieces[from]][to] + BASE_SCORE_NORMAL;
     } else {
@@ -211,6 +215,7 @@ static bool get_move_incremental(struct search_worker *worker, uint32_t *move)
     struct moveselector *ms;
     struct movelist     list;
     uint32_t            killer;
+    uint32_t            counter;
     int                 k;
     struct position     *pos;
 
@@ -261,6 +266,16 @@ static bool get_move_incremental(struct search_worker *worker, uint32_t *move)
             (killer != ms->killer1) &&
             board_is_move_pseudo_legal(pos, killer)) {
             *move = killer;
+            return true;
+        }
+        /* Fall through */
+    case PHASE_COUNTER:
+        ms->phase++;
+        counter = ms->counter;
+        if ((counter != NOMOVE) && (counter != ms->ttmove) &&
+            (counter != ms->killer1) && (counter != ms->killer2) &&
+            board_is_move_pseudo_legal(pos, counter)) {
+            *move = counter;
             return true;
         }
         /* Fall through */
@@ -379,6 +394,8 @@ void select_init_node(struct search_worker *worker, uint32_t flags,
 {
     struct moveselector *ms;
     uint32_t            move;
+    uint32_t            prev_move;
+    int                 prev_to;
     int                 k;
     struct position     *pos;
     struct moveinfo     *info;
@@ -409,6 +426,16 @@ void select_init_node(struct search_worker *worker, uint32_t flags,
     }
     ms->killer1 = worker->killer_table[pos->sply][0];
     ms->killer2 = worker->killer_table[pos->sply][1];
+    if (!(flags&FLAG_ROOT_NODE)) {
+        prev_move = pos->history[pos->ply-1].move;
+        if (!ISNULLMOVE(prev_move)) {
+            prev_to = TO(prev_move);
+            ms->counter =
+                    worker->countermove_table[pos->pieces[prev_to]][prev_to];
+        }
+    } else {
+        ms->counter = NOMOVE;
+    }
 
     /*
      * The move info list at the root is reused for each iteration

@@ -117,10 +117,6 @@ static void add_killer_move(struct search_worker *worker, uint32_t move)
 {
     struct position *pos = &worker->pos;
 
-    if ((ISCAPTURE(move) || ISENPASSANT(move)) && see_ge(pos, move, 0)) {
-        return;
-    }
-
     if (move == worker->killer_table[pos->sply][0]) {
         return;
     }
@@ -136,6 +132,22 @@ static bool is_killer_move(struct search_worker *worker, uint32_t move)
     pos = &worker->pos;
     return (worker->killer_table[pos->sply][0] == move) ||
             (worker->killer_table[pos->sply][1] == move);
+}
+
+static void add_counter_move(struct search_worker *worker, uint32_t move)
+{
+    struct position *pos;
+    uint32_t prev_move;
+
+    assert(worker->pos.sply > 0);
+
+    pos = &worker->pos;
+    prev_move = pos->history[pos->ply-1].move;
+    if (ISNULLMOVE(prev_move)) {
+        return;
+    }
+
+    worker->countermove_table[pos->pieces[TO(prev_move)]][TO(move)] = move;
 }
 
 static bool is_pawn_push(struct position *pos, uint32_t move)
@@ -758,7 +770,11 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                  * search this position further.
                  */
                 if (score >= beta) {
-                    add_killer_move(worker, move);
+                    if ((!ISCAPTURE(move) && !ISENPASSANT(move)) ||
+                        !see_ge(pos, move, 0)) {
+                        add_killer_move(worker, move);
+                        add_counter_move(worker, move);
+                    }
                     tt_flag = TT_BETA;
                     break;
                 }
@@ -865,7 +881,10 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                  * save some time.
                  */
                 if (score >= beta) {
-                    add_killer_move(worker, move);
+                    if ((!ISCAPTURE(move) && !ISENPASSANT(move)) ||
+                        !see_ge(pos, move, 0)) {
+                        add_killer_move(worker, move);
+                    }
                     tt_flag = TT_BETA;
                     break;
                 }
@@ -1040,6 +1059,7 @@ int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
     for (k=0;k<NPIECES;k++) {
         for (l=0;l<NSQUARES;l++) {
             worker->history_table[k][l] = 0;
+            worker->countermove_table[k][l] = NOMOVE;
         }
     }
     worker->depth = 0;

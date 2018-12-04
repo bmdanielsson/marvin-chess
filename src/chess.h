@@ -260,6 +260,8 @@ struct moveselector {
     /* Killer moves for this position */
     uint32_t killer1;
     uint32_t killer2;
+    /* Counter move for this position */
+    uint32_t counter;
     /* Additional information for the availables moves */
     struct moveinfo moveinfo[MAX_MOVES+MAX_CAPTURES];
     /* Index of the last move plus one */
@@ -443,6 +445,8 @@ struct search_worker {
     struct pv pv_table[MAX_PLY];
     /* Tables used for killer heuristics */
     uint32_t killer_table[MAX_PLY][2];
+    /* Table used for counter move heuristics */
+    uint32_t countermove_table[NPIECES][NSQUARES];
     /* Tables used for history heuristics */
     int history_table[NPIECES][NSQUARES];
     /* Pawn transposition table */

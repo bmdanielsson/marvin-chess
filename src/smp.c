@@ -188,6 +188,7 @@ static void prepare_worker(struct search_worker *worker,
     for (k=0;k<NPIECES;k++) {
         for (l=0;l<NSQUARES;l++) {
             worker->history_table[k][l] = 0;
+            worker->countermove_table[k][l] = NOMOVE;
         }
     }
 
