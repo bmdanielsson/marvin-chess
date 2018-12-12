@@ -179,6 +179,32 @@ static bool is_tactical_move(uint32_t move)
     return ISCAPTURE(move) || ISENPASSANT(move) || ISPROMOTION(move);
 }
 
+static bool is_recapture(struct position *pos)
+{
+    struct unmake *prev = &pos->history[pos->ply-2];
+    struct unmake *curr = &pos->history[pos->ply-1];
+
+    if (!ISCAPTURE(prev->move) || (TO(prev->move) != TO(curr->move))) {
+        return false;
+    }
+
+    switch (VALUE(prev->capture)) {
+    case PAWN:
+        return VALUE(curr->capture) == PAWN;
+    case KNIGHT:
+    case BISHOP:
+        return VALUE(curr->capture) == KNIGHT || VALUE(curr->capture) == BISHOP;
+    case ROOK:
+        return VALUE(curr->capture) == ROOK;
+    case QUEEN:
+        return VALUE(curr->capture) == QUEEN;
+    default:
+        break;
+    }
+
+    return false;
+}
+
 static bool probe_wdl_tables(struct search_worker *worker, int alpha, int beta,
                              int *score)
 {
@@ -707,6 +733,13 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
          * that the move is losing material.
          */
         if (!extended && gives_check && see_post_ge(pos, move, 0)) {
+            new_depth++;
+            extended = true;
+        }
+
+        /* Extend recaptures */
+        if (!extended && pos->sply >= 2 && pv_node && !gives_check &&
+            is_recapture(pos) && (see_post_ge(pos, move, 0))) {
             new_depth++;
             extended = true;
         }
