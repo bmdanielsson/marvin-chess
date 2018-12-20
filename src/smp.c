@@ -136,30 +136,7 @@ static thread_retval_t worker_thread_func(void *data)
 {
     struct search_worker *worker = data;
 
-    /* Worker main loop */
-    while (true) {
-        /* Wait for signal to start a searching */
-        event_wait(&worker->ev_start);
-        if (worker->action == ACTION_EXIT) {
-            break;
-        }
-		if (worker->action == ACTION_IDLE) {
-			continue;
-		}
-
-        search_find_best_move(worker);
-
-        /* Signal that the worker is done searching */
-        worker->action = ACTION_IDLE;
-        event_set(&worker->ev_done);
-    }
-
-    /* Clean up */
-#ifndef WINDOWS
-    event_destroy(&worker->ev_start);
-    event_destroy(&worker->ev_done);
-    hash_pawntt_destroy_table(worker);
-#endif
+    search_find_best_move(worker);
 
     return (thread_retval_t)0;
 }
@@ -232,10 +209,6 @@ void smp_create_workers(int nthreads)
     number_of_workers = nthreads;
     for (k=0;k<number_of_workers;k++) {
         memset(&workers[k], 0, sizeof(struct search_worker));
-        event_init(&workers[k].ev_start);
-        event_init(&workers[k].ev_done);
-        thread_create(&workers[k].thread, (thread_func_t)worker_thread_func, &workers[k]);
-
         hash_pawntt_create_table(&workers[k], PAWN_HASH_SIZE);
         workers[k].state = NULL;
         workers[k].id = k;
@@ -247,19 +220,9 @@ void smp_destroy_workers(void)
     int k;
 
     for (k=0;k<number_of_workers;k++) {
-        workers[k].action = ACTION_EXIT;
-        event_set(&workers[k].ev_start);
+        hash_pawntt_destroy_table(&workers[k]);
     }
-    for (k=0;k<number_of_workers;k++) {
-        thread_join(&workers[k].thread);
-    }
-#ifdef WINDOWS
-	for (k=0;k<number_of_workers;k++) {
-		event_destroy(&workers[k].ev_start);
-		event_destroy(&workers[k].ev_done);
-		hash_pawntt_destroy_table(&workers[k]);
-	}
-#endif
+
     number_of_workers = 0;
 }
 
@@ -346,13 +309,13 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     /* Start all workers */
     stop_mask = 0ULL;
     for (k=0;k<number_of_workers;k++) {
-        workers[k].action = ACTION_RUN;
-        event_set(&workers[k].ev_start);
+        thread_create(&workers[k].thread, (thread_func_t)worker_thread_func,
+                      &workers[k]);
     }
 
-    /* Wait for workers to finish */
+    /* Wait for all workers to finish */
     for (k=0;k<number_of_workers;k++) {
-        event_wait(&workers[k].ev_done);
+        thread_join(&workers[k].thread);
     }
 }
 

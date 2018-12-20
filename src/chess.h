@@ -474,8 +474,6 @@ struct search_worker {
 
     /* Data for the worker thread */
     thread_t thread;
-    event_t ev_start;
-    event_t ev_done;
     int action;
     jmp_buf env;
 
