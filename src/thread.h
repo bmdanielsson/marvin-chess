@@ -27,11 +27,13 @@
 
 /* Portable multi-threading primitives */
 #ifdef WINDOWS
+#define thread_retval_t DWORD
 typedef HANDLE thread_t;
 typedef LPTHREAD_START_ROUTINE thread_func_t;
 typedef CRITICAL_SECTION mutex_t;
 typedef HANDLE event_t;
 #else
+#define thread_retval_t void*
 typedef pthread_t thread_t;
 typedef void* (*thread_func_t)(void*);;  
 typedef pthread_mutex_t mutex_t;

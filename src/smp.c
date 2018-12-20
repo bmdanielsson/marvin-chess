@@ -132,11 +132,7 @@ static bool probe_dtz_tables(struct gamestate *state, int *score)
     return true;
 }
 
-#ifdef WINDOWS
-static DWORD worker_thread_func(void *data)
-#else
-static void* worker_thread_func(void *data)
-#endif
+static thread_retval_t worker_thread_func(void *data)
 {
     struct search_worker *worker = data;
 
@@ -165,7 +161,7 @@ static void* worker_thread_func(void *data)
     hash_pawntt_destroy_table(worker);
 #endif
 
-    return 0;
+    return (thread_retval_t)0;
 }
 
 static void prepare_worker(struct search_worker *worker,

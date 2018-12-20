@@ -314,7 +314,7 @@ static double calc_texel_sigmoid(int score, double k)
     return 1.0/(1.0 + pow(10.0, exp));
 }
 
-static void* calc_texel_error_func(void *data)
+static thread_retval_t calc_texel_error_func(void *data)
 {
     struct tuning_worker *worker;
     struct gamestate     *state;
@@ -386,7 +386,7 @@ static void* calc_texel_error_func(void *data)
     event_destroy(&workers->ev_done);
     destroy_game_state(state);
 
-    return NULL;
+    return (thread_retval_t)0;
 }
 
 static double calc_texel_error(struct trainingset *trainingset, double k)
