@@ -334,30 +334,18 @@ uint32_t smp_nodes(void)
     return nodes;
 }
 
-void smp_stop_all(struct search_worker *worker, bool abort)
+void smp_stop_all(void)
 {
-    uint64_t mask;
-
     mutex_lock(&stop_lock);
-    mask = ALL_WORKERS;
-    if (!abort) {
-        /*
-         * Clear the bit for the current worker to indicate that this
-         * is a "soft stop". This is ok since the current worker
-         * already knows that it should stop.
-         */
-        mask &= (~(1ULL<<worker->id));
-    }
-    stop_mask = mask;
+    stop_mask = ALL_WORKERS;
     mutex_unlock(&stop_lock);
 }
 
-bool smp_should_stop(struct search_worker *worker, bool *abort)
+bool smp_should_stop(struct search_worker *worker)
 {
     uint64_t mask;
 
     mask = atomic_load_explicit(&stop_mask, memory_order_relaxed);
-    *abort = (mask == ABORT);
     return (mask&(1ULL << worker->id)) != 0ULL;
 }
 

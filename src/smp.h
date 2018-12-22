@@ -56,22 +56,16 @@ uint32_t smp_nodes(void);
 
 /*
  * Stop all workers.
- *
- * @param worker The worker requesting the stop.
- * @param abort Flag indicating if the stop is unconditional or if the worker
- *              is allowed to finish resolving a fail low.
  */
-void smp_stop_all(struct search_worker *worker, bool abort);
+void smp_stop_all(void);
 
 /*
  * Check if a worker should stop.
  *
  * @param worker The worker.
- * @param abort If the function returns true and this flag is set to true
- *              the the workr should stop no matter what.
  * @return Returns true if the worker should stop.
  */
-bool smp_should_stop(struct search_worker *worker, bool *abort);
+bool smp_should_stop(struct search_worker *worker);
 
 /*
  * Update best move so far and send status information.

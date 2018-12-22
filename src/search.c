@@ -262,29 +262,26 @@ static void update_pv(struct search_worker *worker, uint32_t move)
 
 static void checkup(struct search_worker *worker)
 {
-    bool stop;
-    bool abort;
-
     /* Check if the worker is requested to stop */
-    stop = smp_should_stop(worker, &abort);
-    if (stop) {
-        if (abort || !worker->resolving_root_fail) {
-            longjmp(worker->env, EXCEPTION_STOP);
-        }
+    if (smp_should_stop(worker)) {
+        longjmp(worker->env, EXCEPTION_STOP);
     }
 
-    /* Check if the time is up or if we have received a new command */
-    if (!CHECKUP(worker->nodes)) {
+    /*
+     * For the master worker also check if the time
+     * is up or if a new command have been received.
+     */
+    if ((worker->id != 0) || !CHECKUP(worker->nodes)) {
         return;
     }
 
     /* Perform checkup */
     if (!tc_check_time(worker)) {
-        smp_stop_all(worker, false);
+        smp_stop_all();
         longjmp(worker->env, EXCEPTION_TIMEOUT);
     }
-    if ((worker->id == 0) && engine_check_input(worker)) {
-        smp_stop_all(worker, true);
+    if (engine_check_input(worker)) {
+        smp_stop_all();
         longjmp(worker->env, EXCEPTION_COMMAND);
     }
 }
@@ -1019,9 +1016,15 @@ void search_find_best_move(struct search_worker *worker)
          */
         if (worker->state->exit_on_mate && !worker->state->pondering) {
             if ((score > KNOWN_WIN) || (score < (-KNOWN_WIN))) {
-                smp_stop_all(worker, true);
+                smp_stop_all();
                 break;
             }
+        }
+
+        /* Check if the worker has reached the maximum depth */
+        if (depth > worker->state->sd) {
+            smp_stop_all();
+            break;
         }
 
         /*
@@ -1038,12 +1041,18 @@ void search_find_best_move(struct search_worker *worker)
             alpha = -INFINITE_SCORE;
             beta = INFINITE_SCORE;
         }
-        if (!tc_new_iteration(worker)) {
-            smp_stop_all(worker, false);
-            break;
+
+        /*
+         * Time management is handled by the master worker so  ordinary
+         * workers can just continue with thye next iteration.
+         */
+        if (worker->id != 0) {
+            continue;
         }
-        if (depth > worker->state->sd) {
-            smp_stop_all(worker, true);
+
+        /* Check if the is time for a new iteration */
+        if (!tc_new_iteration(worker)) {
+            smp_stop_all();
             break;
         }
     }
@@ -1056,11 +1065,11 @@ void search_find_best_move(struct search_worker *worker)
      */
 	while ((worker->id == 0) && worker->state->pondering) {
 		if (engine_wait_for_input(worker)) {
-			smp_stop_all(worker, true);
+			smp_stop_all();
             break;
 		}
 		if (!worker->state->pondering) {
-			smp_stop_all(worker, true);
+			smp_stop_all();
 		}
 	}
 }
