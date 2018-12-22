@@ -306,15 +306,18 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
         prepare_worker(&workers[k], state);
     }
 
-    /* Start all workers */
+    /* Start helpers */
     stop_mask = 0ULL;
-    for (k=0;k<number_of_workers;k++) {
+    for (k=1;k<number_of_workers;k++) {
         thread_create(&workers[k].thread, (thread_func_t)worker_thread_func,
                       &workers[k]);
     }
 
-    /* Wait for all workers to finish */
-    for (k=0;k<number_of_workers;k++) {
+    /* Start the master worker thread */
+    search_find_best_move(&workers[0]);
+
+    /* Wait for all helpers to finish */
+    for (k=1;k<number_of_workers;k++) {
         thread_join(&workers[k].thread);
     }
 }
