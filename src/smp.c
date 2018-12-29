@@ -377,7 +377,6 @@ void smp_update(struct search_worker *worker, int score)
 
 int smp_complete_iteration(struct search_worker *worker)
 {
-    int highest_depth;
     int new_depth;
     int count;
     int k;
@@ -391,19 +390,21 @@ int smp_complete_iteration(struct search_worker *worker)
     }
 
     /* Calculate the next depth for this worker to search */
-    highest_depth = 0;
-    count = 0;
-    for (k=0;k<number_of_workers;k++) {
-        if (workers[k].depth > highest_depth) {
-            highest_depth = workers[k].depth;
-            count = 1;
-        } else if (workers[k].depth == highest_depth) {
-            count++;
-        }
-    }
-    new_depth = MAX(worker->depth+1, highest_depth);
-    if ((new_depth == highest_depth) && (count >= (number_of_workers/2))) {
+    new_depth = worker->depth;
+    while (true) {
         new_depth++;
+        count = 0;
+        for (k=0;k<number_of_workers;k++) {
+            if (workers[k].depth >= new_depth) {
+                count++;
+            }
+            if (((count+1)/2) >= (number_of_workers/2)) {
+                break;
+            }
+        }
+        if (k == number_of_workers || (number_of_workers == 1)) {
+            break;
+        }
     }
 
     mutex_unlock(&state_lock);
