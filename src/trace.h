@@ -39,13 +39,13 @@
 
 /* Parameter of an evaluation trace */
 struct trace_param {
-    int multiplier[NPHASES][NSIDES];
-    int divisor[NPHASES][NSIDES];
+    int mul[NPHASES][NSIDES];
+    int div[NPHASES][NSIDES];
 };
 
 /* Evaluation trace */
 struct eval_trace {
-    int                 phase;
+    int                 phase_factor;
     int                 base[NPHASES][NSIDES];
     struct trace_param  params[NUM_TUNING_PARAMS];
 };
@@ -106,11 +106,11 @@ void trace_psq(struct eval_trace *trace, int side, int piece, int sq,
  * @param tp1 The middlegame tuning parameter, or -1 if there is none.
  * @param tp2 The endgame tuning parameter, or -1 if there is none.
  * @param offset Offset to apply to the tuning parameters.
- * @param multiplier The multiplier.
- * @param divisor The divisor.
+ * @param mul The multiplier.
+ * @param div The divisor.
  */
 void trace_param(struct eval_trace *trace, int side, int tp1, int tp2,
-                 int offset, int multiplier, int divisor);
+                 int offset, int mul, int div);
 
 #endif
 

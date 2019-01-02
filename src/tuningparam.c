@@ -367,11 +367,11 @@ void tuning_param_write_parameters(FILE *fp, struct tuning_param *params,
 
         if (start == stop) {
             fprintf(fp, "%s %d\n", parameter_declarations[k].name,
-                    zero?0:params[start].current);
+                    zero?0:(int)params[start].current);
         } else {
             fprintf(fp, "%s {", parameter_declarations[k].name);
             for (l=start;l<=stop;l++) {
-                fprintf(fp, "%d", zero?0:params[l].current);
+                fprintf(fp, "%d", zero?0:(int)params[l].current);
                 if (l < stop) {
                     fprintf(fp, ", ");
                 }

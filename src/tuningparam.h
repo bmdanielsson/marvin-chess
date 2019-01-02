@@ -120,10 +120,10 @@ struct param_decl {
 
 /* Tunable parameter */
 struct tuning_param {
-    bool active;
-    int  current;
-    int  min;
-    int  max;
+    bool   active;
+    double current;
+    int    min;
+    int    max;
 };
 
 /*

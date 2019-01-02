@@ -55,9 +55,9 @@
 
 /* Equation term */
 struct term {
-    int param;
-    int multiplier;
-    int divisor;
+    int    param_id;
+    double fact;
+    double scale;
 };
 
 /*
@@ -65,10 +65,9 @@ struct term {
  * for a specific position.
  */
 struct eval_equation {
-    int         phase;
-    int         base[NPHASES][NSIDES];
-    int         nterms[NPHASES][NSIDES];
-    struct term *terms[NPHASES][NSIDES];
+    double      base;
+    int         nterms;
+    struct term *terms;
 };
 
 /* Training position */
@@ -93,44 +92,23 @@ struct tuningset {
     int                 nactive;
 };
 
-/* Different state for worker threads */
-enum worker_state {
-    WORKER_IDLE,
-    WORKER_RUNNING,
-    WORKER_FINISHED,
-    WORKER_STOPPED
-};
-
 /* Worker thread */
 struct tuning_worker {
-    thread_t            thread;
-    event_t             ev_start;
-    event_t             ev_done;
-    struct trainingset  *trainingset;
-    struct tuningset    *tuningset;
-    int                 first_pos;
-    int                 last_pos;
-    double              k;
-    double              sum;
-    bool                update_pv;
-    enum worker_state   state;
+    thread_t           thread;
+    struct trainingset *trainingset;
+    struct tuningset   *tuningset;
+    int                first_pos;
+    int                last_pos;
+    double             sum;
 };
 
 /* Workers used for calculating errors */
 struct tuning_worker *workers = NULL;
-static int    nworkerthreads = 0;
+static int nworkerthreads = 0;
+static double scaling_constant = K;
 
 /* Function declarations */
 static void* calc_texel_error_func(void *data);
-
-static void mark_pv_for_update(void)
-{
-    int k;
-
-    for (k=0;k<nworkerthreads;k++) {
-        workers[k].update_pv = true;
-    }
-}
 
 static void init_workers(struct trainingset *trainingset,
                          struct tuningset *tuningset)
@@ -142,150 +120,144 @@ static void init_workers(struct trainingset *trainingset,
     pos_per_thread = trainingset->size/nworkerthreads;
     nextpos = 0;
     for (iter=0;iter<nworkerthreads;iter++) {
-        workers[iter].state = WORKER_IDLE;
         workers[iter].trainingset = trainingset;
         workers[iter].tuningset = tuningset;
         workers[iter].first_pos = nextpos;
         workers[iter].last_pos = workers[iter].first_pos + pos_per_thread - 1;
         nextpos = workers[iter].last_pos + 1;
-
-        thread_create(&workers[iter].thread, calc_texel_error_func,
-                      &workers[iter]);
-        event_init(&workers[iter].ev_start);
-        event_init(&workers[iter].ev_done);
     }
 }
 
-static struct term* setup_equation_terms(struct eval_trace *trace, int phase,
-                                         int side, int *nterms)
+static void setup_term(struct term *term, struct trace_param *param,
+                       int param_id, int phase_factor)
 {
-    struct term *terms;
-    int         count;
-    int         k;
+    double temp;
+    double fact[NPHASES];
+    int    phase;
 
-    /* Count the number of terms */
-    count = 0;
-    for (k=0;k<NUM_TUNING_PARAMS;k++) {
-        if (trace->params[k].multiplier[phase][side] > 0) {
-            count++;
+    term->param_id = param_id;
+
+    for (phase=0;phase<NPHASES;phase++) {
+        temp = param->mul[phase][WHITE];
+        if (param->div[phase][WHITE] > 0) {
+            temp /= param->div[phase][WHITE];
         }
+        fact[phase] = temp;
+
+        temp = param->mul[phase][BLACK];
+        if (param->div[phase][BLACK] > 0) {
+            temp /= param->div[phase][BLACK];
+        }
+        fact[phase] -= temp;
     }
 
-    /* Allocate terms */
-    terms = malloc(sizeof(struct term)*count);
-
-    /* Setup terms */
-    count = 0;
-    for (k=0;k<NUM_TUNING_PARAMS;k++) {
-        if (trace->params[k].multiplier[phase][side] > 0) {
-            terms[count].param = k;
-            terms[count].multiplier = trace->params[k].multiplier[phase][side];
-            terms[count].divisor = trace->params[k].divisor[phase][side];
-            count++;
-        }
+    if ((fact[MIDDLEGAME] != 0) && (fact[ENDGAME] != 0)) {
+        assert(fact[MIDDLEGAME] == fact[ENDGAME]);
+        term->fact = fact[MIDDLEGAME];
+        term->scale = 1;
+    } else if (fact[MIDDLEGAME] != 0) {
+        term->fact = fact[MIDDLEGAME];
+        term->scale = (256.0-phase_factor)/256.0;
+    } else {
+        term->fact = fact[ENDGAME];
+        term->scale = phase_factor/256.0;
     }
-    *nterms = count;
-
-    return terms;
 }
 
 static void setup_eval_equation(struct eval_trace *trace,
                                 struct eval_equation *equation)
 {
-    int phase;
-    int side;
+    int k;
+    int idx;
+    int count;
 
-    equation->phase = trace->phase;
-    for (phase=0;phase<=1;phase++) {
-        for (side=0;side<=1;side++) {
-            equation->base[phase][side] = trace->base[phase][side];
-            equation->terms[phase][side] = setup_equation_terms(trace, phase,
-                                        side, &equation->nterms[phase][side]);
+    /* Count the number of non-zero parameters */
+    count = 0;
+    for (k=0;k<NUM_TUNING_PARAMS;k++) {
+        if ((trace->params[k].mul[MIDDLEGAME][WHITE] != 0) ||
+            (trace->params[k].mul[MIDDLEGAME][BLACK] != 0) ||
+            (trace->params[k].mul[ENDGAME][WHITE] != 0) ||
+            (trace->params[k].mul[ENDGAME][BLACK] != 0)) {
+            count++;
         }
     }
-}
 
-static int summarize_term(struct term *term, struct tuningset *tuningset)
-{
-    int val;
+    /* Allocate terms */
+    equation->terms = malloc(sizeof(struct term)*count);
+    equation->nterms = count;
 
-    val = tuningset->params[term->param].current;
-    val *= term->multiplier;
-    if (term->divisor > 0) {
-        val /= term->divisor;
+    /* Setup base score */
+    assert(trace->base[MIDDLEGAME][WHITE] == trace->base[ENDGAME][WHITE]);
+    assert(trace->base[MIDDLEGAME][BLACK] == trace->base[ENDGAME][BLACK]);
+    equation->base = trace->base[ENDGAME][WHITE] - trace->base[ENDGAME][BLACK];
+
+    /* Setup terms */
+    idx = 0;
+    for (k=0;k<NUM_TUNING_PARAMS;k++) {
+        if ((trace->params[k].mul[MIDDLEGAME][WHITE] == 0) &&
+            (trace->params[k].mul[MIDDLEGAME][BLACK] == 0) &&
+            (trace->params[k].mul[ENDGAME][WHITE] == 0) &&
+            (trace->params[k].mul[ENDGAME][BLACK] == 0)) {
+            continue;
+        }
+
+        setup_term(&equation->terms[idx], &trace->params[k], k,
+                   trace->phase_factor);
+        idx++;
     }
-
-    return val;
 }
 
-static int evaluate_equation(struct position *pos, struct tuningset *tuningset,
-                             struct trainingpos  *trainingpos)
+static double evaluate_term(struct term *term, struct tuningset *tuningset)
+{
+    return tuningset->params[term->param_id].current*term->fact*term->scale;
+}
+
+static double evaluate_equation(struct tuningset *tuningset,
+                                struct trainingpos *trainingpos)
 {
     struct eval_equation *equation;
-    struct term          *term;
-    int                  score[NPHASES][NSIDES];
-    int                  score_mg;
-    int                  score_eg;
-    int                  phase;
-    int                  side;
+    double               score;
     int                  k;
 
     equation = &trainingpos->equation;
-    for (phase=0;phase<=1;phase++) {
-        for (side=0;side<=1;side++) {
-            score[phase][side] = equation->base[phase][side];
-            for (k=0;k<equation->nterms[phase][side];k++) {
-                term = &equation->terms[phase][side][k];
-                score[phase][side] += summarize_term(term, tuningset);
-            }
-        }
+    score = equation->base;
+    for (k=0;k<equation->nterms;k++) {
+        score += evaluate_term(&equation->terms[k], tuningset);
     }
 
-    score_mg = score[MIDDLEGAME][WHITE] - score[MIDDLEGAME][BLACK];
-    score_eg = score[ENDGAME][WHITE] - score[ENDGAME][BLACK];
-    score_mg = (pos->stm == WHITE)?score_mg:-score_mg;
-    score_eg = (pos->stm == WHITE)?score_eg:-score_eg;
-
-    return ((score_mg*(256-equation->phase)) + (score_eg*equation->phase))/256;
+    return score;
 }
 
-void print_equation(struct eval_equation *equation, int endgame, int side)
+void print_equation(struct eval_equation *equation)
 {
     struct term *term;
-    char *phase;
-    char *player;
-    int  k;
+    int         k;
 
-    phase = endgame?"endgame":"middlegame";
-    player = (side == WHITE)?"white":"black";
-
-    printf("%s, %s\n", phase, player);
-    printf("phase: %d\n", equation->phase);
-    printf("base: %d\n", equation->base[endgame][side]);
-    for (k=0;k<equation->nterms[endgame][side];k++) {
-        term = &equation->terms[endgame][side][k];
-        printf("param %d = %d", term->param, term->multiplier);
-        if (term->divisor != 0) {
-            printf("/%d\n", term->divisor);
-        } else {
-            printf("\n");
-        }
+    printf("base: %f\n", equation->base);
+    for (k=0;k<equation->nterms;k++) {
+        term = &equation->terms[k];
+        printf("param %d: %f, %f\n", term->param_id, term->fact, term->scale);
     }
 }
 
-static void find_quiet_trainingset(struct gamestate *state,
-                                   struct tuning_worker *worker)
+static thread_retval_t trace_positions_func(void *data)
 {
-    int                iter;
-    struct pv          *pv;
-    struct trainingset *trainingset;
-    int                k;
-    char               fenstr[FEN_MAX_LENGTH];
+    struct tuning_worker *worker;
+    struct gamestate     *state;
+    struct trainingset   *trainingset;
+    int                  iter;
+    struct eval_trace    *trace;
+    struct pv            *pv;
+    int                  k;
+    char                 fenstr[FEN_MAX_LENGTH];
 
-    /* Iterate over all training positions */
+    worker = (struct tuning_worker*)data;
+    state = create_game_state();
     pv = malloc(sizeof(struct pv));
     memset(pv, 0, sizeof(struct pv));
     trainingset = worker->trainingset;
+
+    /* Iterate over all training positions assigned to this worker */
     for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
         /* Setup position */
         board_reset(&state->pos);
@@ -302,16 +274,79 @@ static void find_quiet_trainingset(struct gamestate *state,
         fen_build_string(&state->pos, fenstr);
         free(trainingset->positions[iter].fen_quiet);
         trainingset->positions[iter].fen_quiet = strdup(fenstr);
+
+        /*
+         * Trace the evaluation function for this position
+         * and create a corresponding equation
+         */
+        board_reset(&state->pos);
+        (void)fen_setup_board(&state->pos,
+                              trainingset->positions[iter].fen_quiet, true);
+        trace = malloc(sizeof(struct eval_trace));
+        eval_generate_trace(&state->pos, trace);
+        setup_eval_equation(trace, &trainingset->positions[iter].equation);
+        free(trace);
     }
+
+    /* Clean up */
     free(pv);
+    destroy_game_state(state);
+
+    return (thread_retval_t)0;
 }
 
-static double calc_texel_sigmoid(int score, double k)
+static void trace_positions(void)
+{
+    int iter;
+
+    /* Start all worker threads */
+    for (iter=0;iter<nworkerthreads;iter++) {
+        thread_create(&workers[iter].thread, trace_positions_func,
+                      &workers[iter]);
+    }
+
+    /* Wait for all workers to finish */
+    for (iter=0;iter<nworkerthreads;iter++) {
+        thread_join(&workers[iter].thread);
+    }
+}
+
+/*
+static double texel_derivative()
+{
+    (2/m)*sum(result-sigmoid)
+}
+
+static double texel_gradient()
+{
+    texel_derivative()*
+}
+*/
+static double texel_sigmoid(double score)
 {
     double exp;
 
-    exp = -(k*((double)score)/400.0);
+    exp = -(scaling_constant*score/400.0);
     return 1.0/(1.0 + pow(10.0, exp));
+}
+
+static double texel_error(double score, double result)
+{
+    return result - texel_sigmoid(score);
+}
+/*
+static double texel_partial_derivative(double error)
+{
+    -2*param*error
+    (2/m)*sum(result-sigmoid)
+}
+*/
+static double texel_squared_error(double score, double result)
+{
+    double error;
+
+    error = texel_error(score, result);
+    return error*error;
 }
 
 static thread_retval_t calc_texel_error_func(void *data)
@@ -320,90 +355,45 @@ static thread_retval_t calc_texel_error_func(void *data)
     struct gamestate     *state;
     struct trainingset   *trainingset;
     int                  iter;
-    int                  score;
-    double               sigmoid;
-    double               result;
-    struct eval_trace    *trace;
+    double               score;
 
     /* Initialize worker */
     worker = (struct tuning_worker*)data;
     state = create_game_state();
     trainingset = worker->trainingset;
 
-    /* Worker main loop */
-    while (true) {
-        /* Wait for signal to start */
-        event_wait(&worker->ev_start);
-        if (worker->state == WORKER_STOPPED) {
-            break;
-        }
+    /* Iterate over all training positions assigned to this worker */
+    worker->sum = 0.0;
+    for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
+        /* Evaluate the equation */
+        score = evaluate_equation(worker->tuningset,
+                                  &trainingset->positions[iter]);
 
-        /* Check if the pv should be updated */
-        if (worker->update_pv) {
-            find_quiet_trainingset(state, worker);
-            worker->update_pv = false;
-        }
-
-        /* Iterate over all training positions assigned to this worker */
-        worker->sum = 0.0;
-        for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
-            /*
-             * Trace the evaluation function for this position
-             * and create a corresponding equation
-             */
-            if (!trainingset->positions[iter].has_equation) {
-                board_reset(&state->pos);
-                (void)fen_setup_board(&state->pos,
-                                      trainingset->positions[iter].fen_quiet,
-                                      true);
-                trace = malloc(sizeof(struct eval_trace));
-                eval_generate_trace(&state->pos, trace);
-                setup_eval_equation(trace,
-                                    &trainingset->positions[iter].equation);
-                trainingset->positions[iter].has_equation = true;
-                free(trace);
-                trace = NULL;
-            }
-
-            /* Evaluate the equation */
-            score = evaluate_equation(&state->pos, worker->tuningset,
-                                      &trainingset->positions[iter]);
-            score = (state->pos.stm == WHITE)?score:-score;
-
-            /* Calculate error */
-            sigmoid = calc_texel_sigmoid(score, worker->k);
-            result = trainingset->positions[iter].result;
-            worker->sum += ((result - sigmoid)*(result - sigmoid));
-        }
-
-        /* Signal that this iteration is finished */
-        worker->state = WORKER_FINISHED;
-        event_set(&worker->ev_done);
+        /* Calculate error */
+        worker->sum += texel_squared_error(score,
+                                           trainingset->positions[iter].result);
     }
 
     /* Clean up */
-    event_destroy(&workers->ev_start);
-    event_destroy(&workers->ev_done);
     destroy_game_state(state);
 
     return (thread_retval_t)0;
 }
 
-static double calc_texel_error(struct trainingset *trainingset, double k)
+static double calc_texel_error(struct trainingset *trainingset)
 {
     int     iter;
     double  sum;
 
     /* Start all worker threads */
     for (iter=0;iter<nworkerthreads;iter++) {
-        workers[iter].k = k;
-        workers[iter].state = WORKER_RUNNING;
-        event_set(&workers[iter].ev_start);
+        thread_create(&workers[iter].thread, calc_texel_error_func,
+                      &workers[iter]);
     }
 
     /* Wait for all workers to finish */
     for (iter=0;iter<nworkerthreads;iter++) {
-        event_wait(&workers[iter].ev_done);
+        thread_join(&workers[iter].thread);
     }
 
     /* Summarize the result of all workers and calculate the error */
@@ -415,8 +405,33 @@ static double calc_texel_error(struct trainingset *trainingset, double k)
     return sum/(double)trainingset->size;
 }
 
-static void local_optimize(struct tuningset *tuningset,
-                           struct trainingset *trainingset, int stepsize)
+#if 0
+static double calc_texel_gradient(struct trainingset *trainingset)
+{
+
+}
+
+static void gradient_descent(struct tuningset *tuningset,
+                             struct trainingset *trainingset,
+                             double learning_rate)
+{
+    /*
+    while true
+        for each position
+            calc evaluation
+            calc error
+            for each parameter        
+                sum gradient for param = texel_gradient for param
+                
+        avarge gradient for param = sum gradient for param / number of positions
+                    
+        update params
+    */
+}
+#endif
+
+static void local_search(struct tuningset *tuningset,
+                         struct trainingset *trainingset, int stepsize)
 {
     struct  tuning_param *param;
     double  best_e;
@@ -430,9 +445,9 @@ static void local_optimize(struct tuningset *tuningset,
     int     delta;
 
     /* Generate a quiet trainingset and calculate the initial error */
-    mark_pv_for_update();
+    trace_positions();
     tuning_param_assign_current(tuningset->params);
-    best_e = calc_texel_error(trainingset, K);
+    best_e = calc_texel_error(trainingset);
     printf("Initial error: %f\n", best_e);
 
     /* Loop until no more improvements are found */
@@ -462,7 +477,7 @@ static void local_optimize(struct tuningset *tuningset,
             while ((param->current+delta) <= param->max) {
                 param->current += delta;
                 tuning_param_assign_current(tuningset->params);
-                e = calc_texel_error(trainingset, K);
+                e = calc_texel_error(trainingset);
                 if (e < best_e) {
                     best_e = e;
                     improved = true;
@@ -484,7 +499,7 @@ static void local_optimize(struct tuningset *tuningset,
                 while ((param->current-delta) >= param->min) {
                     param->current -= delta;
                     tuning_param_assign_current(tuningset->params);
-                    e = calc_texel_error(trainingset, K);
+                    e = calc_texel_error(trainingset);
                     if (e < best_e) {
                         best_e = e;
                         improved = true;
@@ -524,10 +539,7 @@ static void free_trainingset(struct trainingset *trainingset)
 
     for (k=0;k<trainingset->size;k++) {
         free(trainingset->positions[k].epd);
-        free(trainingset->positions[k].equation.terms[MIDDLEGAME][WHITE]);
-        free(trainingset->positions[k].equation.terms[MIDDLEGAME][BLACK]);
-        free(trainingset->positions[k].equation.terms[ENDGAME][WHITE]);
-        free(trainingset->positions[k].equation.terms[ENDGAME][BLACK]);
+        free(trainingset->positions[k].equation.terms);
     }
     free(trainingset->positions);
     free(trainingset);
@@ -722,7 +734,6 @@ void find_k(char *file, int nthreads)
     double              best_k;
     double              e;
     double              lowest_e;
-    int                 iter;
     int                 niterations;
 
     assert(file != NULL);
@@ -751,7 +762,7 @@ void find_k(char *file, int nthreads)
     nworkerthreads = nthreads;
     workers = malloc(sizeof(struct tuning_worker)*nworkerthreads);
     init_workers(trainingset, tuningset);
-    mark_pv_for_update();
+    trace_positions();
 
     /* Make sure all training positions are covered */
     workers[nworkerthreads-1].last_pos = trainingset->size - 1;
@@ -762,7 +773,8 @@ void find_k(char *file, int nthreads)
     niterations = 0;
     for (k=K_MIN;k<K_MAX;k+=K_STEP) {
         /* Calculate error */
-        e = calc_texel_error(trainingset, k);
+        scaling_constant = k;
+        e = calc_texel_error(trainingset);
 
         /* Check if the error has decreased */
         if (e < lowest_e) {
@@ -776,18 +788,6 @@ void find_k(char *file, int nthreads)
         if ((niterations%50) == 0) {
             printf("\n");
         }
-    }
-
-    /* Stop all worker threads */
-    for (iter=0;iter<nthreads;iter++) {
-        workers[iter].k = k;
-        workers[iter].state = WORKER_STOPPED;
-        event_set(&workers[iter].ev_start);
-    }
-
-    /* Wait for all threads to exit */
-    for (iter=0;iter<nthreads;iter++) {
-        thread_join(&workers[iter].thread);
     }
 
     /* Print result */
@@ -855,7 +855,7 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     printf("\n");
 
     /* Optimize the tuning set */
-    local_optimize(tuningset, trainingset, stepsize);
+    local_search(tuningset, trainingset, stepsize);
 
     /* Write tuning result */
     printf("\n");
@@ -946,19 +946,21 @@ static void verify_trace(char *training_file)
 
         /* Setup an equation and evaluate it */
         setup_eval_equation(trace, &trainingset->positions[k].equation);
-        score2 = evaluate_equation(&state->pos, tuningset,
-                                   &trainingset->positions[k]);
+        score2 = evaluate_equation(tuningset, &trainingset->positions[k]);
+        score2 = (state->pos.stm == WHITE)?score2:-score2;
         free(trace);
         trace = NULL;
 
-        /* Check that the scores match */
-        if (score != score2) {
+        /*
+         * Check that the scores match. Since the standard evaluation
+         * is done using integers and equations are evaluated using
+         * doubles a difference of 1 is allowed to account for difference
+         * in precision.
+         */
+        if (abs(score-score2) > 1) {
             printf("Wrong score (%d): %d (%d)\n", k, score2, score);
             printf("%s", trainingset->positions[k].epd);
-            print_equation(&trainingset->positions[k].equation, false, WHITE);
-            print_equation(&trainingset->positions[k].equation, true, WHITE);
-            print_equation(&trainingset->positions[k].equation, false, BLACK);
-            print_equation(&trainingset->positions[k].equation, true, BLACK);
+            print_equation(&trainingset->positions[k].equation);
             printf("\n");
         }
     }

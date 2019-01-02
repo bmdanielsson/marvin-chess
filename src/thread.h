@@ -35,7 +35,7 @@ typedef HANDLE event_t;
 #else
 #define thread_retval_t void*
 typedef pthread_t thread_t;
-typedef void* (*thread_func_t)(void*);;  
+typedef void* (*thread_func_t)(void*);
 typedef pthread_mutex_t mutex_t;
 typedef struct {
     pthread_mutex_t mutex;

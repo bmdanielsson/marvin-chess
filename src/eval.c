@@ -448,7 +448,7 @@ static void evaluate_passers(struct position *pos, struct eval *eval, int side)
         if (is_free_pawn(pos, eval, side, sq)) {
             eval->positional[MIDDLEGAME][side] += FREE_PASSED_PAWN_MG;
             eval->positional[ENDGAME][side] += FREE_PASSED_PAWN_EG;
-            TRACE_M(FREE_PASSED_PAWN_MG, FREE_PASSED_PAWN_MG, 1);
+            TRACE_M(FREE_PASSED_PAWN_MG, FREE_PASSED_PAWN_EG, 1);
         }
     }
 }
@@ -1410,7 +1410,7 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
     eval.trace = trace;
 
     /* Calculate game phase */
-    trace->phase = calculate_game_phase(pos);
+    trace->phase_factor = calculate_game_phase(pos);
 
     /* If there is insufficiernt mating material there is nothing to do */
     if (eval_is_material_draw(pos)) {

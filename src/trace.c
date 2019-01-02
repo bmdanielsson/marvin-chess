@@ -41,25 +41,25 @@ void trace_material(struct eval_trace *trace, int side, int piece, bool endgame,
     case BLACK_KNIGHT:
         tp = endgame?TP_KNIGHT_MATERIAL_VALUE_EG:TP_KNIGHT_MATERIAL_VALUE_MG;
         idx = tuning_param_index(tp);
-        trace->params[idx].multiplier[endgame][side] += count;
+        trace->params[idx].mul[endgame][side] += count;
         break;
     case WHITE_BISHOP:
     case BLACK_BISHOP:
         tp = endgame?TP_BISHOP_MATERIAL_VALUE_EG:TP_BISHOP_MATERIAL_VALUE_MG;
         idx = tuning_param_index(tp);
-        trace->params[idx].multiplier[endgame][side] += count;
+        trace->params[idx].mul[endgame][side] += count;
         break;
     case WHITE_ROOK:
     case BLACK_ROOK:
         tp = endgame?TP_ROOK_MATERIAL_VALUE_EG:TP_ROOK_MATERIAL_VALUE_MG;
         idx = tuning_param_index(tp);
-        trace->params[idx].multiplier[endgame][side] += count;
+        trace->params[idx].mul[endgame][side] += count;
         break;
     case WHITE_QUEEN:
     case BLACK_QUEEN:
         tp = endgame?TP_QUEEN_MATERIAL_VALUE_EG:TP_QUEEN_MATERIAL_VALUE_MG;
         idx = tuning_param_index(tp);
-        trace->params[idx].multiplier[endgame][side] += count;
+        trace->params[idx].mul[endgame][side] += count;
         break;
     default:
         break;
@@ -81,37 +81,37 @@ void trace_psq(struct eval_trace *trace, int side, int piece, int sq,
     case BLACK_PAWN:
         tp = endgame?TP_PSQ_TABLE_PAWN_EG:TP_PSQ_TABLE_PAWN_MG;
         idx = tuning_param_index(tp) + sq;
-        trace->params[idx].multiplier[endgame][side] += 1;
+        trace->params[idx].mul[endgame][side] += 1;
         break;
     case WHITE_KNIGHT:
     case BLACK_KNIGHT:
         tp = endgame?TP_PSQ_TABLE_KNIGHT_EG:TP_PSQ_TABLE_KNIGHT_MG;
         idx = tuning_param_index(tp) + sq;
-        trace->params[idx].multiplier[endgame][side] += 1;
+        trace->params[idx].mul[endgame][side] += 1;
         break;
     case WHITE_BISHOP:
     case BLACK_BISHOP:
         tp = endgame?TP_PSQ_TABLE_BISHOP_EG:TP_PSQ_TABLE_BISHOP_MG;
         idx = tuning_param_index(tp) + sq;
-        trace->params[idx].multiplier[endgame][side] += 1;
+        trace->params[idx].mul[endgame][side] += 1;
         break;
     case WHITE_ROOK:
     case BLACK_ROOK:
         tp = endgame?TP_PSQ_TABLE_ROOK_EG:TP_PSQ_TABLE_ROOK_MG;
         idx = tuning_param_index(tp) + sq;
-        trace->params[idx].multiplier[endgame][side] += 1;
+        trace->params[idx].mul[endgame][side] += 1;
         break;
     case WHITE_QUEEN:
     case BLACK_QUEEN:
         tp = endgame?TP_PSQ_TABLE_QUEEN_EG:TP_PSQ_TABLE_QUEEN_MG;
         idx = tuning_param_index(tp) + sq;
-        trace->params[idx].multiplier[endgame][side] += 1;
+        trace->params[idx].mul[endgame][side] += 1;
         break;
     case WHITE_KING:
     case BLACK_KING:
         tp = endgame?TP_PSQ_TABLE_KING_EG:TP_PSQ_TABLE_KING_MG;
         idx = tuning_param_index(tp) + sq;
-        trace->params[idx].multiplier[endgame][side] += 1;
+        trace->params[idx].mul[endgame][side] += 1;
         break;
     default:
         break;
@@ -129,12 +129,12 @@ void trace_param(struct eval_trace *trace, int side, int tp1, int tp2,
 
     if (tp1 != -1) {
         idx = tuning_param_index(tp1) + offset;
-        trace->params[idx].multiplier[MIDDLEGAME][side] += multiplier;
-        trace->params[idx].divisor[MIDDLEGAME][side] += divisor;
+        trace->params[idx].mul[MIDDLEGAME][side] += multiplier;
+        trace->params[idx].div[MIDDLEGAME][side] += divisor;
     }
     if (tp2 != -1) {
         idx = tuning_param_index(tp2) + offset;
-        trace->params[idx].multiplier[ENDGAME][side] += multiplier;
-        trace->params[idx].divisor[ENDGAME][side] += divisor;
+        trace->params[idx].mul[ENDGAME][side] += multiplier;
+        trace->params[idx].div[ENDGAME][side] += divisor;
     }
 }
