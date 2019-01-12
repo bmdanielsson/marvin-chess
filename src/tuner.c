@@ -22,6 +22,9 @@
 #include <math.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#ifndef WINDOWS
+#include <signal.h>
+#endif
 
 #include "chess.h"
 #include "config.h"
@@ -53,6 +56,19 @@
 #define K_MAX 2.0
 #define K_STEP 0.001
 
+/* Constants for Adam */
+#define BETA1 0.9
+#define BETA2 0.999
+#define EPSILON 1.0E-8
+#define STEP_SIZE 0.1
+#define REPORT_INTERVAL 100
+#define DEFAULT_ITERATIONS 1000
+
+enum optimization_algorithm {
+    OPT_LOCAL_SEARCH,
+    OPT_ADAM
+};
+
 /* Equation term */
 struct term {
     int    param_id;
@@ -75,7 +91,6 @@ struct trainingpos {
     char                 *epd;
     char                 *fen_quiet;
     double               result;
-    bool                 has_equation;
     struct eval_equation equation;
 };
 
@@ -99,16 +114,15 @@ struct tuning_worker {
     struct tuningset   *tuningset;
     int                first_pos;
     int                last_pos;
-    double             sum;
+    double             val;
+    double             gradients[NUM_TUNING_PARAMS];
 };
 
 /* Workers used for calculating errors */
 struct tuning_worker *workers = NULL;
 static int nworkerthreads = 0;
 static double scaling_constant = K;
-
-/* Function declarations */
-static void* calc_texel_error_func(void *data);
+static volatile bool stop_optimization = false;
 
 static void init_workers(struct trainingset *trainingset,
                          struct tuningset *tuningset)
@@ -212,14 +226,12 @@ static double evaluate_term(struct term *term, struct tuningset *tuningset)
     return tuningset->params[term->param_id].current*term->fact*term->scale;
 }
 
-static double evaluate_equation(struct tuningset *tuningset,
-                                struct trainingpos *trainingpos)
+static double evaluate_equation(struct eval_equation *equation,
+                                struct tuningset *tuningset)
 {
-    struct eval_equation *equation;
-    double               score;
-    int                  k;
+    double score;
+    int    k;
 
-    equation = &trainingpos->equation;
     score = equation->base;
     for (k=0;k<equation->nterms;k++) {
         score += evaluate_term(&equation->terms[k], tuningset);
@@ -311,17 +323,6 @@ static void trace_positions(void)
     }
 }
 
-/*
-static double texel_derivative()
-{
-    (2/m)*sum(result-sigmoid)
-}
-
-static double texel_gradient()
-{
-    texel_derivative()*
-}
-*/
 static double texel_sigmoid(double score)
 {
     double exp;
@@ -334,13 +335,7 @@ static double texel_error(double score, double result)
 {
     return result - texel_sigmoid(score);
 }
-/*
-static double texel_partial_derivative(double error)
-{
-    -2*param*error
-    (2/m)*sum(result-sigmoid)
-}
-*/
+
 static double texel_squared_error(double score, double result)
 {
     double error;
@@ -349,7 +344,7 @@ static double texel_squared_error(double score, double result)
     return error*error;
 }
 
-static thread_retval_t calc_texel_error_func(void *data)
+static thread_retval_t calc_texel_squared_error_func(void *data)
 {
     struct tuning_worker *worker;
     struct gamestate     *state;
@@ -363,14 +358,14 @@ static thread_retval_t calc_texel_error_func(void *data)
     trainingset = worker->trainingset;
 
     /* Iterate over all training positions assigned to this worker */
-    worker->sum = 0.0;
+    worker->val = 0.0;
     for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
         /* Evaluate the equation */
-        score = evaluate_equation(worker->tuningset,
-                                  &trainingset->positions[iter]);
+        score = evaluate_equation(&trainingset->positions[iter].equation,
+                                  worker->tuningset);
 
         /* Calculate error */
-        worker->sum += texel_squared_error(score,
+        worker->val += texel_squared_error(score,
                                            trainingset->positions[iter].result);
     }
 
@@ -380,14 +375,14 @@ static thread_retval_t calc_texel_error_func(void *data)
     return (thread_retval_t)0;
 }
 
-static double calc_texel_error(struct trainingset *trainingset)
+static double calc_texel_squared_error(struct trainingset *trainingset)
 {
     int     iter;
-    double  sum;
+    double  error;
 
     /* Start all worker threads */
     for (iter=0;iter<nworkerthreads;iter++) {
-        thread_create(&workers[iter].thread, calc_texel_error_func,
+        thread_create(&workers[iter].thread, calc_texel_squared_error_func,
                       &workers[iter]);
     }
 
@@ -397,41 +392,147 @@ static double calc_texel_error(struct trainingset *trainingset)
     }
 
     /* Summarize the result of all workers and calculate the error */
-    sum = 0.0;
+    error = 0.0;
     for (iter=0;iter<nworkerthreads;iter++) {
-        sum += workers[iter].sum;
+        error += workers[iter].val;
     }
 
-    return sum/(double)trainingset->size;
+    return error/(double)trainingset->size;
 }
 
-#if 0
-static double calc_texel_gradient(struct trainingset *trainingset)
+#ifndef WINDOWS
+static void signal_handler(int signum)
 {
-
-}
-
-static void gradient_descent(struct tuningset *tuningset,
-                             struct trainingset *trainingset,
-                             double learning_rate)
-{
-    /*
-    while true
-        for each position
-            calc evaluation
-            calc error
-            for each parameter        
-                sum gradient for param = texel_gradient for param
-                
-        avarge gradient for param = sum gradient for param / number of positions
-                    
-        update params
-    */
+    if (signum == SIGINT) {
+        stop_optimization = true;
+    }
 }
 #endif
 
+static thread_retval_t calc_texel_gradients_func(void *data)
+{
+    struct tuning_worker *worker;
+    struct trainingset   *trainingset;
+    struct eval_equation *equation;
+    struct term          *term;
+    double               score;
+    double               error;
+    int                  iter;
+    int                  k;
+
+    /* Initialize worker */
+    worker = (struct tuning_worker*)data;
+    trainingset = worker->trainingset;
+    for (k=0;k<NUM_TUNING_PARAMS;k++) {
+        worker->gradients[k] = 0.0;
+    }
+
+    for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
+        equation = &trainingset->positions[iter].equation;
+        score = evaluate_equation(equation, worker->tuningset);
+        error = texel_error(score, trainingset->positions[iter].result);
+
+        for (k=0;k<equation->nterms;k++) {
+            term = &equation->terms[k];
+            worker->gradients[term->param_id] += (error*term->fact*term->scale);
+        }
+    }
+
+    return (thread_retval_t)0;
+}
+
+static void calc_texel_gradients(double *gradients)
+{
+    int iter;
+    int k;
+
+    /* Start all worker threads */
+    for (iter=0;iter<nworkerthreads;iter++) {
+        thread_create(&workers[iter].thread, calc_texel_gradients_func,
+                      &workers[iter]);
+    }
+
+    /* Wait for all workers to finish */
+    for (iter=0;iter<nworkerthreads;iter++) {
+        thread_join(&workers[iter].thread);
+    }
+
+    /* Summarize the result of all workers and calculate the error */
+    for (k=0;k<NUM_TUNING_PARAMS;k++) {
+        gradients[k] = 0.0;
+        for (iter=0;iter<nworkerthreads;iter++) {
+            gradients[k] += (workers[iter].gradients[k]);
+        }
+        gradients[k] *= (-2.0/workers[0].trainingset->size);
+    }
+}
+
+static void adam(struct tuningset *tuningset, struct trainingset *trainingset,
+                 int max_iterations, double step_size)
+{
+    struct tuning_param *param;
+    double              m[NUM_TUNING_PARAMS] = {0.0};
+    double              v[NUM_TUNING_PARAMS] = {0.0};
+    double              gradients[NUM_TUNING_PARAMS];
+    double              m_hat;
+    double              v_hat;
+    int                 k;
+    int                 niterations;
+    double              error;
+
+#ifndef WINDOWS
+    struct sigaction sa = {0};
+    sigemptyset(&sa.sa_mask);
+    sa.sa_handler = signal_handler;
+    sigaction(SIGINT, &sa, NULL);
+#endif
+
+    trace_positions();
+    tuning_param_assign_current(tuningset->params);
+    error = calc_texel_squared_error(trainingset);
+    printf("Initial error: %f\n", error);
+
+    printf("\nOptimizing using Adam\n");
+
+    for (niterations=1;niterations<=max_iterations;niterations++) {
+        if (stop_optimization) {
+            break;
+        }
+
+        /* Display regular progress */
+        if ((niterations%REPORT_INTERVAL) == 0) {
+            error = calc_texel_squared_error(trainingset);
+            printf("Iteration: %d, Error: %f\n", niterations, error);
+        }
+
+        /* Calculate the gradient for each parameter */
+        calc_texel_gradients(gradients);
+
+        /* Update the parameters that are being tuned */
+        for (k=0;k<NUM_TUNING_PARAMS;k++) {
+            param = &tuningset->params[k];
+            if (!param->active) {
+                continue;
+            }
+
+            m[k] = BETA1*m[k] + (1 - BETA1)*gradients[k];
+            v[k] = BETA2*v[k] + (1 - BETA2)*gradients[k]*gradients[k];
+            m_hat = m[k]/(1 - pow(BETA1, niterations));
+            v_hat = v[k]/(1 - pow(BETA2, niterations));
+            param->current -= ((step_size/(sqrt(v_hat) + EPSILON))*m_hat);
+            param->current = CLAMP(param->current, param->min, param->max);
+        }
+        tuning_param_assign_current(tuningset->params);
+    }
+
+    error = calc_texel_squared_error(trainingset);
+    printf("\n");
+    printf("Total number of iterations: %d\n", niterations-1);
+    printf("Final error: %f\n", error);
+}
+
 static void local_search(struct tuningset *tuningset,
-                         struct trainingset *trainingset, int stepsize)
+                         struct trainingset *trainingset)
 {
     struct  tuning_param *param;
     double  best_e;
@@ -447,11 +548,11 @@ static void local_search(struct tuningset *tuningset,
     /* Generate a quiet trainingset and calculate the initial error */
     trace_positions();
     tuning_param_assign_current(tuningset->params);
-    best_e = calc_texel_error(trainingset);
+    best_e = calc_texel_squared_error(trainingset);
     printf("Initial error: %f\n", best_e);
 
     /* Loop until no more improvements are found */
-    delta = stepsize;
+    delta = 1;
     niterations = 0;
     improved = true;
     while (improved || (niterations <= 1)) {
@@ -477,7 +578,7 @@ static void local_search(struct tuningset *tuningset,
             while ((param->current+delta) <= param->max) {
                 param->current += delta;
                 tuning_param_assign_current(tuningset->params);
-                e = calc_texel_error(trainingset);
+                e = calc_texel_squared_error(trainingset);
                 if (e < best_e) {
                     best_e = e;
                     improved = true;
@@ -499,7 +600,7 @@ static void local_search(struct tuningset *tuningset,
                 while ((param->current-delta) >= param->min) {
                     param->current -= delta;
                     tuning_param_assign_current(tuningset->params);
-                    e = calc_texel_error(trainingset);
+                    e = calc_texel_squared_error(trainingset);
                     if (e < best_e) {
                         best_e = e;
                         improved = true;
@@ -607,7 +708,6 @@ static struct trainingset* read_trainingset(struct gamestate *state, char *file)
         /* Update training set */
         trainingset->positions[trainingset->size].epd = strdup(buffer);
         trainingset->positions[trainingset->size].fen_quiet = NULL;
-        trainingset->positions[trainingset->size].has_equation = false;
         trainingset->size++;
 
         /* Next position */
@@ -774,7 +874,7 @@ void find_k(char *file, int nthreads)
     for (k=K_MIN;k<K_MAX;k+=K_STEP) {
         /* Calculate error */
         scaling_constant = k;
-        e = calc_texel_error(trainingset);
+        e = calc_texel_squared_error(trainingset);
 
         /* Check if the error has decreased */
         if (e < lowest_e) {
@@ -801,8 +901,9 @@ void find_k(char *file, int nthreads)
     destroy_game_state(state);
 }
 
-void tune_parameters(char *training_file, char *parameter_file, int nthreads,
-                     int stepsize)
+static void tune_parameters(char *training_file, char *parameter_file,
+                            int nthreads, enum optimization_algorithm optalgo,
+                            int niterations)
 {
     struct tuningset    *tuningset;
     struct trainingset  *trainingset;
@@ -852,10 +953,18 @@ void tune_parameters(char *training_file, char *parameter_file, int nthreads,
     /* Make sure all training positions are covered */
     workers[nthreads-1].last_pos = trainingset->size - 1;
 
-    printf("\n");
-
     /* Optimize the tuning set */
-    local_search(tuningset, trainingset, stepsize);
+    switch (optalgo) {
+    case OPT_LOCAL_SEARCH:
+        local_search(tuningset, trainingset);
+        break;
+    case OPT_ADAM:
+        adam(tuningset, trainingset, niterations, STEP_SIZE);
+        break;
+    default:
+        assert(false);
+        break;
+    }
 
     /* Write tuning result */
     printf("\n");
@@ -946,7 +1055,8 @@ static void verify_trace(char *training_file)
 
         /* Setup an equation and evaluate it */
         setup_eval_equation(trace, &trainingset->positions[k].equation);
-        score2 = evaluate_equation(tuningset, &trainingset->positions[k]);
+        score2 = evaluate_equation(&trainingset->positions[k].equation,
+                                   tuningset);
         score2 = (state->pos.stm == WHITE)?score2:-score2;
         free(trace);
         trace = NULL;
@@ -980,22 +1090,24 @@ static void print_usage(void)
     printf("\t-t <training file> <parameter file>\n\tTune parameters\n\n");
     printf("\t-p <output file>\n\tPrint all tunable parameters\n\n");
     printf("\t-n <nthreads>\n\tThe number of threads to use\n\n");
-    printf("\t-s <stepsize>\n\tStep size for first iteration\n\n");
+    printf("\t-i <niterations>\n\tThe number of iterations to run\n\n");
+    printf("\t-o [local|adam]\n\tOptimization algorithm to use for tuning\n\n");
     printf("\t-z\n\tPrint tuning parameters with all values set to zero\n\n");
     printf("\t-h\n\tDisplay this message\n\n");
 }
 
 int main(int argc, char *argv[])
 {
-    int  iter;
-    int  nconv;
-    char *training_file;
-    char *parameter_file;
-    char *output_file;
-    int  nthreads;
-    int  command;
-    int  stepsize;
-    bool zero_params;
+    enum optimization_algorithm optalgo;
+    int                         iter;
+    int                         nconv;
+    char                        *training_file;
+    char                        *parameter_file;
+    char                        *output_file;
+    int                         nthreads;
+    int                         command;
+    bool                        zero_params;
+    int                         niterations;
 
     /* Turn off buffering for I/O */
     setbuf(stdout, NULL);
@@ -1015,8 +1127,9 @@ int main(int argc, char *argv[])
     parameter_file = NULL;
     output_file = NULL;
     nthreads = 1;
-    stepsize = 1;
+    optalgo = OPT_LOCAL_SEARCH;
     zero_params = false;
+    niterations = DEFAULT_ITERATIONS;
 
     /* Parse command line arguments */
     iter = 1;
@@ -1063,6 +1176,20 @@ int main(int argc, char *argv[])
                 print_usage();
                 exit(1);
             }
+        } else if (!strcmp(argv[iter], "-i")) {
+            iter++;
+            if (iter == argc) {
+                printf("Invalid argument\n");
+                print_usage();
+                exit(1);
+            }
+            nconv = sscanf(argv[iter], "%u", &niterations);
+            if (nconv != 1) {
+                printf("Invalid argument\n");
+                print_usage();
+                exit(1);
+            }
+
         } else if (!strcmp(argv[iter], "-p")) {
             command = 2;
             iter++;
@@ -1072,19 +1199,6 @@ int main(int argc, char *argv[])
                 exit(1);
             }
             output_file = argv[iter];
-        } else if (!strcmp(argv[iter], "-s")) {
-            iter++;
-            if (iter == argc) {
-                printf("Invalid argument\n");
-                print_usage();
-                exit(1);
-            }
-            nconv = sscanf(argv[iter], "%u", &stepsize);
-            if (nconv != 1) {
-                printf("Invalid argument\n");
-                print_usage();
-                exit(1);
-            }
         } else if (!strcmp(argv[iter], "-v")) {
             command = 3;
             iter++;
@@ -1096,6 +1210,22 @@ int main(int argc, char *argv[])
             training_file = argv[iter];
         } else if (!strcmp(argv[iter], "-z")) {
             zero_params = true;
+        } else if (!strcmp(argv[iter], "-o")) {
+            iter++;
+            if (iter == argc) {
+                printf("Invalid argument\n");
+                print_usage();
+                exit(1);
+            }
+            if (!strcmp(argv[iter], "local")) {
+                optalgo = OPT_LOCAL_SEARCH;
+            } else if (!strcmp(argv[iter], "adam")) {
+                optalgo = OPT_ADAM;
+            } else {
+                printf("Invalid argument\n");
+                print_usage();
+                exit(1);
+            }
         } else {
             printf("Invalid argument\n");
             print_usage();
@@ -1110,7 +1240,8 @@ int main(int argc, char *argv[])
         find_k(training_file, nthreads);
         break;
     case 1:
-        tune_parameters(training_file, parameter_file, nthreads, stepsize);
+        tune_parameters(training_file, parameter_file, nthreads, optalgo,
+                        niterations);
         break;
     case 2:
         print_parameters(output_file, zero_params);

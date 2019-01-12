@@ -149,6 +149,17 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"free_passed_pawn_eg", 834, 834, 0, 200}
 };
 
+static void validate_value(FILE *fp, char *name, struct tuning_param *param)
+{
+    if ((int)param->current < param->min) {
+        fprintf(fp, "# %s: value is below minimum (%d/%d)\n", name,
+                (int)param->current, param->min);
+    } else if ((int)param->current > param->max) {
+        fprintf(fp, "# %s: value is above maximum (%d/%d)\n", name,
+                (int)param->current, param->max);
+    }
+}
+
 void tuning_param_assign_current(struct tuning_param *params)
 {
     int start;
@@ -366,9 +377,13 @@ void tuning_param_write_parameters(FILE *fp, struct tuning_param *params,
         }
 
         if (start == stop) {
+            validate_value(fp, parameter_declarations[k].name, &params[start]);
             fprintf(fp, "%s %d\n", parameter_declarations[k].name,
                     zero?0:(int)params[start].current);
         } else {
+            for (l=start;l<=stop;l++) {
+                validate_value(fp, parameter_declarations[k].name, &params[l]);
+            }
             fprintf(fp, "%s {", parameter_declarations[k].name);
             for (l=start;l<=stop;l++) {
                 fprintf(fp, "%d", zero?0:(int)params[l].current);

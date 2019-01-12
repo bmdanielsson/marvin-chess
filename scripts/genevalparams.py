@@ -60,6 +60,8 @@ output.write('\n')
 
 for line in open(inputfile):
     line = line.rstrip()
+    if line[0] == '#':
+        continue
     parts = line.split(' ')
     if parts[0].startswith('psq_table_'):
         print_psq_table(output, parts[0], line)
