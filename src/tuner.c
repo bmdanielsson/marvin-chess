@@ -1081,6 +1081,54 @@ static void verify_trace(char *training_file)
     destroy_game_state(state);
 }
 
+static void print_error(char *training_file, char *parameter_file, int nthreads)
+{
+    struct tuningset    *tuningset;
+    struct trainingset  *trainingset;
+    struct gamestate    *state;
+    double              error;
+
+    assert(training_file != NULL);
+    assert(parameter_file != NULL);
+
+    /* Create game state */
+    state = create_game_state();
+
+    /* Read tuning set */
+    tuningset = read_tuningset(parameter_file);
+    if (tuningset == NULL) {
+        printf("Error: failed to read tuning set\n");
+        return;
+    }
+
+    /* Read training set */
+    trainingset = read_trainingset(state, training_file);
+    if (trainingset == NULL) {
+        printf("Error: failed to read training set\n");
+        return;
+    }
+
+    /* Setup worker threads */
+    nworkerthreads = nthreads;
+    workers = malloc(sizeof(struct tuning_worker)*nthreads);
+    init_workers(trainingset, tuningset);
+
+    /* Make sure all training positions are covered */
+    workers[nthreads-1].last_pos = trainingset->size - 1;
+
+    /* Calculate error */
+    trace_positions();
+    tuning_param_assign_current(tuningset->params);
+    error = calc_texel_squared_error(trainingset);
+    printf("Error: %f\n", error);
+
+    /* Clean up */
+    free(workers);
+    free_tuningset(tuningset);
+    free_trainingset(trainingset);
+    destroy_game_state(state);
+}
+
 static void print_usage(void)
 {
     printf("Usage: tuner [options]\n");
@@ -1088,6 +1136,7 @@ static void print_usage(void)
     printf("\t-k <training file>\n\tCalculate the tuning constant K\n\n");
     printf("\t-v <training file>\n\tVerify evaluation tracing\n\n");
     printf("\t-t <training file> <parameter file>\n\tTune parameters\n\n");
+    printf("\t-e <training file> <parameter file>\n\tCalculate error\n\n");
     printf("\t-p <output file>\n\tPrint all tunable parameters\n\n");
     printf("\t-n <nthreads>\n\tThe number of threads to use\n\n");
     printf("\t-i <niterations>\n\tThe number of iterations to run\n\n");
@@ -1189,7 +1238,6 @@ int main(int argc, char *argv[])
                 print_usage();
                 exit(1);
             }
-
         } else if (!strcmp(argv[iter], "-p")) {
             command = 2;
             iter++;
@@ -1226,6 +1274,22 @@ int main(int argc, char *argv[])
                 print_usage();
                 exit(1);
             }
+        } else if (!strcmp(argv[iter], "-e")) {
+            command = 4;
+            iter++;
+            if (iter == argc) {
+                printf("Invalid argument\n");
+                print_usage();
+                exit(1);
+            }
+            training_file = argv[iter];
+            iter++;
+            if (iter == argc) {
+                printf("Invalid argument\n");
+                print_usage();
+                exit(1);
+            }
+            parameter_file = argv[iter];
         } else {
             printf("Invalid argument\n");
             print_usage();
@@ -1248,6 +1312,9 @@ int main(int argc, char *argv[])
         break;
     case 3:
         verify_trace(training_file);
+        break;
+    case 4:
+        print_error(training_file, parameter_file, nthreads);
         break;
     default:
         print_usage();
