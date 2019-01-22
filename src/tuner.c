@@ -64,6 +64,9 @@
 #define REPORT_INTERVAL 100
 #define DEFAULT_ITERATIONS 1000
 
+/* Constants for L2 regularization */
+#define LAMBDA 1E-7
+
 enum optimization_algorithm {
     OPT_LOCAL_SEARCH,
     OPT_ADAM
@@ -123,6 +126,7 @@ struct tuning_worker *workers = NULL;
 static int nworkerthreads = 0;
 static double scaling_constant = K;
 static volatile bool stop_optimization = false;
+static bool regularize = true;
 
 static void init_workers(struct trainingset *trainingset,
                          struct tuningset *tuningset)
@@ -323,6 +327,25 @@ static void trace_positions(void)
     }
 }
 
+static double texel_l2_penalty(struct tuningset *tuningset)
+{
+    struct tuning_param *param;
+    int                 k;
+    double              penalty;
+
+    penalty = 0.0;
+    for (k=0;k<NUM_TUNING_PARAMS;k++) {
+        param = &tuningset->params[k];
+        if (!param->active) {
+            continue;
+        }
+        penalty += (param->current*param->current);
+    }
+    penalty *= LAMBDA;
+
+    return penalty;
+}
+
 static double texel_sigmoid(double score)
 {
     double exp;
@@ -464,6 +487,9 @@ static void calc_texel_gradients(double *gradients)
             gradients[k] += (workers[iter].gradients[k]);
         }
         gradients[k] *= (-2.0/workers[0].trainingset->size);
+        if (regularize) {
+            gradients[k] += (2*LAMBDA*workers[0].tuningset->params[k].current);
+        }
     }
 }
 
@@ -493,6 +519,9 @@ static void adam(struct tuningset *tuningset, struct trainingset *trainingset,
     printf("Initial error: %f\n", error);
 
     printf("\nOptimizing using Adam\n");
+    if (regularize) {
+        printf("Applying L2 regularization\n");
+    }
 
     for (niterations=1;niterations<=max_iterations;niterations++) {
         if (stop_optimization) {
@@ -502,7 +531,13 @@ static void adam(struct tuningset *tuningset, struct trainingset *trainingset,
         /* Display regular progress */
         if ((niterations%REPORT_INTERVAL) == 0) {
             error = calc_texel_squared_error(trainingset);
-            printf("Iteration: %d, Error: %f\n", niterations, error);
+            if (regularize) {
+                printf("Iteration: %d, Error: %f, ", niterations, error);
+                error += texel_l2_penalty(tuningset);
+                printf("Objective: %f\n", error);
+            } else {
+                printf("Iteration: %d, Error: %f\n", niterations, error);
+            }
         }
 
         /* Calculate the gradient for each parameter */
@@ -529,6 +564,10 @@ static void adam(struct tuningset *tuningset, struct trainingset *trainingset,
     printf("\n");
     printf("Total number of iterations: %d\n", niterations-1);
     printf("Final error: %f\n", error);
+    if (regularize) {
+        error += texel_l2_penalty(tuningset);
+        printf("Objective score: %f\n", error);
+    }
 }
 
 static void local_search(struct tuningset *tuningset,
