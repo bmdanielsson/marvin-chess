@@ -20,9 +20,6 @@
 
 #include "chess.h"
 
-/* The maximum allowed history score */
-#define MAX_HISTORY_SCORE 10000000
-
 /* Flags describing the position */
 #define FLAG_ROOT_NODE          0x00000001
 #define FLAG_QUIESCENCE_NODE    0x00000002

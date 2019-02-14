@@ -31,6 +31,7 @@
 #include "polybook.h"
 #include "bitboard.h"
 #include "board.h"
+#include "table.h"
 
 /* Worker actions */
 #define ACTION_IDLE 0
@@ -144,26 +145,14 @@ static thread_retval_t worker_thread_func(void *data)
 static void prepare_worker(struct search_worker *worker,
                            struct gamestate *state)
 {
-    int k;
-    int l;
-
     /* Copy data from game state */
     worker->pos = state->pos;
     worker->root_moves = state->root_moves;
 
-    /* Clear killer table */
-    for (k=0;k<MAX_PLY;k++) {
-        worker->killer_table[k][0] = NOMOVE;
-        worker->killer_table[k][1] = NOMOVE;
-    }
-
-    /* Clear history table */
-    for (k=0;k<NPIECES;k++) {
-        for (l=0;l<NSQUARES;l++) {
-            worker->history_table[k][l] = 0;
-            worker->countermove_table[k][l] = NOMOVE;
-        }
-    }
+    /* Clear tables */
+    tbl_clear_history_table(worker);
+    tbl_clear_killermove_table(worker);
+    tbl_clear_countermove_table(worker);
 
     /* Clear statistics */
     worker->nodes = 0;

@@ -39,6 +39,7 @@
 #include "tbprobe.h"
 #include "smp.h"
 #include "fen.h"
+#include "table.h"
 
 /* Calculates if it is time to check the clock and poll for commands */
 #define CHECKUP(n) (((n)&1023)==0)
@@ -86,69 +87,6 @@ static int see_prune_margin[] = {0, -100, -200, -300, -400};
 
 /* Configuration constants for singular extensions */
 #define SE_DEPTH 8
-
-static void update_history_table(struct search_worker *worker, uint32_t move,
-                                 int depth)
-{
-    int             from;
-    int             to;
-    int             piece;
-    struct position *pos;
-
-    if (ISCAPTURE(move) || ISENPASSANT(move)) {
-        return;
-    }
-
-    /* Update the history table and rescale entries if necessary */
-    pos = &worker->pos;
-    from = FROM(move);
-    to = TO(move);
-    worker->history_table[pos->pieces[from]][to] += depth*depth;
-    if (worker->history_table[pos->pieces[from]][to] > MAX_HISTORY_SCORE) {
-        for (piece=0;piece<NPIECES;piece++) {
-            for (to=0;to<NSQUARES;to++) {
-                worker->history_table[piece][to] /= 2;
-            }
-        }
-    }
-}
-
-static void add_killer_move(struct search_worker *worker, uint32_t move)
-{
-    struct position *pos = &worker->pos;
-
-    if (move == worker->killer_table[pos->sply][0]) {
-        return;
-    }
-
-    worker->killer_table[pos->sply][1] = worker->killer_table[pos->sply][0];
-    worker->killer_table[pos->sply][0] = move;
-}
-
-static bool is_killer_move(struct search_worker *worker, uint32_t move)
-{
-    struct position *pos;
-
-    pos = &worker->pos;
-    return (worker->killer_table[pos->sply][0] == move) ||
-            (worker->killer_table[pos->sply][1] == move);
-}
-
-static void add_counter_move(struct search_worker *worker, uint32_t move)
-{
-    struct position *pos;
-    uint32_t prev_move;
-
-    assert(worker->pos.sply > 0);
-
-    pos = &worker->pos;
-    prev_move = pos->history[pos->ply-1].move;
-    if (ISNULLMOVE(prev_move)) {
-        return;
-    }
-
-    worker->countermove_table[pos->pieces[TO(prev_move)]][TO(move)] = move;
-}
 
 static bool is_pawn_push(struct position *pos, uint32_t move)
 {
@@ -664,7 +602,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
 
         /* Various move properties */
         pawn_push = is_pawn_push(pos, move);
-        killer = is_killer_move(worker, move);
+        killer = tbl_is_killer_move(worker, move);
         hist = worker->history_table[pos->pieces[FROM(move)]][TO(move)];
         gives_check = board_move_gives_check(pos, move);
         tactical = is_tactical_move(move) || in_check || gives_check;
@@ -802,8 +740,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                 if (score >= beta) {
                     if ((!ISCAPTURE(move) && !ISENPASSANT(move)) ||
                         !see_ge(pos, move, 0)) {
-                        add_killer_move(worker, move);
-                        add_counter_move(worker, move);
+                        tbl_add_killer_move(worker, move);
+                        tbl_add_counter_move(worker, move);
                     }
                     tt_flag = TT_BETA;
                     break;
@@ -816,7 +754,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                 tt_flag = TT_EXACT;
                 alpha = score;
                 update_pv(worker, move);
-                update_history_table(worker, move, depth);
+                tbl_update_history_table(worker, move, depth);
             }
         }
     }
@@ -913,7 +851,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 if (score >= beta) {
                     if ((!ISCAPTURE(move) && !ISENPASSANT(move)) ||
                         !see_ge(pos, move, 0)) {
-                        add_killer_move(worker, move);
+                        tbl_add_killer_move(worker, move);
                     }
                     tt_flag = TT_BETA;
                     break;
@@ -927,7 +865,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 tt_flag = TT_EXACT;
                 alpha = score;
                 update_pv(worker, move);
-                update_history_table(worker, move, depth);
+                tbl_update_history_table(worker, move, depth);
 
                 /*
                  * Update the best move and the ponder move. The moves
@@ -1077,8 +1015,6 @@ void search_find_best_move(struct search_worker *worker)
 int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
 {
     struct search_worker *worker;
-    int                  k;
-    int                  l;
     int                  score;
 
     tc_configure_time_control(TC_INFINITE, 0, 0, 0);
@@ -1094,16 +1030,6 @@ int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
 
     worker->pos = state->pos;
     worker->root_moves = state->root_moves;
-    for (k=0;k<MAX_PLY;k++) {
-        worker->killer_table[k][0] = NOMOVE;
-        worker->killer_table[k][1] = NOMOVE;
-    }
-    for (k=0;k<NPIECES;k++) {
-        for (l=0;l<NSQUARES;l++) {
-            worker->history_table[k][l] = 0;
-            worker->countermove_table[k][l] = NOMOVE;
-        }
-    }
     worker->depth = 0;
     worker->nodes = 0;
     worker->id = 0;
@@ -1114,6 +1040,10 @@ int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
     worker->state = state;
     worker->pos.state = state;
     worker->pos.worker = worker;
+
+    tbl_clear_history_table(worker);
+    tbl_clear_killermove_table(worker);
+    tbl_clear_countermove_table(worker);
 
     pv->length = 0;
     score = quiescence(worker, 0, -INFINITE_SCORE, INFINITE_SCORE);

@@ -94,6 +94,7 @@ SOURCES = src/bitboard.c \
           src/search.c \
           src/see.c \
           src/smp.c \
+          src/table.c \
           src/test.c \
           src/thread.c \
           src/timectl.c \
@@ -118,6 +119,7 @@ TUNER_SOURCES = src/bitboard.c \
                 src/search.c \
                 src/see.c \
                 src/smp.c \
+                src/table.c \
                 src/test.c \
                 src/thread.c \
                 src/timectl.c \
