@@ -754,9 +754,13 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                 tt_flag = TT_EXACT;
                 alpha = score;
                 update_pv(worker, move);
-                tbl_update_history_table(worker, move, depth);
             }
         }
+    }
+
+    /* If the best move is a quiet move then update the history table */
+    if (!ISCAPTURE(move) && !ISENPASSANT(move) && (tt_flag != TT_ALPHA)) {
+        tbl_update_history_table(worker, best_move, depth);
     }
 
     /*
@@ -865,7 +869,6 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 tt_flag = TT_EXACT;
                 alpha = score;
                 update_pv(worker, move);
-                tbl_update_history_table(worker, move, depth);
 
                 /*
                  * Update the best move and the ponder move. The moves
@@ -878,6 +881,11 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 smp_update(worker, score);
             }
         }
+    }
+
+    /* If the best move is a quiet move then update the history table */
+    if (!ISCAPTURE(move) && !ISENPASSANT(move) && (tt_flag != TT_ALPHA)) {
+        tbl_update_history_table(worker, best_move, depth);
     }
 
     /* Store the result for this node in the transposition table */
