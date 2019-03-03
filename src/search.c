@@ -54,9 +54,13 @@
 #define NULLMOVE_BASE_REDUCTION 2
 #define NULLMOVE_DIVISOR 6
 
-/* Margins used for futility pruning */
-#define FUTILITY_DEPTH 3
-static int futility_margin[] = {0, 300, 500, 900};
+/* Configuration constants for futility pruning */
+#define FUTILITY_DEPTH 7
+static int futility_margin[] = {0, 150, 250, 350, 450, 550, 650, 750};
+
+/* Margins used for reverse futility pruning */
+#define REVERSE_FUTILITY_DEPTH 3
+static int reverse_futility_margin[] = {0, 300, 500, 900};
 
 /* Margins used for razoring */
 #define RAZORING_DEPTH 3
@@ -461,11 +465,11 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     static_score = eval_evaluate(worker);
 
     /* Reverse futility pruning */
-    if ((depth <= FUTILITY_DEPTH) &&
+    if ((depth <= REVERSE_FUTILITY_DEPTH) &&
         !in_check &&
         !pv_node &&
         board_has_non_pawn(pos, pos->stm) &&
-        ((static_score-futility_margin[depth]) >= beta)) {
+        ((static_score-reverse_futility_margin[depth]) >= beta)) {
         return static_score;
     }
 
