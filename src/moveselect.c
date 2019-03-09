@@ -331,7 +331,6 @@ static bool get_move(struct search_worker *worker, uint32_t *move)
 
     pos = &worker->pos;
     ms = &worker->ppms[pos->sply];
-    assert(!(ms->flags&FLAG_ROOT_NODE));
 
     switch (ms->phase) {
     case PHASE_ROOT:
