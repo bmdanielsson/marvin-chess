@@ -432,6 +432,8 @@ void select_init_node(struct search_worker *worker, uint32_t flags,
             prev_to = TO(prev_move);
             ms->counter =
                     worker->countermove_table[pos->pieces[prev_to]][prev_to];
+        } else {
+            ms->counter = NOMOVE;
         }
     } else {
         ms->counter = NOMOVE;
