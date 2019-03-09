@@ -23,7 +23,135 @@
 #include "movegen.h"
 #include "board.h"
 #include "eval.h"
+#include "search.h"
+#include "moveselect.h"
+#include "hash.h"
 #include "debug.h"
+
+static int qsearch_verification(struct search_worker *worker, int depth,
+                                int alpha, int beta)
+{
+    int             score;
+    int             best_score;
+    int             static_score;
+    uint32_t        move;
+    uint32_t        tt_move;
+    bool            found_move;
+    bool            in_check;
+    struct position *pos;
+
+    pos = &worker->pos;
+
+    if (board_is_repetition(pos) || (pos->fifty >= 100)) {
+        return 0;
+    }
+
+    static_score = eval_evaluate(worker);
+
+    if (pos->sply >= MAX_PLY) {
+        return static_score;
+    }
+
+    in_check = board_in_check(pos, pos->stm);
+    best_score = -INFINITE_SCORE;
+    if (!in_check) {
+        best_score = static_score;
+        if (static_score >= beta) {
+            return static_score;
+        }
+        if (static_score > alpha) {
+            alpha = static_score;
+        }
+    }
+
+    tt_move = NOMOVE;
+    if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score, NULL)) {
+        return score;
+    }
+    select_init_node(worker, FLAG_QUIESCENCE_NODE, in_check, tt_move);
+
+    found_move = false;
+    while (select_get_move(worker, &move)) {
+        if (!board_make_move(pos, move)) {
+            continue;
+        }
+        found_move = true;
+        score = -qsearch_verification(worker, depth-1, -beta, -alpha);
+        board_unmake_move(pos);
+
+        if (score > best_score) {
+            best_score = score;
+            if (score > alpha) {
+                if (score >= beta) {
+                    break;
+                }
+                alpha = score;
+            }
+        }
+    }
+
+    return (in_check && !found_move)?-CHECKMATE+pos->sply:best_score;
+}
+
+static int search_verification(struct search_worker *worker, int depth,
+                               int alpha, int beta)
+{
+    int             score;
+    int             tt_score;
+    int             best_score;
+    uint32_t        move;
+    uint32_t        tt_move;
+    bool            found_move;
+    bool            in_check;
+    struct tt_item  *tt_item;
+    struct position *pos;
+
+    pos = &worker->pos;
+
+    in_check = board_in_check(pos, pos->stm);
+
+    if (depth <= 0) {
+        return qsearch_verification(worker, 0, alpha, beta);
+    }
+
+    if (board_is_repetition(pos) || (pos->fifty >= 100)) {
+        return 0;
+    }
+
+    tt_move = NOMOVE;
+    tt_item = NULL;
+    if (hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &tt_score,
+                       &tt_item)) {
+        return tt_score;
+    }
+    select_init_node(worker, 0, in_check, tt_move);
+
+    best_score = -INFINITE_SCORE;
+    while (select_get_move(worker, &move)) {
+        if (!board_make_move(pos, move)) {
+            continue;
+        }
+        found_move = true;
+        score = -search_verification(worker, depth-1, -beta, -alpha);
+        board_unmake_move(pos);
+
+        if (score > best_score) {
+            best_score = score;
+            if (score > alpha) {
+                if (score >= beta) {
+                    break;
+                }
+                alpha = score;
+            }
+        }
+    }
+
+    if (!found_move) {
+        best_score = in_check?-CHECKMATE+pos->sply:0;
+    }
+
+    return best_score;
+}
 
 bool valid_position(struct position *pos)
 {
@@ -184,4 +312,23 @@ bool valid_scores(struct position *pos)
         pos->psq[MIDDLEGAME][BLACK] == eval_psq(pos, BLACK, false) &&
         pos->psq[ENDGAME][WHITE] == eval_psq(pos, WHITE, true) &&
         pos->psq[ENDGAME][BLACK] == eval_psq(pos, BLACK, true);
+}
+
+bool valid_pruning(struct search_worker *worker, uint32_t move, int depth,
+                   int alpha, int beta)
+{
+    int             score;
+    struct position *pos;
+
+    pos = &worker->pos;
+
+    if (!board_make_move(pos, move)) {
+        return true;
+    }
+
+    score = -search_verification(worker, depth-1, -beta, -alpha);
+
+    board_unmake_move(pos);
+
+    return (score <= alpha);
 }
