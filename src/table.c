@@ -114,5 +114,5 @@ void tbl_add_counter_move(struct search_worker *worker, uint32_t move)
         return;
     }
 
-    worker->countermove_table[pos->pieces[TO(prev_move)]][TO(move)] = move;
+    worker->countermove_table[pos->pieces[TO(prev_move)]][TO(prev_move)] = move;
 }
