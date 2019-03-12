@@ -165,6 +165,7 @@ static bool probe_wdl_tables(struct search_worker *worker, int alpha, int beta,
         *score = 0;
         return false;
     }
+    worker->tbhits++;
 
     switch (res) {
     case TB_WIN:

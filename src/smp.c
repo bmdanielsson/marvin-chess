@@ -161,6 +161,7 @@ static void prepare_worker(struct search_worker *worker,
     worker->seldepth = 0;
     worker->currmovenumber = 0;
     worker->currmove = NOMOVE;
+    worker->tbhits = 0ULL;
 
     /* Clear best move information */
     worker->ponder_move = NOMOVE;
@@ -321,6 +322,18 @@ uint32_t smp_nodes(void)
         nodes += workers[k].nodes;
     }
     return nodes;
+}
+
+uint64_t smp_tbhits(void)
+{
+    uint64_t tbhits;
+    int      k;
+
+    tbhits = 0ULL;
+    for (k=0;k<number_of_workers;k++) {
+        tbhits += workers[k].tbhits;
+    }
+    return tbhits;
 }
 
 void smp_stop_all(void)

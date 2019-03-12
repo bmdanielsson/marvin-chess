@@ -21,6 +21,7 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stdbool.h>
+#include <inttypes.h>
 
 #include "uci.h"
 #include "config.h"
@@ -459,15 +460,17 @@ bool uci_check_input(struct search_worker *worker)
 void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
                       int seldepth, int score, uint32_t nodes)
 {
-    char movestr[6];
-    char buffer[1024];
-    int  msec;
-    int  nps;
-    int  k;
+    char     movestr[6];
+    char     buffer[1024];
+    int      msec;
+    int      nps;
+    int      k;
+    uint64_t tbhits;
 
     /* Get the currently searched time */
     msec = (int)tc_elapsed_time();
     nps = (msec > 0)?(nodes/msec)*1000:0;
+    tbhits = worker->state->root_in_tb?1:smp_tbhits();
 
     /* Adjust score in case the root position was found in tablebases */
     if (worker->state->root_in_tb) {
@@ -477,7 +480,8 @@ void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
 
     /* Build command */
     sprintf(buffer, "info depth %d seldepth %d nodes %d time %d nps %d "
-            "score cp %d pv", depth, seldepth, nodes, msec, nps, score);
+            "tbhits %"PRIu64" score cp %d pv", depth, seldepth, nodes, msec,
+            nps, tbhits, score);
     for (k=0;k<pv->length;k++) {
         strcat(buffer, " ");
         move2str(pv->moves[k], movestr);

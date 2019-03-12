@@ -467,6 +467,8 @@ struct search_worker {
     uint32_t currmove;
     /* The number of the move currently being searched (one-based) */
     int currmovenumber;
+    /* The number of tablebase hits */
+    uint64_t tbhits;
 
     /* The best move found so far */
     uint32_t best_move;

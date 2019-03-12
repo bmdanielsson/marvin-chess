@@ -55,6 +55,13 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
 uint32_t smp_nodes(void);
 
 /*
+ * The number of tablebase hits during search.
+ *
+ * @return Returns the total number of tablebase hits.
+ */
+uint64_t smp_tbhits(void);
+
+/*
  * Stop all workers.
  */
 void smp_stop_all(void);
