@@ -100,10 +100,9 @@ bool engine_wait_for_input(struct search_worker *worker);
  * @param depth The depth.
  * @param seldepth The selctive depth.
  * @param score The PV score.
- * @param nodes The number of searched nodes.
  */
 void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
-                         int seldepth, int score, uint32_t nodes);
+                         int seldepth, int score);
 
 /*
  * Send information about the move currently being searched.

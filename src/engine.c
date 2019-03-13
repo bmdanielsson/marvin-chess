@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <inttypes.h>
 
 #include "engine.h"
 #include "uci.h"
@@ -33,6 +34,7 @@
 #include "chess.h"
 #include "timectl.h"
 #include "thread.h"
+#include "smp.h"
 
 /* Size of the receive buffer */
 #define RX_BUFFER_SIZE 4096
@@ -268,7 +270,7 @@ bool engine_wait_for_input(struct search_worker *worker)
 }
 
 void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
-                         int seldepth, int score, uint32_t nodes)
+                         int seldepth, int score)
 {
     char movestr[6];
     char buffer[1024];
@@ -283,16 +285,16 @@ void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
     }
 
     if (engine_protocol == PROTOCOL_UCI) {
-        return uci_send_pv_info(worker, pv, depth, seldepth, score, nodes);
+        return uci_send_pv_info(worker, pv, depth, seldepth, score);
     } else if (engine_protocol == PROTOCOL_XBOARD) {
-        return xboard_send_pv_info(worker, pv, depth, score, nodes);
+        return xboard_send_pv_info(worker, pv, depth, score);
     }
 
     /* Get the currently searched time */
     msec = (int)tc_elapsed_time();
 
-    printf("=> depth: %d, score: %d, time: %d, nodes: %d\n",
-           depth, score, msec, nodes);
+    printf("=> depth: %d, score: %d, time: %d, nodes: %"PRIu64"\n",
+           depth, score, msec, smp_nodes());
     buffer[0] = '\0';
     nlines = 1;
     strcat(buffer, "  ");

@@ -52,7 +52,7 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
  *
  * @return Returns the total number of nodes searched (by all workers).
  */
-uint32_t smp_nodes(void);
+uint64_t smp_nodes(void);
 
 /*
  * The number of tablebase hits during search.

@@ -312,12 +312,12 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     }
 }
 
-uint32_t smp_nodes(void)
+uint64_t smp_nodes(void)
 {
-    uint32_t nodes;
+    uint64_t nodes;
     int      k;
 
-    nodes = 0;
+    nodes = 0ULL;
     for (k=0;k<number_of_workers;k++) {
         nodes += workers[k].nodes;
     }
@@ -371,7 +371,7 @@ void smp_update(struct search_worker *worker, int score)
 
         /* Send pv information */
         engine_send_pv_info(worker, &worker->pv_table[0], worker->depth,
-                            worker->seldepth, score, smp_nodes());
+                            worker->seldepth, score);
     }
 
     mutex_unlock(&state_lock);

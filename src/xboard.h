@@ -43,10 +43,12 @@ bool xboard_check_input(struct search_worker *worker);
 /*
  * Send information about the principle variation.
  *
- * @param state The board structure.
+ * @param worker The worker
+ * @param pv The pv.
+ * @param depth The depth.
  * @param score The PV score.
  */
 void xboard_send_pv_info(struct search_worker *worker, struct pv *pv,
-                         int depth, int score, uint32_t nodes);
+                         int depth, int score);
 
 #endif

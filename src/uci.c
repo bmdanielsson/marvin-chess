@@ -458,7 +458,7 @@ bool uci_check_input(struct search_worker *worker)
 }
 
 void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
-                      int seldepth, int score, uint32_t nodes)
+                      int seldepth, int score)
 {
     char     movestr[6];
     char     buffer[1024];
@@ -466,9 +466,11 @@ void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
     int      nps;
     int      k;
     uint64_t tbhits;
+    uint64_t nodes;
 
     /* Get the currently searched time */
     msec = (int)tc_elapsed_time();
+    nodes = smp_nodes();
     nps = (msec > 0)?(nodes/msec)*1000:0;
     tbhits = worker->state->root_in_tb?1:smp_tbhits();
 
@@ -479,7 +481,7 @@ void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
     }
 
     /* Build command */
-    sprintf(buffer, "info depth %d seldepth %d nodes %d time %d nps %d "
+    sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
             "tbhits %"PRIu64" score cp %d pv", depth, seldepth, nodes, msec,
             nps, tbhits, score);
     for (k=0;k<pv->length;k++) {

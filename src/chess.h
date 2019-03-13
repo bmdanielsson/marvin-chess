@@ -456,9 +456,9 @@ struct search_worker {
     /* Indicates if the engine is resolving a fail-low/fail-high at the root */
     bool resolving_root_fail;
     /* The number of nodes searched so far */
-    uint32_t nodes;
+    uint64_t nodes;
     /* The number of quiscence nodes searched so far */
-    uint32_t qnodes;
+    uint64_t qnodes;
     /* The current search depth in plies */
     int depth;
     /* The current selective search depth in plies */
