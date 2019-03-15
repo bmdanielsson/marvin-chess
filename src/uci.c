@@ -501,7 +501,7 @@ void uci_send_move_info(struct search_worker *worker)
 
     /* Get the currently searched time */
     msec = (int)tc_elapsed_time();
-    if (msec < 1000) {
+    if (msec < 3000) {
         /* Wait 1s before starting to send move info to avoid traffic */
         return;
     }
