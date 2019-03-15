@@ -482,8 +482,8 @@ void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
 
     /* Build command */
     sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
-            "tbhits %"PRIu64" score cp %d pv", depth, seldepth, nodes, msec,
-            nps, tbhits, score);
+            "tbhits %"PRIu64" hashfull %d score cp %d pv", depth, seldepth,
+            nodes, msec, nps, tbhits, hash_tt_usage(), score);
     for (k=0;k<pv->length;k++) {
         strcat(buffer, " ");
         move2str(pv->moves[k], movestr);

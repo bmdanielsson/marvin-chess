@@ -104,6 +104,13 @@ struct tt_item* hash_tt_lookup_raw(struct position *pos);
 void hash_tt_insert_pv(struct position *pos, struct pv *pv);
 
 /*
+ * Get the transposition table usage.
+ *
+ * @return Returns how many permill of the transposition table that is used.
+ */
+int hash_tt_usage(void);
+
+/*
  * Create the pawn transposition table.
  *
  * @param worker The worker.

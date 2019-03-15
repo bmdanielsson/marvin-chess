@@ -365,6 +365,27 @@ void hash_tt_insert_pv(struct position *pos, struct pv *pv)
     }
 }
 
+/* Transposition table usage is estimated based on the first 1000 buckets */
+int hash_tt_usage(void)
+{
+    struct tt_bucket *bucket;
+    int k;
+    int idx;
+    int nused;
+
+    nused = 0;
+    for (k=0;k<=1000;k++) {
+        bucket = &transposition_table[k];
+        for (idx=0;idx<TT_BUCKET_SIZE;idx++) {
+            if (bucket->items[idx].date > 0) {
+                nused++;
+            }
+        }
+    }
+
+    return nused/TT_BUCKET_SIZE;
+}
+
 void hash_pawntt_create_table(struct search_worker *worker, int size)
 {
     assert(size >= 0);
