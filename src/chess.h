@@ -471,6 +471,8 @@ struct search_worker {
     uint64_t tbhits;
 
     /* The best move found so far */
+    int best_score;
+    int best_depth;
     uint32_t best_move;
     uint32_t ponder_move;
 

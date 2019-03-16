@@ -219,8 +219,10 @@ void smp_destroy_workers(void)
 void smp_search(struct gamestate *state, bool pondering, bool use_book,
                 bool use_tablebases)
 {
-    int  k;
-    bool analysis;
+    int                  k;
+    bool                 analysis;
+    struct search_worker *worker;
+    struct search_worker *best_worker;
 
     assert(valid_position(&state->pos));
 
@@ -310,6 +312,33 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     for (k=1;k<number_of_workers;k++) {
         thread_join(&workers[k].thread);
     }
+
+    /* Find the worker with the best move */
+    best_worker = &workers[0];
+    for (k=1;k<number_of_workers;k++) {
+        worker = &workers[k];
+        if ((worker->best_depth > best_worker->best_depth) ||
+            ((worker->best_depth == best_worker->best_depth) &&
+             (worker->best_score > best_worker->best_score))) {
+            best_worker = worker;
+        }
+    }
+
+    /*
+     * If the best worker is not the first worker then send
+     * an exxtra pv line to thye GUI.
+     */
+    if (best_worker->id != 0) {
+        engine_send_pv_info(worker, &best_worker->pv_table[0],
+                            best_worker->depth, best_worker->depth,
+                            best_worker->best_score);
+    }
+
+    /* Copy the best move to the state struct */
+    best_worker->state->best_move = best_worker->best_move;
+    best_worker->state->ponder_move = best_worker->ponder_move;
+    best_worker->state->best_move_depth = best_worker->best_depth;
+    best_worker->state->best_move_score = best_worker->best_score;
 }
 
 uint64_t smp_nodes(void)
@@ -349,32 +378,6 @@ bool smp_should_stop(struct search_worker *worker)
 
     mask = atomic_load_explicit(&stop_mask, memory_order_relaxed);
     return (mask&(1ULL << worker->id)) != 0ULL;
-}
-
-void smp_update(struct search_worker *worker, int score)
-{
-    mutex_lock(&state_lock);
-
-    /*
-     * Update the best move if the depth is larger than the
-     * depth for the current best move, or if the depth is
-     * the same but the score is higher.
-     */
-    if ((worker->depth > worker->state->best_move_depth) ||
-        ((worker->depth == worker->state->best_move_depth) &&
-         (score > worker->state->best_move_score))) {
-        /* Update best move information */
-        worker->state->best_move = worker->best_move;
-        worker->state->ponder_move = worker->ponder_move;
-        worker->state->best_move_depth = worker->depth;
-        worker->state->best_move_score = score;
-
-        /* Send pv information */
-        engine_send_pv_info(worker, &worker->pv_table[0], worker->depth,
-                            worker->seldepth, score);
-    }
-
-    mutex_unlock(&state_lock);
 }
 
 int smp_complete_iteration(struct search_worker *worker)

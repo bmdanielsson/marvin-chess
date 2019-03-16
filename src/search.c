@@ -821,8 +821,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
         /* Send stats for the first worker */
         worker->currmovenumber++;
         worker->currmove = move;
-        if ((worker->id == 0) &&
-            (worker->depth > worker->state->completed_depth))  {
+        if (worker->id == 0)  {
             engine_send_move_info(worker);
         }
 
@@ -876,10 +875,15 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                  * are only updated when the score is inside the aspiration
                  * window since it's only then that the score can be trusted.
                  */
+                worker->best_score = score;
+                worker->best_depth = worker->depth;
                 worker->best_move = move;
                 worker->ponder_move = (worker->pv_table[0].length > 1)?
                                             worker->pv_table[0].moves[1]:NOMOVE;
-                smp_update(worker, score);
+                if (worker->id == 0) {
+                    engine_send_pv_info(worker, &worker->pv_table[0],
+                                        worker->depth, worker->seldepth, score);
+                }
             }
         }
     }
