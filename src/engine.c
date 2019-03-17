@@ -278,8 +278,6 @@ void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
     int  k;
     int  nlines;
 
-    (void)seldepth;
-
     if (worker->state->silent) {
         return;
     }
@@ -309,6 +307,18 @@ void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
         }
     }
     printf("%s\n", buffer);
+}
+
+void engine_send_bound_info(struct search_worker *worker, int depth,
+                            int seldepth, int score, bool lower)
+{
+    if (worker->state->silent) {
+        return;
+    }
+
+    if (engine_protocol == PROTOCOL_UCI) {
+        uci_send_bound_info(worker, depth, seldepth, score, lower);
+    }
 }
 
 void engine_send_move_info(struct search_worker *worker)

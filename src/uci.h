@@ -46,11 +46,23 @@ bool uci_check_input(struct search_worker *worker);
  * @param worker The worker
  * @param pv The pv.
  * @param depth The depth.
- * @param seldepth The selctive depth.
+ * @param seldepth The selective depth.
  * @param score The PV score.
  */
 void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
                       int seldepth, int score);
+
+/*
+ * Send information about score bound during search.
+ *
+ * @param worker The worker
+ * @param depth The depth.
+ * @param seldepth The selective depth.
+ * @param score The score.
+ * @param lower Flag indicating a lower or upper bound.
+ */
+void uci_send_bound_info(struct search_worker *worker, int depth, int seldepth,
+                         int score, bool lower);
 
 /*
  * Send information about the move currently being searched.

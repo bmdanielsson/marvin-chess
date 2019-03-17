@@ -468,7 +468,7 @@ void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
     uint64_t tbhits;
     uint64_t nodes;
 
-    /* Get the currently searched time */
+    /* Get information about the search */
     msec = (int)tc_elapsed_time();
     nodes = smp_nodes();
     nps = (msec > 0)?(nodes/msec)*1000:0;
@@ -489,6 +489,37 @@ void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
         move2str(pv->moves[k], movestr);
         strcat(buffer, movestr);
     }
+
+    /* Write command */
+    engine_write_command(buffer);
+}
+
+void uci_send_bound_info(struct search_worker *worker, int depth, int seldepth,
+                         int score, bool lower)
+{
+    char     buffer[1024];
+    int      msec;
+    int      nps;
+    uint64_t tbhits;
+    uint64_t nodes;
+
+    /* Get information about the search */
+    msec = (int)tc_elapsed_time();
+    nodes = smp_nodes();
+    nps = (msec > 0)?(nodes/msec)*1000:0;
+    tbhits = worker->state->root_in_tb?1:smp_tbhits();
+
+    /* Adjust score in case the root position was found in tablebases */
+    if (worker->state->root_in_tb) {
+        score = ((score > FORCED_MATE) || (score < (-FORCED_MATE)))?
+                                            score:worker->state->root_tb_score;
+    }
+
+    /* Build command */
+    sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
+            "tbhits %"PRIu64" hashfull %d score cp %d %s", depth, seldepth,
+            nodes, msec, nps, tbhits, hash_tt_usage(), score,
+            lower?"lower":"upper");
 
     /* Write command */
     engine_write_command(buffer);

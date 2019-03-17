@@ -948,11 +948,19 @@ void search_find_best_move(struct search_worker *worker)
             awindex++;
             alpha = score - aspiration_window[awindex];
             worker->resolving_root_fail = true;
+            if (worker->id == 0) {
+                engine_send_bound_info(worker, worker->depth, worker->seldepth,
+                                       score, false);
+            }
             continue;
         }
         if (score >= beta) {
             bwindex++;
             beta = score + aspiration_window[bwindex];
+            if (worker->id == 0) {
+                engine_send_bound_info(worker, worker->depth, worker->seldepth,
+                                       score, true);
+            }
             continue;
         }
         worker->resolving_root_fail = false;
