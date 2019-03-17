@@ -457,16 +457,16 @@ bool uci_check_input(struct search_worker *worker)
     return stop;
 }
 
-void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
-                      int seldepth, int score)
+void uci_send_pv_info(struct search_worker *worker, int score)
 {
-    char     movestr[6];
-    char     buffer[1024];
-    int      msec;
-    int      nps;
-    int      k;
-    uint64_t tbhits;
-    uint64_t nodes;
+    char      movestr[6];
+    char      buffer[1024];
+    int       msec;
+    int       nps;
+    int       k;
+    uint64_t  tbhits;
+    uint64_t  nodes;
+    struct pv *pv;
 
     /* Get information about the search */
     msec = (int)tc_elapsed_time();
@@ -482,8 +482,9 @@ void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
 
     /* Build command */
     sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
-            "tbhits %"PRIu64" hashfull %d score cp %d pv", depth, seldepth,
-            nodes, msec, nps, tbhits, hash_tt_usage(), score);
+            "tbhits %"PRIu64" hashfull %d score cp %d pv", worker->depth,
+            worker->seldepth, nodes, msec, nps, tbhits, hash_tt_usage(), score);
+    pv = &worker->pv_table[0];
     for (k=0;k<pv->length;k++) {
         strcat(buffer, " ");
         move2str(pv->moves[k], movestr);
@@ -494,8 +495,7 @@ void uci_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
     engine_write_command(buffer);
 }
 
-void uci_send_bound_info(struct search_worker *worker, int depth, int seldepth,
-                         int score, bool lower)
+void uci_send_bound_info(struct search_worker *worker, int score, bool lower)
 {
     char     buffer[1024];
     int      msec;
@@ -517,8 +517,8 @@ void uci_send_bound_info(struct search_worker *worker, int depth, int seldepth,
 
     /* Build command */
     sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
-            "tbhits %"PRIu64" hashfull %d score cp %d %s", depth, seldepth,
-            nodes, msec, nps, tbhits, hash_tt_usage(), score,
+            "tbhits %"PRIu64" hashfull %d score cp %d %s", worker->depth,
+            worker->seldepth, nodes, msec, nps, tbhits, hash_tt_usage(), score,
             lower?"lower":"upper");
 
     /* Write command */

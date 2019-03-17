@@ -269,33 +269,34 @@ bool engine_wait_for_input(struct search_worker *worker)
     return false;
 }
 
-void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
-                         int seldepth, int score)
+void engine_send_pv_info(struct search_worker *worker, int score)
 {
-    char movestr[6];
-    char buffer[1024];
-    int  msec;
-    int  k;
-    int  nlines;
+    char      movestr[6];
+    char      buffer[1024];
+    int       msec;
+    int       k;
+    int       nlines;
+    struct pv *pv;
 
     if (worker->state->silent) {
         return;
     }
 
     if (engine_protocol == PROTOCOL_UCI) {
-        return uci_send_pv_info(worker, pv, depth, seldepth, score);
+        return uci_send_pv_info(worker, score);
     } else if (engine_protocol == PROTOCOL_XBOARD) {
-        return xboard_send_pv_info(worker, pv, depth, score);
+        return xboard_send_pv_info(worker, score);
     }
 
     /* Get the currently searched time */
     msec = (int)tc_elapsed_time();
 
     printf("=> depth: %d, score: %d, time: %d, nodes: %"PRIu64"\n",
-           depth, score, msec, smp_nodes());
+           worker->depth, score, msec, smp_nodes());
     buffer[0] = '\0';
     nlines = 1;
     strcat(buffer, "  ");
+    pv = &worker->pv_table[0];
     for (k=0;k<pv->length;k++) {
         strcat(buffer, " ");
         move2str(pv->moves[k], movestr);
@@ -309,15 +310,14 @@ void engine_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
     printf("%s\n", buffer);
 }
 
-void engine_send_bound_info(struct search_worker *worker, int depth,
-                            int seldepth, int score, bool lower)
+void engine_send_bound_info(struct search_worker *worker, int score, bool lower)
 {
     if (worker->state->silent) {
         return;
     }
 
     if (engine_protocol == PROTOCOL_UCI) {
-        uci_send_bound_info(worker, depth, seldepth, score, lower);
+        uci_send_bound_info(worker, score, lower);
     }
 }
 

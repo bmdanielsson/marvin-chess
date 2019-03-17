@@ -329,9 +329,7 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
      * an exxtra pv line to thye GUI.
      */
     if (best_worker->id != 0) {
-        engine_send_pv_info(worker, &best_worker->pv_table[0],
-                            best_worker->depth, best_worker->depth,
-                            best_worker->best_score);
+        engine_send_pv_info(best_worker, best_worker->best_score);
     }
 
     /* Copy the best move to the state struct */

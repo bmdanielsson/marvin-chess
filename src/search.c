@@ -881,8 +881,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 worker->ponder_move = (worker->pv_table[0].length > 1)?
                                             worker->pv_table[0].moves[1]:NOMOVE;
                 if (worker->id == 0) {
-                    engine_send_pv_info(worker, &worker->pv_table[0],
-                                        worker->depth, worker->seldepth, score);
+                    engine_send_pv_info(worker, score);
                 }
             }
         }
@@ -949,8 +948,7 @@ void search_find_best_move(struct search_worker *worker)
             alpha = score - aspiration_window[awindex];
             worker->resolving_root_fail = true;
             if (worker->id == 0) {
-                engine_send_bound_info(worker, worker->depth, worker->seldepth,
-                                       score, false);
+                engine_send_bound_info(worker, score, false);
             }
             continue;
         }
@@ -958,8 +956,7 @@ void search_find_best_move(struct search_worker *worker)
             bwindex++;
             beta = score + aspiration_window[bwindex];
             if (worker->id == 0) {
-                engine_send_bound_info(worker, worker->depth, worker->seldepth,
-                                       score, true);
+                engine_send_bound_info(worker, score, true);
             }
             continue;
         }

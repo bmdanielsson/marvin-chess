@@ -921,13 +921,13 @@ bool xboard_check_input(struct search_worker *worker)
     return stop;
 }
 
-void xboard_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
-                         int score)
+void xboard_send_pv_info(struct search_worker *worker,  int score)
 {
-	char     buffer[1024];
-	int      k;
-	char     movestr[6];
-	uint32_t msec;
+	char      buffer[1024];
+	int       k;
+	char      movestr[6];
+	uint32_t  msec;
+    struct pv *pv;
 
 	/* Only display thinking in post mode */
 	if (!post_mode) {
@@ -942,8 +942,9 @@ void xboard_send_pv_info(struct search_worker *worker, struct pv *pv, int depth,
 
 	/* Display thinking according to the current output mode */
 	msec = tc_elapsed_time();
-	sprintf(buffer, "%3d %6d %7d %9"PRIu64"", depth, score, msec/10,
+	sprintf(buffer, "%3d %6d %7d %9"PRIu64"", worker->depth, score, msec/10,
             smp_nodes());
+    pv = &worker->pv_table[0];
 	for (k=0;k<pv->length;k++) {
 		strcat(buffer, " ");
         move2str(pv->moves[k], movestr);
