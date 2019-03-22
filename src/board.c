@@ -532,7 +532,6 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
                 (pos->pieces[kingsq[pos->stm]] == (KING+pos->stm)) &&
                 (pos->pieces[rooksq[pos->stm]] == (ROOK+pos->stm)) &&
                 (!bb_is_attacked(pos, kingsq[pos->stm], opp)) &&
-                (!bb_is_attacked(pos, emptysq1[pos->stm], opp)) &&
                 (!bb_is_attacked(pos, emptysq2[pos->stm], opp)) &&
                 (from == kingsq[pos->stm]) &&
                 (to == emptysq1[pos->stm]));
@@ -552,7 +551,6 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
                 (pos->pieces[kingsq[pos->stm]] == (KING+pos->stm)) &&
                 (pos->pieces[rooksq[pos->stm]] == (ROOK+pos->stm)) &&
                 (!bb_is_attacked(pos, kingsq[pos->stm], opp)) &&
-                (!bb_is_attacked(pos, emptysq2[pos->stm], opp)) &&
                 (!bb_is_attacked(pos, emptysq3[pos->stm], opp)) &&
                 (from == kingsq[pos->stm]) &&
                 (to == emptysq2[pos->stm]));
