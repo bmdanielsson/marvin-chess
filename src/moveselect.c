@@ -309,6 +309,7 @@ static bool get_move_incremental(struct search_worker *worker, uint32_t *move)
         /* Fall through */
     default:
         /* All moves have been searched */
+        *move = NOMOVE;
         return false;
     }
 
@@ -379,6 +380,7 @@ static bool get_move(struct search_worker *worker, uint32_t *move)
         /* Fall through */
     default:
         /* All moves have been searched */
+        *move = NOMOVE;
         return false;
     }
 
