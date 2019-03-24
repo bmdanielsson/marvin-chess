@@ -23,6 +23,9 @@
 
 #include "chess.h"
 
+/* The highest (most verbose) log level */
+#define LOG_HIGHEST_LEVEL 2
+
 /* Logging macros */
 #define LOG_INFO1(...) dbg_log_info(1, __VA_ARGS__)
 #define LOG_INFO2(...) dbg_log_info(2, __VA_ARGS__)
@@ -33,6 +36,13 @@
  * @param level The log level.
  */
 void dbg_set_log_level(int level);
+
+/*
+ * Get the log level.
+ *
+ * @return Returns the log level.
+ */
+int dbg_get_log_level(void);
 
 /* Close the log file */
 void dbg_log_close(void);

@@ -350,6 +350,17 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
                 smp_destroy_workers();
                 smp_create_workers(value);
             }
+        } else if (!strncmp(iter, "LogLevel", 8)) {
+            iter += 8;
+            iter = skip_whitespace(iter);
+            if (sscanf(iter, "value %d", &value) == 1) {
+                if (value > LOG_HIGHEST_LEVEL) {
+                    value = LOG_HIGHEST_LEVEL;
+                } else if (value < 0) {
+                    value = 0;
+                }
+                dbg_set_log_level(value);
+            }
         }
         iter = strstr(iter, "name");
     }
@@ -378,6 +389,9 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command(
                         "option name Threads type spin default %d min 1 max %d",
                         engine_default_num_threads, MAX_WORKERS);
+    engine_write_command(
+                       "option name LogLevel type spin default %d min 0 max %d",
+                        dbg_get_log_level(), LOG_HIGHEST_LEVEL);
     engine_write_command("uciok");
 }
 

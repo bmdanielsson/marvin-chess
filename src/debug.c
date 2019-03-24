@@ -180,6 +180,11 @@ void dbg_set_log_level(int level)
     }
 }
 
+int dbg_get_log_level(void)
+{
+    return log_level;
+}
+
 void dbg_log_close(void)
 {
     if (logfp != NULL) {
