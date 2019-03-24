@@ -137,7 +137,9 @@ static void browse_display_position(struct position *pos,
 
 void dbg_set_log_level(int level)
 {
-    char name[256];
+    char path[256];
+    char *home;
+    time_t t;
 
     assert(logfp == NULL);
 
@@ -157,27 +159,25 @@ void dbg_set_log_level(int level)
     /* Initialize lock */
     mutex_init(&log_lock);
 
-    /* Construct the name of the log file */
-    snprintf(name, sizeof(name), LOGFILE_NAME, get_current_pid());
-
     /*
      * Open the log file. First try to open the it in the current
      * working directory. If that fails use the users home directory.
      */
-    logfp = fopen(name, "w");
+    logfp = fopen(LOGFILE_NAME, "a");
     if (logfp == NULL) {
-        char path[256];
-        char *home;
-
         home = getenv("HOME");
         if (home != NULL) {
-            snprintf(path, sizeof(path), "%s/%s", home, name);
-            logfp = fopen(path, "w");
+            snprintf(path, sizeof(path), "%s/%s", home, LOGFILE_NAME);
+            logfp = fopen(path, "a");
         }
     }
     if (logfp != NULL) {
         setbuf(logfp, NULL);
     }
+
+    /* Write a timestamp to the log */
+    t = time(NULL);
+    fprintf(logfp, "\n%s\n", ctime(&t));
 }
 
 int dbg_get_log_level(void)

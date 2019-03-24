@@ -24,7 +24,7 @@
 #define APP_AUTHOR "Martin Danielsson"
 
 /* The name of the log file */
-#define LOGFILE_NAME "marvin-%d.log"
+#define LOGFILE_NAME "marvin.log"
 
 /*
  * The size of the main hash tables (in MB). This value
