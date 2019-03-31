@@ -391,7 +391,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     bool            tactical;
     bool            extended;
     int             new_depth;
-    struct tt_item  *tt_item;
+    struct tt_item  tt_item;
     struct position *pos;
     bool            is_singular;
 
@@ -440,7 +440,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * be done for this node.
      */
     tt_move = NOMOVE;
-    tt_item = NULL;
     if (hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &tt_score,
                        &tt_item) && (tt_move != exclude_move)) {
         return tt_score;
@@ -560,8 +559,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     if (depth >= SE_DEPTH &&
         (exclude_move == NOMOVE) &&
         (tt_move != NOMOVE) &&
-        (tt_item->type == TT_BETA) &&
-        (tt_item->depth >= (depth-3)) &&
+        (tt_item.type == TT_BETA) &&
+        (tt_item.depth >= (depth-3)) &&
         (abs(beta) < KNOWN_WIN) &&
         board_is_move_pseudo_legal(pos, tt_move)) {
         threshold = tt_score-2*depth;

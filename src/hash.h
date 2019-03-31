@@ -84,7 +84,7 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
  * @return Returns true if the entry is good enough to trigger a cutoff.
  */
 bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
-                    uint32_t *move, int *score, struct tt_item **item);
+                    uint32_t *move, int *score, struct tt_item *item);
 
 /*
  * Lookup the current position in the main transposition table.

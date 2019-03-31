@@ -272,7 +272,7 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
 }
 
 bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
-                    uint32_t *move, int *score, struct tt_item **item)
+                    uint32_t *move, int *score, struct tt_item *item)
 {
     uint64_t         idx;
     struct tt_bucket *bucket;
@@ -308,7 +308,7 @@ bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
         if (KEY_EQUALS(pos->key, tmp)) {
             *move = tmp->move;
             if (item != NULL) {
-                *item = tmp;
+                memcpy(item, tmp, sizeof(struct tt_item));
             }
             cutoff = check_tt_cutoff(pos, tmp, depth, alpha, beta, score);
             break;

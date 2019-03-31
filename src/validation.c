@@ -103,7 +103,6 @@ static int search_verification(struct search_worker *worker, int depth,
     uint32_t        tt_move;
     bool            found_move;
     bool            in_check;
-    struct tt_item  *tt_item;
     struct position *pos;
 
     pos = &worker->pos;
@@ -119,9 +118,7 @@ static int search_verification(struct search_worker *worker, int depth,
     }
 
     tt_move = NOMOVE;
-    tt_item = NULL;
-    if (hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &tt_score,
-                       &tt_item)) {
+    if (hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &tt_score, NULL)) {
         return tt_score;
     }
     select_init_node(worker, 0, in_check, tt_move);
