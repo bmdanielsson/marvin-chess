@@ -533,7 +533,7 @@ void uci_send_bound_info(struct search_worker *worker, int score, bool lower)
     sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
             "tbhits %"PRIu64" hashfull %d score cp %d %s", worker->depth,
             worker->seldepth, nodes, msec, nps, tbhits, hash_tt_usage(), score,
-            lower?"lower":"upper");
+            lower?"lowerbound":"upperbound");
 
     /* Write command */
     engine_write_command(buffer);
