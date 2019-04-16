@@ -166,6 +166,8 @@ static void prepare_worker(struct search_worker *worker,
     /* Clear best move information */
     worker->ponder_move = NOMOVE;
     worker->best_move = worker->root_moves.moves[0];
+    worker->best_score = -INFINITE_SCORE;
+    worker->best_depth = 0;
 
     /* Initialize helper variables */
     worker->resolving_root_fail = false;
@@ -262,8 +264,6 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     state->pondering = pondering;
     state->pos.sply = 0;
     state->completed_depth = 0;
-    state->best_move_depth = 0;
-    state->best_move_score = 0;
 
     /* Probe tablebases for the root position */
     if (use_tablebases &&
@@ -326,7 +326,7 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
 
     /*
      * If the best worker is not the first worker then send
-     * an exxtra pv line to thye GUI.
+     * an extra pv line to the GUI.
      */
     if (best_worker->id != 0) {
         engine_send_pv_info(best_worker, best_worker->best_score);
@@ -335,8 +335,6 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     /* Copy the best move to the state struct */
     best_worker->state->best_move = best_worker->best_move;
     best_worker->state->ponder_move = best_worker->ponder_move;
-    best_worker->state->best_move_depth = best_worker->best_depth;
-    best_worker->state->best_move_score = best_worker->best_score;
 }
 
 uint64_t smp_nodes(void)

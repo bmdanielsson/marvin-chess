@@ -519,8 +519,6 @@ struct gamestate {
     /* Information about the best move */
     uint32_t best_move;
     uint32_t ponder_move;
-    int best_move_depth;
-    int best_move_score;
     /* Information about the highest completed depth */
     int completed_depth;
 };
