@@ -71,8 +71,8 @@ static int aspiration_window[] = {10, 20, 40, 80, 160, 320, 640,
                                   INFINITE_SCORE};
 
 /* Move counts for the different depths to use for late move pruning */
-#define LMP_DEPTH 6
-static int lmp_counts[] = {0, 5, 10, 20, 35, 55};
+#define LMP_DEPTH 10
+static int lmp_counts[] = {0, 4, 6, 8, 12, 17, 24, 33, 44, 57, 72};
 
 /* Configuration constants for probcut */
 #define PROBCUT_DEPTH 5
@@ -385,9 +385,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     bool            gives_check;
     int             tt_flag;
     bool            pv_node;
-    bool            pawn_push;
-    bool            killer;
-    int             hist;
     bool            tactical;
     bool            extended;
     int             new_depth;
@@ -601,9 +598,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         }
 
         /* Various move properties */
-        pawn_push = is_pawn_push(pos, move);
-        killer = tbl_is_killer_move(worker, move);
-        hist = worker->history_table[pos->pieces[FROM(move)]][TO(move)];
         gives_check = board_move_gives_check(pos, move);
         tactical = is_tactical_move(move) || in_check || gives_check;
 
@@ -624,14 +618,10 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
          * obvious tactics.
          */
         if (!pv_node &&
-            (depth < LMP_DEPTH) &&
+            (depth <= LMP_DEPTH) &&
             (movenumber > lmp_counts[depth]) &&
-            (movenumber > 1) &&
             !tactical &&
-            !pawn_push &&
-            !killer &&
             (abs(alpha) < KNOWN_WIN) &&
-            (hist == 0) &&
             (best_score > KNOWN_LOSS)) {
             continue;
         }
