@@ -171,7 +171,7 @@ bool fen_setup_board(struct position *pos, char *fenstr, bool epd)
         pos->ep_sq = SQUARE(file, rank);
         iter += 2;
     }
-    if (*iter != ' ') {
+    if ((*iter != ' ') && (*iter != '\0')) {
         return false;
     }
     if ((pos->castle < A1) || (pos->ep_sq > NO_SQUARE)) {
