@@ -373,6 +373,16 @@ static uint32_t poly2engine_move(struct position *pos, struct movelist *list,
     from = SQUARE((polymove>>6)&0x0007, (polymove>>9)&0x0007);
     promotion = ((polymove>>12)&0x0007)*2 + pos->stm;
 
+    if (from == 4 && to == 0 && pos->pieces[4] == WHITE_KING) {
+        to = 2;
+    } else if (from == 4 && to == 7 && pos->pieces[4] == WHITE_KING) {
+        to = 6;
+    } else if (from == 60 && to == 56 && pos->pieces[60] == BLACK_KING) {
+        to = 58;
+    } else if (from == 60 && to == 63 && pos->pieces[60] == BLACK_KING) {
+        to = 62;
+    }
+
     for (k=0;k<list->nmoves;k++) {
         move = list->moves[k];
         if ((TO(move) == to) && (FROM(move) == from)) {
@@ -459,64 +469,34 @@ static bool read_book_entry(long offset, struct polybook_entry *entry)
     return true;
 }
 
-static struct book_entry* read_book_entries(struct position *pos,
-                                            uint64_t polykey, long index,
-                                            int *count)
+static int find_key(uint64_t key)
 {
-    long                  nentries;
-    struct polybook_entry polyentry;
-    struct book_entry     *entries;
-    struct book_entry     *entry;
-    struct movelist       list;
+    struct polybook_entry entry;
+    int                   left;
+    int                   right;
+    int                   center;
 
-    gen_legal_moves(pos, &list);
-
-    *count = 0;
-    entries = malloc(MAX_MOVES*sizeof(struct book_entry));
-    nentries = booksize/BOOK_ENTRY_SIZE;
-    while (index < nentries) {
-        if (!read_book_entry(index*BOOK_ENTRY_SIZE, &polyentry)) {
-            *count = 0;
-            free(entries);
-            return NULL;
-        }
-        if (polyentry.key != polykey) {
-            break;
+    /* Use a binary search to find the first entry with the correct key */
+    center = 0;
+    left = 0;
+    right = booksize/BOOK_ENTRY_SIZE;
+    while (left < right) {
+        center = (left + right)/2;
+        if (!read_book_entry(center*BOOK_ENTRY_SIZE, &entry)) {
+            return -1;
         }
 
-        entry = &entries[*count];
-        entry->weight = polyentry.weight;
-        entry->move = poly2engine_move(pos, &list, polyentry.move);
-
-        if (entry->move != NOMOVE) {
-            (*count)++;
-        }
-        index++;
-    }
-
-    return entries;
-}
-
-static uint32_t select_book_move(struct book_entry *entries, int nentries)
-{
-    int      k;
-    uint32_t sum;
-    uint32_t r;
-
-    sum = 0;
-    for (k=0;k<nentries;k++) {
-        sum += entries[k].weight;
-    }
-
-    r = rand()%sum;
-    sum = 0;
-    for (k=0;k<nentries;k++) {
-        sum += entries[k].weight;
-        if (r < sum) {
-            return entries[k].move;
+        if (key <= entry.key) {
+            right = center;
+        } else {
+            left = center + 1;
         }
     }
-    return entries[nentries-1].move;
+    if (!read_book_entry(left*BOOK_ENTRY_SIZE, &entry)) {
+        return -1;
+    }
+
+    return key == entry.key?left:-1;
 }
 
 bool polybook_open(char *path)
@@ -556,16 +536,15 @@ void polybook_close(void)
  */
 uint32_t polybook_probe(struct position *pos)
 {
-    uint64_t              polykey;
-    struct polybook_entry polyentry;
-    struct book_entry     *entries;
-    int                   nentries;
-    bool                  found;
-    long                  left;
-    long                  right;
-    long                  center;
-    long                  index;
-    uint32_t              move;
+    uint64_t              key;
+    struct polybook_entry entry;
+    struct movelist       list;
+    int                   first;
+    int                   last;
+    int                   best;
+    int                   index;
+    int                   score;
+    int                   best_score;
 
     assert(valid_position(pos));
 
@@ -574,61 +553,42 @@ uint32_t polybook_probe(struct position *pos)
     }
 
     /* Generate a Polyglot key */
-    polykey = generate_polykey(pos);
+    key = generate_polykey(pos);
 
-    /* Use a binary search to find an entry with the correct key */
-    found = false;
-    center = 0;
-    left = 0;
-    right = booksize/BOOK_ENTRY_SIZE;
-    while (left < right) {
-        center = (left + right)/2;
-        if (!read_book_entry(center*BOOK_ENTRY_SIZE, &polyentry)) {
-            return NOMOVE;
-        }
-
-        if (polyentry.key == polykey) {
-            found = true;
-            break;
-        } else if (polyentry.key > polykey) {
-            right = center;
-        } else if (polyentry.key < polykey) {
-            left = center + 1;
-        }
-    }
-    if (!found) {
+    /* Find key */
+    first = find_key(key);
+    if (first == -1) {
         return NOMOVE;
     }
 
-    /* Find the first entry with the same key */
-    index = center - 1;
-    while (index >= 0) {
-        if (!read_book_entry(index*BOOK_ENTRY_SIZE, &polyentry)) {
+    /* Get a random entry with probability based on the weights */
+    index = first;
+    best = first;
+    best_score = 0;
+    last = booksize/BOOK_ENTRY_SIZE;
+    while (index < last) {
+        if (!read_book_entry(index*BOOK_ENTRY_SIZE, &entry)) {
             return NOMOVE;
         }
-        if (polyentry.key != polykey) {
+        if (key != entry.key) {
             break;
         }
-        index--;
-    }
-    if (polyentry.key != polykey) {
+        if (entry.weight > 0) {
+            score = rand()%(entry.weight*100);
+            if (score > best_score) {
+                best_score = score;
+                best = index;
+            }
+        }
         index++;
     }
 
-    /* Read all book entries */
-    entries = read_book_entries(pos, polykey, index, &nentries);
-    if ((entries == NULL) || (nentries == 0)) {
-        free(entries);
+    /* Convert the move to the internal format and return it */
+    if (!read_book_entry(best*BOOK_ENTRY_SIZE, &entry)) {
         return NOMOVE;
     }
-
-    /* Select a move from the book entries at random */
-    move = select_book_move(entries, nentries);
-
-    /* Clean up */
-    free(entries);
-
-    return move;
+    gen_legal_moves(pos, &list);
+    return poly2engine_move(pos, &list, entry.move);
 }
 
 /*
@@ -637,61 +597,57 @@ uint32_t polybook_probe(struct position *pos)
  */
 struct book_entry* polybook_get_entries(struct position *pos, int *nentries)
 {
-    uint64_t              polykey;
-    struct polybook_entry polyentry;
-    bool                  found;
-    long                  left;
-    long                  right;
-    long                  center;
-    long                  index;
+    uint64_t              key;
+    struct polybook_entry entry;
+    struct book_entry     *bookentries;
+    struct movelist       list;
+    int                   index;
+    int                   last;
+    int                   count;
 
     assert(valid_position(pos));
 
     if (bookfp == NULL) {
-        return NOMOVE;
+        *nentries = 0;
+        return NULL;
     }
 
     /* Generate a Polyglot key */
-    polykey = generate_polykey(pos);
+    key = generate_polykey(pos);
 
-    /* Use a binary search to find an entry with the correct key */
-    found = false;
-    center = 0;
-    left = 0;
-    right = booksize/BOOK_ENTRY_SIZE;
-    while (left < right) {
-        center = (left + right)/2;
-        if (!read_book_entry(center*BOOK_ENTRY_SIZE, &polyentry)) {
-            return NOMOVE;
-        }
-
-        if (polyentry.key == polykey) {
-            found = true;
-            break;
-        } else if (polyentry.key > polykey) {
-            right = center;
-        } else if (polyentry.key < polykey) {
-            left = center + 1;
-        }
-    }
-    if (!found) {
-        return NOMOVE;
+    /* Find key */
+    index = find_key(key);
+    if (index == -1) {
+        *nentries = 0;
+        return NULL;
     }
 
-    /* Find the first entry with the same key */
-    index = center - 1;
-    while (index >= 0) {
-        if (!read_book_entry(index*BOOK_ENTRY_SIZE, &polyentry)) {
-            return NOMOVE;
+    /* Find all legal moves */
+    gen_legal_moves(pos, &list);
+
+    /* Find all entries for this position */
+    bookentries = malloc(MAX_MOVES*sizeof(struct book_entry));
+    count = 0;
+    last = booksize/BOOK_ENTRY_SIZE;
+    while (index < last) {
+        if (!read_book_entry(index*BOOK_ENTRY_SIZE, &entry)) {
+            free(bookentries);
+            *nentries = 0;
+            return NULL;
         }
-        if (polyentry.key != polykey) {
+        if (key != entry.key) {
             break;
         }
-        index--;
-    }
-    if (polyentry.key != polykey) {
+        if (entry.weight > 0) {
+            bookentries[count].weight = entry.weight;
+            bookentries[count].move = poly2engine_move(pos, &list, entry.move);
+            if (bookentries[count].move != NOMOVE) {
+               count++;
+            }
+        }
         index++;
     }
+    *nentries = count;
 
-    return read_book_entries(pos, polykey, index, nentries);
+    return bookentries;
 }
