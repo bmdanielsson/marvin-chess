@@ -239,12 +239,11 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
 	analysis = tc_is_infinite() || (state->root_moves.nmoves > 0);
 
     /* Try to find a move in the opening book */
-    if (use_book && state->in_book) {
+    if (use_book) {
         state->best_move = polybook_probe(&state->pos);
         if (state->best_move != NOMOVE) {
             return;
         }
-        state->in_book = false;
     }
 
 	/*

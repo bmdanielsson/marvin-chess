@@ -59,6 +59,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     char     *temp;
     bool     ponder = false;
     uint32_t move;
+    bool     skip_book = false;
 
     /* Start the clock */
     tc_start_clock();
@@ -170,7 +171,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     if (infinite) {
         tc_configure_time_control(TC_INFINITE, 0, 0, 0);
         state->exit_on_mate = false;
-        state->in_book = false;
+        skip_book = true;
     } else if (movetime > 0) {
         tc_configure_time_control(TC_FIXED_TIME, movetime, 0, 0);
     } else if ((winc > 0) && (state->pos.stm == WHITE)) {
@@ -188,11 +189,12 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     } else {
         tc_configure_time_control(TC_INFINITE, 0, 0, 0);
         state->exit_on_mate = false;
-        state->in_book = false;
+        skip_book = true;
     }
 
     /* Search the position for a move */
-    smp_search(state, ponder && ponder_mode, own_book_mode, tablebase_mode);
+    smp_search(state, ponder && ponder_mode, own_book_mode && !skip_book,
+               tablebase_mode);
 
     /* Send the best move */
     move2str(state->best_move, best_movestr);
@@ -283,7 +285,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
     }
 }
 
-static void uci_cmd_setoption(char *cmd, struct gamestate *state)
+static void uci_cmd_setoption(char *cmd)
 {
     char *iter;
     int  value;
@@ -316,10 +318,8 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
             iter = skip_whitespace(iter);
             if (!strncmp(iter, "false", 5)) {
                 own_book_mode = false;
-                state->in_book = false;
             } else if (!strncmp(iter, "true", 4)) {
                 own_book_mode = true;
-                state->in_book = true;
             }
         } else if (!strncmp(iter, "Ponder", 6)) {
             iter = strstr(iter, "value");
@@ -373,7 +373,6 @@ static void uci_cmd_uci(struct gamestate *state)
     tablebase_mode = TB_LARGEST > 0;
 
     state->silent = false;
-    state->in_book = true;
 
     engine_write_command("id name %s %s", APP_NAME, APP_VERSION);
     engine_write_command("id author %s", APP_AUTHOR);
@@ -395,12 +394,9 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command("uciok");
 }
 
-static void uci_cmd_ucinewgame(struct gamestate *state)
+static void uci_cmd_ucinewgame(void)
 {
     hash_tt_clear_table();
-    if (own_book_mode) {
-        state->in_book = true;
-    }
 }
 
 bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop)
@@ -424,13 +420,13 @@ bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop)
     } else if (!strncmp(cmd, "position", 8)) {
         uci_cmd_position(cmd, state);
     } else if (!strncmp(cmd, "setoption", 9)) {
-        uci_cmd_setoption(cmd, state);
+        uci_cmd_setoption(cmd);
 	} else if (!strncmp(cmd, "stop", 4)) {
 		/* Ignore */
     } else if (!strncmp(cmd, "uci", 3) && (strlen(cmd) == 3)) {
         uci_cmd_uci(state);
     } else if (!strncmp(cmd, "ucinewgame", 10) && (strlen(cmd) == 10)) {
-        uci_cmd_ucinewgame(state);
+        uci_cmd_ucinewgame();
     } else if (!strncmp(cmd, "quit", 4)) {
         /* Both UCI and Xboard protocol has a quit command */
         if (engine_protocol == PROTOCOL_UCI) {

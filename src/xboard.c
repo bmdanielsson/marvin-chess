@@ -558,7 +558,6 @@ static void xboard_cmd_new(struct gamestate *state)
     force_mode = false;
     game_over = false;
     state->exit_on_mate = true;
-    state->in_book = true;
 }
 
 static void xboard_cmd_nopost(void)
@@ -740,7 +739,6 @@ static void xboard_cmd_xboard(struct gamestate *state)
     game_over = false;
 
     state->silent = false;
-    state->in_book = true;
     state->sd = MAX_SEARCH_DEPTH;
 }
 

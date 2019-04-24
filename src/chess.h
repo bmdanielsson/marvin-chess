@@ -507,15 +507,10 @@ struct gamestate {
     /* Flag used to suppress output during search */
     bool silent;
     /*
-     * Flag indicating if the engine is currently following
-     * the opening book.
+     * Flag indicating if the engine is currently
+     * searching in pondering mode.
      */
-    bool in_book;
-	/*
-	 * Flag indicating if the engine is currently
-	 * searching in pondering mode.
-	 */
-	bool pondering;
+    bool pondering;
     /* Information about the best move */
     uint32_t best_move;
     uint32_t ponder_move;
