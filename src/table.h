@@ -36,11 +36,12 @@ void tbl_clear_history_table(struct search_worker *worker);
  * Update the history table with a move.
  *
  * @param worker The worker.
- * @param move The move yo update the table with.
+ * @param list List of quiet moves tried for this position. The last move
+ *             in the list is the move tha caused the beta cutoff.
  * @param depth The depth to which the move was searched.
  */
-void tbl_update_history_table(struct search_worker *worker, uint32_t move,
-                              int depth);
+void tbl_update_history_table(struct search_worker *worker,
+                              struct movelist *list, int depth);
 
 /*
  * Clear the killer move table.

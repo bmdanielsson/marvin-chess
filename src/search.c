@@ -391,6 +391,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     struct tt_item  tt_item;
     struct position *pos;
     bool            is_singular;
+    struct movelist quiets;
 
     pos = &worker->pos;
 
@@ -583,6 +584,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Search all moves */
+    quiets.nmoves = 0;
     best_score = -INFINITE_SCORE;
     best_move = NOMOVE;
     tt_flag = TT_ALPHA;
@@ -600,6 +602,11 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         /* Various move properties */
         gives_check = board_move_gives_check(pos, move);
         tactical = is_tactical_move(move) || in_check || gives_check;
+
+        /* Remeber all quiet moves */
+        if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
+            quiets.moves[quiets.nmoves++] = move;
+        }
 
         /*
          * If the futility pruning flag is set then prune all moves except
@@ -749,8 +756,9 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* If the best move is a quiet move then update the history table */
-    if (!ISCAPTURE(move) && !ISENPASSANT(move) && (tt_flag != TT_ALPHA)) {
-        tbl_update_history_table(worker, best_move, depth);
+    if (!ISCAPTURE(best_move) && !ISENPASSANT(best_move) &&
+         (tt_flag == TT_BETA)) {
+        tbl_update_history_table(worker, &quiets, depth);
     }
 
     /*
@@ -784,6 +792,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     struct position *pos;
     int             in_check;
     int             new_depth;
+    struct movelist quiets;
 
     pos = &worker->pos;
 
@@ -803,6 +812,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     best_move = tt_move;
 
     /* Search all moves */
+    quiets.nmoves = 0;
     tt_flag = TT_ALPHA;
     best_score = -INFINITE_SCORE;
     worker->currmovenumber = 0;
@@ -812,6 +822,11 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
         worker->currmove = move;
         if (worker->id == 0)  {
             engine_send_move_info(worker);
+        }
+
+        /* Remeber all quiet moves */
+        if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
+            quiets.moves[quiets.nmoves++] = move;
         }
 
         /* Make the move */
@@ -877,8 +892,9 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     }
 
     /* If the best move is a quiet move then update the history table */
-    if (!ISCAPTURE(move) && !ISENPASSANT(move) && (tt_flag != TT_ALPHA)) {
-        tbl_update_history_table(worker, best_move, depth);
+    if (!ISCAPTURE(best_move) && !ISENPASSANT(best_move) &&
+        (tt_flag == TT_BETA)) {
+        tbl_update_history_table(worker, &quiets, depth);
     }
 
     /* Store the result for this node in the transposition table */

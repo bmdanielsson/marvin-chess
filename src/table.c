@@ -16,6 +16,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include <assert.h>
+#include <stdlib.h>
 
 #include "table.h"
 
@@ -31,24 +32,40 @@ void tbl_clear_history_table(struct search_worker *worker)
     }
 }
 
-void tbl_update_history_table(struct search_worker *worker, uint32_t move,
-                              int depth)
+void tbl_update_history_table(struct search_worker *worker,
+                              struct movelist *list, int depth)
 {
-    int             from;
+    uint32_t        best_move;
+    uint32_t        move;
     int             to;
     int             piece;
+    int             k;
+    bool            rescale;
+    int             delta;
     struct position *pos;
 
-    if (ISCAPTURE(move) || ISENPASSANT(move)) {
-        return;
+    assert(list != NULL);
+    assert(list->nmoves > 0);
+    assert(depth > 0);
+
+    /* Update history table */
+    best_move = list->moves[list->nmoves-1];
+    rescale = false;
+    pos = &worker->pos;
+    for (k=0;k<list->nmoves;k++) {
+        move = list->moves[k];
+        piece = pos->pieces[FROM(move)];
+        to = TO(move);
+
+        delta = (move != best_move)?-(depth*depth):depth*depth;
+        worker->history_table[piece][to] += delta;
+        if (abs(worker->history_table[piece][to]) > MAX_HISTORY_SCORE) {
+            rescale = true;
+        }
     }
 
-    /* Update the history table and rescale entries if necessary */
-    pos = &worker->pos;
-    from = FROM(move);
-    to = TO(move);
-    worker->history_table[pos->pieces[from]][to] += depth*depth;
-    if (worker->history_table[pos->pieces[from]][to] > MAX_HISTORY_SCORE) {
+    /* Rescale entries if necessary */
+    if (rescale) {
         for (piece=0;piece<NPIECES;piece++) {
             for (to=0;to<NSQUARES;to++) {
                 worker->history_table[piece][to] /= 2;
