@@ -262,6 +262,7 @@ bool board_make_move(struct position *pos, uint32_t move)
     /* Update the history */
     elem = push_history(pos);
     elem->move = move;
+    elem->piece = piece;
     elem->capture = capture;
     elem->castle = pos->castle;
     elem->ep_sq = pos->ep_sq;
@@ -445,6 +446,7 @@ void board_make_null_move(struct position *pos)
     /* Update the history */
     elem = push_history(pos);
     elem->move = NULLMOVE;
+    elem->piece = NO_PIECE;
     elem->capture = NO_PIECE;
     elem->castle = pos->castle;
     elem->ep_sq = pos->ep_sq;

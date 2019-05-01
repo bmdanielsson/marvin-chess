@@ -281,6 +281,8 @@ struct moveselector {
 struct unmake {
     /* The move to unmake */
     uint32_t move;
+    /* The moving piece, or NO_PIECE in case of a nullmove */
+    int piece;
     /* The captured piece, or NO_PIECE if the move is not a capture */
     int capture;
     /* Castling permissions before the move was made */
