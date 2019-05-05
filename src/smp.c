@@ -31,7 +31,7 @@
 #include "polybook.h"
 #include "bitboard.h"
 #include "board.h"
-#include "table.h"
+#include "history.h"
 
 /* Worker actions */
 #define ACTION_IDLE 0
@@ -150,9 +150,9 @@ static void prepare_worker(struct search_worker *worker,
     worker->root_moves = state->root_moves;
 
     /* Clear tables */
-    tbl_clear_history_table(worker);
-    tbl_clear_killermove_table(worker);
-    tbl_clear_countermove_table(worker);
+    history_clear_table(worker);
+    killer_clear_table(worker);
+    counter_clear_table(worker);
 
     /* Clear statistics */
     worker->nodes = 0;

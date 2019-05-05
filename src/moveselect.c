@@ -24,7 +24,7 @@
 #include "hash.h"
 #include "eval.h"
 #include "board.h"
-#include "table.h"
+#include "history.h"
 
 /*
  * Different move generation phases.

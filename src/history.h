@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef TABLE_H
-#define TABLE_H
+#ifndef HISTORY_H
+#define HISTORY_H
 
 #include <stdbool.h>
 
@@ -30,7 +30,7 @@
  *
  * @param worker The worker to clear the history table for.
  */
-void tbl_clear_history_table(struct search_worker *worker);
+void history_clear_table(struct search_worker *worker);
 
 /*
  * Update the history table with a move.
@@ -40,15 +40,15 @@ void tbl_clear_history_table(struct search_worker *worker);
  *             in the list is the move tha caused the beta cutoff.
  * @param depth The depth to which the move was searched.
  */
-void tbl_update_history_table(struct search_worker *worker,
-                              struct movelist *list, int depth);
+void history_update_table(struct search_worker *worker, struct movelist *list,
+                          int depth);
 
 /*
  * Clear the killer move table.
  *
  * @param worker The worker to clear the killer table for.
  */
-void tbl_clear_killermove_table(struct search_worker *worker);
+void killer_clear_table(struct search_worker *worker);
 
 /*
  * Add a move to the killer move table.
@@ -56,23 +56,14 @@ void tbl_clear_killermove_table(struct search_worker *worker);
  * @param worker The worker.
  * @param move The move to add.
  */ 
-void tbl_add_killer_move(struct search_worker *worker, uint32_t move);
-
-/*
- * Check if a move is present in the killer move table.
- *
- * @param worker The worker.
- * @param move The move to check.
- * @return Returns true if the move is present.
- */
-bool tbl_is_killer_move(struct search_worker *worker, uint32_t move);
+void killer_add_move(struct search_worker *worker, uint32_t move);
 
 /*
  * Clear the counter move table.
  *
  * @param worker The worker to clear the counter move table for.
  */
-void tbl_clear_countermove_table(struct search_worker *worker);
+void counter_clear_table(struct search_worker *worker);
 
 /*
  * Add a move to the counter move table.
@@ -80,6 +71,6 @@ void tbl_clear_countermove_table(struct search_worker *worker);
  * @param worker The worker.
  * @param move The move to add.
  */
-void tbl_add_counter_move(struct search_worker *worker, uint32_t move);
+void counter_add_move(struct search_worker *worker, uint32_t move);
 
 #endif

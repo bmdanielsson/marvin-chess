@@ -39,7 +39,7 @@
 #include "tbprobe.h"
 #include "smp.h"
 #include "fen.h"
-#include "table.h"
+#include "history.h"
 
 /* Calculates if it is time to check the clock and poll for commands */
 #define CHECKUP(n) (((n)&1023)==0)
@@ -737,8 +737,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                 if (score >= beta) {
                     if ((!ISCAPTURE(move) && !ISENPASSANT(move)) ||
                         !see_ge(pos, move, 0)) {
-                        tbl_add_killer_move(worker, move);
-                        tbl_add_counter_move(worker, move);
+                        killer_add_move(worker, move);
+                        counter_add_move(worker, move);
                     }
                     tt_flag = TT_BETA;
                     break;
@@ -758,7 +758,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     /* If the best move is a quiet move then update the history table */
     if (!ISCAPTURE(best_move) && !ISENPASSANT(best_move) &&
          (tt_flag == TT_BETA)) {
-        tbl_update_history_table(worker, &quiets, depth);
+        history_update_table(worker, &quiets, depth);
     }
 
     /*
@@ -859,7 +859,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 if (score >= beta) {
                     if ((!ISCAPTURE(move) && !ISENPASSANT(move)) ||
                         !see_ge(pos, move, 0)) {
-                        tbl_add_killer_move(worker, move);
+                        killer_add_move(worker, move);
                     }
                     tt_flag = TT_BETA;
                     break;
@@ -894,7 +894,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     /* If the best move is a quiet move then update the history table */
     if (!ISCAPTURE(best_move) && !ISENPASSANT(best_move) &&
         (tt_flag == TT_BETA)) {
-        tbl_update_history_table(worker, &quiets, depth);
+        history_update_table(worker, &quiets, depth);
     }
 
     /* Store the result for this node in the transposition table */
@@ -1064,9 +1064,9 @@ int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
     worker->pos.state = state;
     worker->pos.worker = worker;
 
-    tbl_clear_history_table(worker);
-    tbl_clear_killermove_table(worker);
-    tbl_clear_countermove_table(worker);
+    history_clear_table(worker);
+    killer_clear_table(worker);
+    counter_clear_table(worker);
 
     pv->length = 0;
     score = quiescence(worker, 0, -INFINITE_SCORE, INFINITE_SCORE);

@@ -18,9 +18,9 @@
 #include <assert.h>
 #include <stdlib.h>
 
-#include "table.h"
+#include "history.h"
 
-void tbl_clear_history_table(struct search_worker *worker)
+void history_clear_table(struct search_worker *worker)
 {
     int k;
     int l;
@@ -32,8 +32,8 @@ void tbl_clear_history_table(struct search_worker *worker)
     }
 }
 
-void tbl_update_history_table(struct search_worker *worker,
-                              struct movelist *list, int depth)
+void history_update_table(struct search_worker *worker, struct movelist *list,
+                          int depth)
 {
     uint32_t        best_move;
     uint32_t        move;
@@ -74,7 +74,7 @@ void tbl_update_history_table(struct search_worker *worker,
     }
 }
 
-void tbl_clear_killermove_table(struct search_worker *worker)
+void killer_clear_table(struct search_worker *worker)
 {
     int k;
 
@@ -84,7 +84,7 @@ void tbl_clear_killermove_table(struct search_worker *worker)
     }
 }
 
-void tbl_add_killer_move(struct search_worker *worker, uint32_t move)
+void killer_add_move(struct search_worker *worker, uint32_t move)
 {
     struct position *pos = &worker->pos;
 
@@ -96,17 +96,7 @@ void tbl_add_killer_move(struct search_worker *worker, uint32_t move)
     worker->killer_table[pos->sply][0] = move;
 }
 
-bool tbl_is_killer_move(struct search_worker *worker, uint32_t move)
-{
-    struct position *pos;
-
-    pos = &worker->pos;
-    return (worker->killer_table[pos->sply][0] == move) ||
-            (worker->killer_table[pos->sply][1] == move);
-}
-
-
-void tbl_clear_countermove_table(struct search_worker *worker)
+void counter_clear_table(struct search_worker *worker)
 {
     int k;
     int l;
@@ -118,7 +108,7 @@ void tbl_clear_countermove_table(struct search_worker *worker)
     }
 }
 
-void tbl_add_counter_move(struct search_worker *worker, uint32_t move)
+void counter_add_move(struct search_worker *worker, uint32_t move)
 {
     struct position *pos;
     uint32_t prev_move;
