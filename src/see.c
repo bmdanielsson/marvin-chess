@@ -31,55 +31,30 @@ static uint64_t find_xray_attackers(struct position *pos, uint64_t occ,
                                     int target, uint64_t last_attacker)
 {
     int      sq;
-    int      piece;
-    int      piece_value;
-    uint64_t xrays;
-    int      fdelta;
-    int      rdelta;
     uint64_t mask;
-    uint64_t attackers;
 
     /*
-     * First check if there can actually be an xray attacker
+     * Check if there can actually be an xray attacker
      * hidden behind the last attacker.
      */
-    sq = LSB(last_attacker);
-    piece = pos->pieces[sq];
-    piece_value = VALUE(piece);
-    if (piece_value == KNIGHT) {
+    if (last_attacker&
+                (pos->bb_pieces[WHITE_KNIGHT]|pos->bb_pieces[BLACK_KNIGHT])) {
         return 0ULL;
     }
 
-    /* Find the normalized direction of potential xray attackers */
-    fdelta = FILENR(sq) - FILENR(target);
-    if (fdelta != 0) {
-        fdelta /= abs(fdelta);
-    }
-    rdelta = RANKNR(sq) - RANKNR(target);
-    if (rdelta != 0) {
-        rdelta /= abs(rdelta);
-    }
-
-    /* Generate slider moves in the xray direction */
-    xrays = bb_slider_moves(occ, sq, fdelta, rdelta);
-
-    /*
-     * If the xrays set contains a piece that can move in the given
-     * direction then that piece can attack the target square and
-     * should be added as an attacker.
-     */
-    attackers = 0ULL;
-    mask = 0ULL;
-    if ((fdelta == 0) || (rdelta == 0)) {
+    sq = LSB(last_attacker);
+    occ |= sq_mask[target];
+    if ((RANKNR(target) == RANKNR(sq)) || (FILENR(target) == FILENR(sq)))  {
         mask = pos->bb_pieces[WHITE_ROOK] | pos->bb_pieces[WHITE_QUEEN] |
-                    pos->bb_pieces[BLACK_ROOK] | pos->bb_pieces[BLACK_QUEEN];
+               pos->bb_pieces[BLACK_ROOK] | pos->bb_pieces[BLACK_QUEEN];
+        mask &= occ;
+        return (bb_rook_moves(occ, target)&bb_rook_moves(occ, sq))&mask;
     } else {
         mask = pos->bb_pieces[WHITE_BISHOP] | pos->bb_pieces[WHITE_QUEEN] |
-                    pos->bb_pieces[BLACK_BISHOP] | pos->bb_pieces[BLACK_QUEEN];
+               pos->bb_pieces[BLACK_BISHOP] | pos->bb_pieces[BLACK_QUEEN];
+        mask &= occ;
+        return (bb_bishop_moves(occ, target)&bb_bishop_moves(occ, sq))&mask;
     }
-    attackers = xrays & mask;
-
-    return attackers;
 }
 
 static uint64_t find_next_attacker(struct position *pos, uint64_t attackers,
