@@ -71,20 +71,6 @@ static uint64_t find_next_attacker(struct position *pos, uint64_t attackers,
     return 0ULL;
 }
 
-static int move_score(int sq, int piece, int stm, int victim)
-{
-    int score;
-
-    score = see_material[victim];
-    if ((piece == PAWN) &&
-        ((rank_mask[RANK_1]|rank_mask[RANK_8])&sq_mask[sq]) != 0ULL) {
-        score += see_material[QUEEN+stm];
-        score -= see_material[PAWN+stm];
-    }
-
-    return score;
-}
-
 void see_init(void)
 {
     int k;
@@ -195,17 +181,13 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
     } else {
         see_score = 0;
     }
-    if (ISPROMOTION(move)) {
-        see_score += see_material[PROMOTION(move)+stm];
-        see_score -= see_material[PAWN+stm];
-    }
 
     /* Apply the move */
     occ = pos->bb_all&(~sq_mask[FROM(move)]);
     if (ISENPASSANT(move)) {
         occ &= ~sq_mask[(pos->stm==WHITE)?sq-8:sq+8];
     }
-    victim = ISPROMOTION(move)?PROMOTION(move)+stm:piece;
+    victim = piece;
     stm = FLIP_COLOR(stm);
 
     /* Find all pieces that attacks the target square */
@@ -236,9 +218,9 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
 
         /* Update the score based on the move */
         if (stm == maximizer) {
-            see_score += move_score(sq, piece, stm, victim);
+            see_score += see_material[victim];
         } else {
-            see_score -= move_score(sq, piece, stm, victim);
+            see_score -= see_material[victim];
         }
 
         /*
@@ -248,7 +230,7 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
          */
         attackers &= ~attacker;
         occ &= ~attacker;
-        victim = ((VALUE(piece) == PAWN) && ISPROMOTION(move))?QUEEN+stm:piece;
+        victim = piece;
         stm = FLIP_COLOR(stm);
 
         /* Find xray attackers and add them to the set of attackers */
@@ -286,17 +268,13 @@ bool see_post_ge(struct position *pos, uint32_t move, int threshold)
     maximizer = FLIP_COLOR(pos->stm);
     stm = maximizer;
     sq = TO(move);
-    piece = pos->pieces[sq];
+    piece = ISPROMOTION(move)?PAWN+stm:pos->pieces[sq];
     if (ISENPASSANT(move)) {
         see_score = see_material[PAWN+FLIP_COLOR(stm)];
     } else if (ISCAPTURE(move)) {
         see_score = see_material[pos->history[pos->ply-1].capture];
     } else {
         see_score = 0;
-    }
-    if (ISPROMOTION(move)) {
-        see_score += see_material[PROMOTION(move)+stm];
-        see_score -= see_material[PAWN+stm];
     }
 
     /* Find all pieces that attacks the target square */
@@ -306,13 +284,13 @@ bool see_post_ge(struct position *pos, uint32_t move, int threshold)
     attackers &= ~sq_mask[FROM(move)];
 
     /* Iterate until there are no more attackers */
-    victim = ISPROMOTION(move)?PROMOTION(move)+stm:piece;
+    victim = piece;
     stm = FLIP_COLOR(stm);
     while (!ISEMPTY(attackers)) {
         /*
          * Before recapturing compare the current score against the
          * threshold. If the side to move is the initial side to move
-         * and the score is alreeady above the threshold then there is
+         * and the score is already above the threshold then there is
          * no need to continue, same thing if it is the oppenents turn
          * to move and the score is below the threshold.
          */
@@ -330,9 +308,9 @@ bool see_post_ge(struct position *pos, uint32_t move, int threshold)
 
         /* Update the score based on the move */
         if (stm == maximizer) {
-            see_score += move_score(sq, piece, stm, victim);
+            see_score += see_material[victim];
         } else {
-            see_score -= move_score(sq, piece, stm, victim);
+            see_score -= see_material[victim];
         }
 
         /*
@@ -342,7 +320,7 @@ bool see_post_ge(struct position *pos, uint32_t move, int threshold)
          */
         attackers &= ~attacker;
         occ &= ~attacker;
-        victim = ((VALUE(piece) == PAWN) && ISPROMOTION(move))?QUEEN+stm:piece;
+        victim = piece;
         stm = FLIP_COLOR(stm);
 
         /* Find xray attackers and add them to the set of attackers */
