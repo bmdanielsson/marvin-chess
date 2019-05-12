@@ -68,7 +68,7 @@ void gen_quiet_moves(struct position *pos, struct movelist *list);
 void gen_capture_moves(struct position *pos, struct movelist *list);
 
 /*
- * Generate all promotion moves (excluding captures).
+ * Generate all promotion moves.
  *
  * @param pos The board structure.
  * @param list The list to store the moves in. Moves are appended to the list

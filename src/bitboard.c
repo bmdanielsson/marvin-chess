@@ -711,34 +711,34 @@ uint64_t bb_moves_for_piece(uint64_t occ, int from, int piece)
     assert(valid_piece(piece));
 
     switch (piece) {
-        case WHITE_PAWN:
-        case BLACK_PAWN:
-            moves = bb_pawn_moves(occ, from, COLOR(piece));
-            break;
-        case WHITE_KNIGHT:
-        case BLACK_KNIGHT:
-            moves = bb_knight_moves(from);
-            break;
-        case WHITE_BISHOP:
-        case BLACK_BISHOP:
-            moves = bb_bishop_moves(occ, from);
-            break;
-        case WHITE_ROOK:
-        case BLACK_ROOK:
-            moves = bb_rook_moves(occ, from);
-            break;
-        case WHITE_QUEEN:
-        case BLACK_QUEEN:
-            moves = bb_queen_moves(occ, from);
-            break;
-        case WHITE_KING:
-        case BLACK_KING:
-            moves = bb_king_moves(from);
-            break;
-        default:
-            assert(false);
-            moves = 0ULL;
-            break;
+    case WHITE_PAWN:
+    case BLACK_PAWN:
+        moves = bb_pawn_moves(occ, from, COLOR(piece));
+        break;
+    case WHITE_KNIGHT:
+    case BLACK_KNIGHT:
+        moves = bb_knight_moves(from);
+        break;
+    case WHITE_BISHOP:
+    case BLACK_BISHOP:
+        moves = bb_bishop_moves(occ, from);
+        break;
+    case WHITE_ROOK:
+    case BLACK_ROOK:
+        moves = bb_rook_moves(occ, from);
+        break;
+    case WHITE_QUEEN:
+    case BLACK_QUEEN:
+        moves = bb_queen_moves(occ, from);
+        break;
+    case WHITE_KING:
+    case BLACK_KING:
+        moves = bb_king_moves(from);
+        break;
+    default:
+        assert(false);
+        moves = 0ULL;
+        break;
     }
 
     return moves;
