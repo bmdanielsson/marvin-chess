@@ -112,11 +112,6 @@ static bool is_pawn_push(struct position *pos, uint32_t move)
     return false;
 }
 
-static bool is_tactical_move(uint32_t move)
-{
-    return ISCAPTURE(move) || ISENPASSANT(move) || ISPROMOTION(move);
-}
-
 static bool is_recapture(struct position *pos)
 {
     struct unmake *prev = &pos->history[pos->ply-2];
@@ -308,7 +303,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score, NULL)) {
         return score;
     }
-    select_init_node(worker, FLAG_QUIESCENCE_NODE, in_check, tt_move);
+    select_init_node(worker, true, in_check, tt_move);
 
     /* Search all moves */
     found_move = false;
@@ -442,7 +437,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                        &tt_item) && (tt_move != exclude_move)) {
         return tt_score;
     }
-    select_init_node(worker, 0, in_check, tt_move);
+    select_init_node(worker, false, in_check, tt_move);
 
     /* Probe tablebases */
     if (worker->state->probe_wdl &&
@@ -520,7 +515,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      */
     if (!pv_node && !in_check && (depth >= PROBCUT_DEPTH) &&
         board_has_non_pawn(&worker->pos, pos->stm)) {
-        select_init_node(worker, FLAG_PROBCUT, in_check, tt_move);
+        select_init_node(worker, true, in_check, tt_move);
         threshold = beta + PROBCUT_MARGIN;
 
         while (select_get_move(worker, &move)) {
@@ -550,7 +545,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             }
         }
     }
-    select_init_node(worker, 0, in_check, tt_move);
+    select_init_node(worker, false, in_check, tt_move);
 
     /* Check if the move from the transposition table is singular */
     is_singular = false;
@@ -568,7 +563,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             is_singular = true;
         }
 
-        select_init_node(worker, 0, in_check, tt_move);
+        select_init_node(worker, false, in_check, tt_move);
     }
 
     /*
@@ -601,7 +596,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
 
         /* Various move properties */
         gives_check = board_move_gives_check(pos, move);
-        tactical = is_tactical_move(move) || in_check || gives_check;
+        tactical = ISTACTICAL(move) || in_check || gives_check;
 
         /* Remeber all quiet moves */
         if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
@@ -735,8 +730,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                  * search this position further.
                  */
                 if (score >= beta) {
-                    if ((!ISCAPTURE(move) && !ISENPASSANT(move)) ||
-                        !see_ge(pos, move, 0)) {
+                    if (!ISTACTICAL(move) || !see_ge(pos, move, 0)) {
                         killer_add_move(worker, move);
                         counter_add_move(worker, move);
                     }
@@ -808,7 +802,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     tt_move = NOMOVE;
     in_check = board_in_check(pos, pos->stm);
     (void)hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &score, NULL);
-    select_init_node(worker, FLAG_ROOT_NODE, in_check, tt_move);
+    select_init_node(worker, false, in_check, tt_move);
     best_move = tt_move;
 
     /* Search all moves */
@@ -830,7 +824,9 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
         }
 
         /* Make the move */
-        (void)board_make_move(pos, move);
+        if (!board_make_move(pos, move)) {
+            continue;
+        }
 
         /* Extend checking moves */
         new_depth = depth;

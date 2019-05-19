@@ -30,39 +30,17 @@
  * Different move generation phases.
  */
 enum {
-    /* Normal search */
     PHASE_TT,
-    PHASE_GEN_CAPS,
-    PHASE_GOOD_CAPS,
+    PHASE_GEN_TACTICAL,
+    PHASE_GOOD_TACTICAL,
     PHASE_KILLER1,
     PHASE_KILLER2,
     PHASE_COUNTER,
     PHASE_GEN_MOVES,
     PHASE_MOVES,
-    PHASE_ADD_BAD_CAPS,
-    PHASE_BAD_CAPS,
-    /* Root search */
-    PHASE_ROOT,
-    /* Quiscence search */
-    PHASE_GEN_QUIESCENCE,
-    PHASE_QUIESCENCE,
-    /* Probcut search */
-    PHASE_GEN_PROBCUT,
-    PHASE_PROBCUT,
-    /* Check evasions */
-    PHASE_GEN_EVASIONS,
-    PHASE_EVASIONS
+    PHASE_ADD_BAD_TACTICAL,
+    PHASE_BAD_TACTICAL,
 };
-
-/* Base scores for move ordering */
-#define BASE_SCORE_DELTA        MAX_HISTORY_SCORE
-#define BASE_SCORE_TT           6*BASE_SCORE_DELTA
-#define BASE_SCORE_GOOD_CAPS    5*BASE_SCORE_DELTA
-#define BASE_SCORE_KILLER1      4*BASE_SCORE_DELTA
-#define BASE_SCORE_KILLER2      3*BASE_SCORE_DELTA
-#define BASE_SCORE_COUNTER      2*BASE_SCORE_DELTA
-#define BASE_SCORE_NORMAL       BASE_SCORE_DELTA
-#define BASE_SCORE_BAD_CAPS     0
 
 /*
  * Table of MVV/LVA scores indexed by [victim, attacker]. For instance
@@ -138,37 +116,11 @@ static void add_move(struct search_worker *worker, struct moveselector *ms,
     from = FROM(move);
     to = TO(move);
     if ((ISCAPTURE(move) || ISENPASSANT(move)) && gez) {
-        info->score = BASE_SCORE_GOOD_CAPS + mvvlva(pos, move);
+        info->score = mvvlva(pos, move);
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
-        info->score =
-            worker->history_table[pos->pieces[from]][to] + BASE_SCORE_NORMAL;
+        info->score = worker->history_table[pos->pieces[from]][to];
     } else {
-        info->score = BASE_SCORE_BAD_CAPS + mvvlva(pos, move);
-    }
-}
-
-static int get_move_score(struct search_worker *worker, struct position *pos,
-                          struct moveselector *ms, uint32_t move)
-{
-    int from;
-    int to;
-
-    from = FROM(move);
-    to = TO(move);
-    if (move == ms->ttmove) {
-        return BASE_SCORE_TT;
-    } else if ((ISCAPTURE(move) || ISENPASSANT(move)) && see_ge(pos, move, 0)) {
-        return BASE_SCORE_GOOD_CAPS + mvvlva(pos, move);
-    } else if (move == ms->killer1) {
-        return BASE_SCORE_KILLER1;
-    } else if (move == ms->killer2) {
-        return BASE_SCORE_KILLER2;
-    } else if (move == ms->counter) {
-        return BASE_SCORE_COUNTER;
-    } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
-        return worker->history_table[pos->pieces[from]][to] + BASE_SCORE_NORMAL;
-    } else {
-        return BASE_SCORE_BAD_CAPS + mvvlva(pos, move);
+        info->score = mvvlva(pos, move);
     }
 }
 
@@ -211,7 +163,43 @@ static uint32_t select_move(struct moveselector *ms)
     return ms->moveinfo[start].move;
 }
 
-static bool get_move_incremental(struct search_worker *worker, uint32_t *move)
+void select_init_node(struct search_worker *worker, bool tactical_only,
+                      bool in_check, uint32_t ttmove)
+{
+    struct moveselector *ms;
+    uint32_t            prev_move;
+    int                 prev_to;
+    struct position     *pos;
+
+    pos = &worker->pos;
+    ms = &worker->ppms[pos->sply];
+    ms->phase = PHASE_TT;
+    ms->tactical_only = tactical_only;
+    ms->underpromote = !tactical_only;
+    if ((ttmove == NOMOVE) || !board_is_move_pseudo_legal(pos, ttmove)) {
+        ms->ttmove = NOMOVE;
+    } else if (ms->tactical_only && !in_check && !ISTACTICAL(ms->ttmove)) {
+        ms->ttmove = NOMOVE;
+    } else {
+        ms->ttmove = ttmove;
+    }
+    ms->in_check = in_check;
+    ms->idx = 0;
+    ms->last_idx = 0;
+    ms->nbadcaps = 0;
+    ms->killer1 = worker->killer_table[pos->sply][0];
+    ms->killer2 = worker->killer_table[pos->sply][1];
+    prev_move = pos->history[pos->ply-1].move;
+    if (!ISNULLMOVE(prev_move)) {
+        prev_to = TO(prev_move);
+        ms->counter =
+                worker->countermove_table[pos->pieces[prev_to]][prev_to];
+    } else {
+        ms->counter = NOMOVE;
+    }
+}
+
+bool select_get_move(struct search_worker *worker, uint32_t *move)
 {
     struct moveselector *ms;
     struct movelist     list;
@@ -221,11 +209,9 @@ static bool get_move_incremental(struct search_worker *worker, uint32_t *move)
     struct position     *pos;
 
     assert(move != NULL);
-    assert(worker->pos.sply > 0);
 
     pos = &worker->pos;
     ms = &worker->ppms[pos->sply];
-    assert(!(ms->flags&FLAG_ROOT_NODE));
 
     switch (ms->phase) {
     case PHASE_TT:
@@ -235,18 +221,26 @@ static bool get_move_incremental(struct search_worker *worker, uint32_t *move)
             return true;
         }
         /* Fall through */
-    case PHASE_GEN_CAPS:
+    case PHASE_GEN_TACTICAL:
         /* Generate all possible captures for this position */
         list.nmoves = 0;
-        gen_capture_moves(pos, &list);
+        if (ms->in_check) {
+            gen_check_evasion_captures(pos, &list);
+        } else {
+            gen_capture_moves(pos, &list);
+            gen_promotion_moves(pos, &list, ms->underpromote);
+        }
         for (k=0;k<list.nmoves;k++) {
             add_move(worker, ms, &list, k);
         }
         ms->phase++;
         ms->idx = 0;
         /* Fall through */
-    case PHASE_GOOD_CAPS:
+    case PHASE_GOOD_TACTICAL:
         if (ms->idx < ms->last_idx) {
+            break;
+        }
+        if (ms->tactical_only && !ms->in_check) {
             break;
         }
         ms->phase++;
@@ -283,8 +277,11 @@ static bool get_move_incremental(struct search_worker *worker, uint32_t *move)
     case PHASE_GEN_MOVES:
         /* Generate all possible moves for this position */
         list.nmoves = 0;
-        gen_promotion_moves(pos, &list, false, true);
-        gen_quiet_moves(pos, &list);
+        if (ms->in_check) {
+            gen_check_evasion_moves(pos, &list);
+        } else {
+            gen_quiet_moves(pos, &list);
+        }
         for (k=0;k<list.nmoves;k++) {
             add_move(worker, ms, &list, k);
         }
@@ -296,12 +293,12 @@ static bool get_move_incremental(struct search_worker *worker, uint32_t *move)
         }
         ms->phase++;
         /* Fall through */
-    case PHASE_ADD_BAD_CAPS:
+    case PHASE_ADD_BAD_TACTICAL:
         ms->last_idx = MAX_MOVES + ms->nbadcaps;
         ms->idx = MAX_MOVES;
         ms->phase++;
         /* Fall through */
-    case PHASE_BAD_CAPS:
+    case PHASE_BAD_TACTICAL:
         if (ms->idx < ms->last_idx) {
             break;
         }
@@ -318,162 +315,6 @@ static bool get_move_incremental(struct search_worker *worker, uint32_t *move)
     ms->idx++;
 
     return *move != NOMOVE;
-}
-
-static bool get_move(struct search_worker *worker, uint32_t *move)
-{
-    struct moveselector *ms;
-    struct movelist     list;
-    int                 k;
-    struct position     *pos;
-    struct moveinfo     *info;
-
-    assert(move != NULL);
-
-    pos = &worker->pos;
-    ms = &worker->ppms[pos->sply];
-
-    switch (ms->phase) {
-    case PHASE_ROOT:
-        if (ms->idx < ms->last_idx) {
-            break;
-        }
-        return false;
-    case PHASE_GEN_QUIESCENCE:
-    case PHASE_GEN_PROBCUT:
-        /* Generate all non-quiet moves for this position */
-        list.nmoves = 0;
-        gen_capture_moves(pos, &list);
-        gen_promotion_moves(pos, &list, false, false);
-        for (k=0;k<list.nmoves;k++) {
-            info = &ms->moveinfo[ms->last_idx];
-            ms->last_idx++;
-            info->move = list.moves[k];
-            info->score = get_move_score(worker, pos, ms, info->move);
-        }
-        ms->phase++;
-        ms->idx = 0;
-        /* Fall through */
-    case PHASE_QUIESCENCE:
-    case PHASE_PROBCUT:
-        if (ms->idx < ms->last_idx) {
-            break;
-        }
-        ms->phase++;
-        return false;
-    case PHASE_GEN_EVASIONS:
-        /* Generate check evasions for this position */
-        gen_check_evasions(pos, &list);
-        for (k=0;k<list.nmoves;k++) {
-            info = &ms->moveinfo[ms->last_idx];
-            ms->last_idx++;
-            info->move = list.moves[k];
-            info->score = get_move_score(worker, pos, ms, info->move);
-        }
-        ms->phase++;
-        ms->idx = 0;
-        /* Fall through */
-    case PHASE_EVASIONS:
-        if (ms->idx < ms->last_idx) {
-            break;
-        }
-        /* Fall through */
-    default:
-        /* All moves have been searched */
-        *move = NOMOVE;
-        return false;
-    }
-
-    /* Select the next move to search */
-    *move = select_move(ms);
-    ms->idx++;
-
-    return *move != NOMOVE;
-}
-
-void select_init_node(struct search_worker *worker, uint32_t flags,
-                      bool in_check, uint32_t ttmove)
-{
-    struct moveselector *ms;
-    uint32_t            move;
-    uint32_t            prev_move;
-    int                 prev_to;
-    int                 k;
-    struct position     *pos;
-    struct moveinfo     *info;
-
-    pos = &worker->pos;
-    ms = &worker->ppms[pos->sply];
-    if (flags&FLAG_ROOT_NODE) {
-        ms->phase = PHASE_ROOT;
-    } else if (in_check) {
-        ms->phase = PHASE_GEN_EVASIONS;
-    } else if (flags&FLAG_QUIESCENCE_NODE) {
-        ms->phase = PHASE_GEN_QUIESCENCE;
-    } else if (flags&FLAG_PROBCUT) {
-        ms->phase = PHASE_GEN_PROBCUT;
-    } else {
-        ms->phase = PHASE_TT;
-    }
-    ms->flags = flags;
-    if ((ttmove != NOMOVE) && board_is_move_pseudo_legal(pos, ttmove)) {
-        ms->ttmove = ttmove;
-    } else {
-        ms->ttmove = NOMOVE;
-    }
-    ms->idx = 0;
-    if (!(flags&FLAG_ROOT_NODE)) {
-        ms->last_idx = 0;
-        ms->nbadcaps = 0;
-    }
-    ms->killer1 = worker->killer_table[pos->sply][0];
-    ms->killer2 = worker->killer_table[pos->sply][1];
-    if (!(flags&FLAG_ROOT_NODE)) {
-        prev_move = pos->history[pos->ply-1].move;
-        if (!ISNULLMOVE(prev_move)) {
-            prev_to = TO(prev_move);
-            ms->counter =
-                    worker->countermove_table[pos->pieces[prev_to]][prev_to];
-        } else {
-            ms->counter = NOMOVE;
-        }
-    } else {
-        ms->counter = NOMOVE;
-    }
-
-    /*
-     * The move info list at the root is reused for each iteration
-     * so it should be setup only during the first iteration.
-     */
-    if (flags&FLAG_ROOT_NODE) {
-        if (ms->last_idx == 0) {
-            ms->last_idx = worker->root_moves.nmoves;
-            for (k=0;k<worker->root_moves.nmoves;k++) {
-                move = worker->root_moves.moves[k];
-                ms->moveinfo[k].move = move;
-                ms->moveinfo[k].score = 0;
-            }
-        }
-        for (k=0;k<ms->last_idx;k++) {
-            info = &ms->moveinfo[k];
-            info->score = get_move_score(worker, pos, ms, info->move);
-        }
-    }
-}
-
-bool select_get_move(struct search_worker *worker, uint32_t *move)
-{
-    struct moveselector *ms;
-    struct position     *pos;
-
-    pos = &worker->pos;
-    ms = &worker->ppms[pos->sply];
-
-    if (ms->phase < PHASE_ROOT) {
-        return get_move_incremental(worker, move);
-    } else {
-        return get_move(worker, move);
-    }
 }
 
 bool select_is_bad_capture_phase(struct search_worker *worker)
@@ -484,5 +325,5 @@ bool select_is_bad_capture_phase(struct search_worker *worker)
     pos = &worker->pos;
     ms = &worker->ppms[pos->sply];
 
-    return ms->moveinfo[ms->idx-1].score/BASE_SCORE_DELTA == 0;
+    return ms->phase == PHASE_BAD_TACTICAL;
 }

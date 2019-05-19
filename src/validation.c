@@ -68,7 +68,7 @@ static int qsearch_verification(struct search_worker *worker, int depth,
     if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score, NULL)) {
         return score;
     }
-    select_init_node(worker, FLAG_QUIESCENCE_NODE, in_check, tt_move);
+    select_init_node(worker, false, in_check, tt_move);
 
     found_move = false;
     while (select_get_move(worker, &move)) {

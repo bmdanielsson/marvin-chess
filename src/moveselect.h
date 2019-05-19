@@ -20,20 +20,16 @@
 
 #include "chess.h"
 
-/* Flags describing the position */
-#define FLAG_ROOT_NODE          0x00000001
-#define FLAG_QUIESCENCE_NODE    0x00000002
-#define FLAG_PROBCUT            0x00000004
-
 /*
  * Initialize the move selector a node.
  *
  * @param worker The worker.
- * @param flags Flags describing the position.
+ * @param captures_only Flags indicating if only tactical moves i.e., captures
+ *                      and promotoions, should be considered.
  * @param in_check Is the side to move in check.
  * @param ttmove Transposition table move for this position.
  */
-void select_init_node(struct search_worker *worker, uint32_t flags,
+void select_init_node(struct search_worker *worker, bool tactical_only,
                       bool in_check, uint32_t ttmove);
 
 /*

@@ -286,7 +286,7 @@ void gen_moves(struct position *pos, struct movelist *list)
 
     gen_quiet_moves(pos, list);
     gen_capture_moves(pos, list);
-    gen_promotion_moves(pos, list, false, true);
+    gen_promotion_moves(pos, list, true);
 }
 
 void gen_legal_moves(struct position *pos, struct movelist *list)
@@ -312,66 +312,18 @@ void gen_legal_moves(struct position *pos, struct movelist *list)
     }
 }
 
-void gen_quiet_moves(struct position *pos, struct movelist *list)
-{
-    uint64_t mask;
-
-    assert(valid_position(pos));
-    assert(list != NULL);
-
-    /* Setup masks for which moves to include */
-    mask = ~pos->bb_all;
-
-    /* Generate standard moves */
-    gen_knight_moves(pos, list, mask, 0);
-    gen_diagonal_slider_moves(pos, list, mask, 0);
-    gen_straight_slider_moves(pos, list, mask, 0);
-    gen_king_moves(pos, list, mask, 0);
-    gen_pawn_moves(pos, list, ~pos->bb_all);
-
-    /* Generate castling moves */
-    gen_kingside_castling_moves(pos, list);
-    gen_queenside_castling_moves(pos, list);
-}
-
-void gen_capture_moves(struct position *pos, struct movelist *list)
-{
-    uint64_t opp_mask;
-
-    assert(valid_position(pos));
-    assert(list != NULL);
-
-    /* Setup masks for which moves to include */
-    opp_mask = pos->bb_sides[FLIP_COLOR(pos->stm)];
-
-    /* Generate piece captures */
-    gen_knight_moves(pos, list, opp_mask, CAPTURE);
-    gen_diagonal_slider_moves(pos, list, opp_mask, CAPTURE);
-    gen_straight_slider_moves(pos, list, opp_mask, CAPTURE);
-    gen_king_moves(pos, list, opp_mask, CAPTURE);
-
-    /* Generate pawn captures */
-    gen_pawn_captures(pos, list, opp_mask);
-    gen_capture_promotions(pos, list, true, opp_mask);
-
-    /* Generate en-passant captures */
-    gen_en_passant_moves(pos, list);
-}
-
-void gen_promotion_moves(struct position *pos, struct movelist *list,
-                         bool capture, bool underpromote)
-{
-    assert(valid_position(pos));
-    assert(list != NULL);
-
-    gen_promotions(pos, list, underpromote, ~pos->bb_all);
-    if (capture) {
-        gen_capture_promotions(pos, list, underpromote,
-                               pos->bb_sides[FLIP_COLOR(pos->stm)]);
-    }
-}
-
 void gen_check_evasions(struct position *pos, struct movelist *list)
+{
+    assert(valid_position(pos));
+    assert(list != NULL);
+
+    list->nmoves = 0;
+
+    gen_check_evasion_moves(pos, list);
+    gen_check_evasion_captures(pos, list);
+}
+
+void gen_check_evasion_moves(struct position *pos, struct movelist *list)
 {
     int      kingsq;
     int      to;
@@ -384,24 +336,18 @@ void gen_check_evasions(struct position *pos, struct movelist *list)
     int      attacksq;
     int      attacker;
     int      from;
-    int      piece;
     int      blocksq;
     bool     promotion;
-
-    assert(valid_position(pos));
-    assert(list != NULL);
-
-    list->nmoves = 0;
 
     /* Find the location of our king */
     kingsq = LSB(pos->bb_pieces[KING+pos->stm]);
 
     /*
      * First try to move the king. Find all
-     * moves to a safe square.
+     * moves to a safe square (excluding captures).
      */
     occ = pos->bb_all&(~pos->bb_pieces[KING+pos->stm]);
-    moves = bb_king_moves(kingsq)&(~pos->bb_sides[pos->stm]);
+    moves = bb_king_moves(kingsq)&(~pos->bb_all);
     while (moves != 0ULL) {
         to = POPBIT(&moves);
         if (bb_attacks_to(pos, occ, to, FLIP_COLOR(pos->stm)) == 0ULL) {
@@ -412,8 +358,7 @@ void gen_check_evasions(struct position *pos, struct movelist *list)
 
     /*
      * If there is more than one attacker there is nothing
-     * more to try. But if there is only one attacker
-     * then also try to capture the attacking piece. If
+     * more to try. But if there is only one attacker and
      * the attacker is a slider then also try to block it.
      */
     attackers = bb_attacks_to(pos, pos->bb_all, kingsq, FLIP_COLOR(pos->stm));
@@ -422,38 +367,6 @@ void gen_check_evasions(struct position *pos, struct movelist *list)
     }
     attacksq = LSB(attackers);
     attacker = pos->pieces[attacksq];
-
-    /*
-     * Find all captures of the attacking piece. Captures with
-     * the king are excluded since they have already been counted
-     * above.
-     */
-    promotion =
-        ((sq_mask[attacksq]&(rank_mask[RANK_1]|rank_mask[RANK_8])) != 0ULL);
-    moves = bb_attacks_to(pos, pos->bb_all, attacksq, pos->stm)&
-                                            (~pos->bb_pieces[KING+pos->stm]);
-    while (moves != 0ULL) {
-        from = POPBIT(&moves);
-        piece = pos->pieces[from];
-        if ((VALUE(piece) == PAWN) && promotion) {
-            add_promotion_moves(pos, list, from, sq_mask[attacksq],
-                                CAPTURE|PROMOTION, true);
-        } else {
-            ADD_MOVE(list, from, attacksq, NO_PIECE, CAPTURE);
-        }
-    }
-
-    /*
-     * If the attacking piece is a pawn then also have to check
-     * if it can be captured en-passant.
-     */
-    if ((VALUE(attacker) == PAWN) && (pos->stm == WHITE) &&
-        (attacksq == (pos->ep_sq-8))) {
-        gen_en_passant_moves(pos, list);
-    } else if ((VALUE(attacker) == PAWN) && (pos->stm == BLACK) &&
-               (attacksq == (pos->ep_sq+8))) {
-        gen_en_passant_moves(pos, list);
-    }
 
     /*
      * If the attacking piece is a slider then find all squares
@@ -515,4 +428,134 @@ void gen_check_evasions(struct position *pos, struct movelist *list)
     if ((pos->ep_sq != NO_SQUARE) && ISBITSET(slide, pos->ep_sq)) {
         gen_en_passant_moves(pos, list);
     }
+}
+
+void gen_check_evasion_captures(struct position *pos, struct movelist *list)
+{
+    int      kingsq;
+    int      to;
+    uint64_t moves;
+    uint64_t attackers;
+    uint64_t occ;
+    int      attacksq;
+    int      attacker;
+    int      from;
+    int      piece;
+    bool     promotion;
+
+    /* Find the location of our king */
+    kingsq = LSB(pos->bb_pieces[KING+pos->stm]);
+
+    /*
+     * First try to move the king. Find all
+     * captures to a safe square.
+     */
+    occ = pos->bb_all&(~pos->bb_pieces[KING+pos->stm]);
+    moves = bb_king_moves(kingsq)&(pos->bb_sides[FLIP_COLOR(pos->stm)]);
+    while (moves != 0ULL) {
+        to = POPBIT(&moves);
+        if (bb_attacks_to(pos, occ, to, FLIP_COLOR(pos->stm)) == 0ULL) {
+            ADD_MOVE(list, kingsq, to, NO_PIECE,
+                     pos->pieces[to] != NO_PIECE?CAPTURE:0);
+        }
+    }
+
+    /*
+     * If there is more than one attacker there is nothing
+     * more to try. But if there is only one attacker
+     * then also try to capture the attacking piece.
+     */
+    attackers = bb_attacks_to(pos, pos->bb_all, kingsq, FLIP_COLOR(pos->stm));
+    if (BITCOUNT(attackers) > 1) {
+        return;
+    }
+    attacksq = LSB(attackers);
+    attacker = pos->pieces[attacksq];
+
+    /*
+     * Find all captures of the attacking piece. Captures with
+     * the king are excluded since they have already been counted
+     * above.
+     */
+    promotion =
+        ((sq_mask[attacksq]&(rank_mask[RANK_1]|rank_mask[RANK_8])) != 0ULL);
+    moves = bb_attacks_to(pos, pos->bb_all, attacksq, pos->stm)&
+                                            (~pos->bb_pieces[KING+pos->stm]);
+    while (moves != 0ULL) {
+        from = POPBIT(&moves);
+        piece = pos->pieces[from];
+        if ((VALUE(piece) == PAWN) && promotion) {
+            add_promotion_moves(pos, list, from, sq_mask[attacksq],
+                                CAPTURE|PROMOTION, true);
+        } else {
+            ADD_MOVE(list, from, attacksq, NO_PIECE, CAPTURE);
+        }
+    }
+
+    /*
+     * If the attacking piece is a pawn then also have to check
+     * if it can be captured en-passant.
+     */
+    if ((VALUE(attacker) == PAWN) && (pos->stm == WHITE) &&
+        (attacksq == (pos->ep_sq-8))) {
+        gen_en_passant_moves(pos, list);
+    } else if ((VALUE(attacker) == PAWN) && (pos->stm == BLACK) &&
+               (attacksq == (pos->ep_sq+8))) {
+        gen_en_passant_moves(pos, list);
+    }
+}
+
+void gen_quiet_moves(struct position *pos, struct movelist *list)
+{
+    uint64_t mask;
+
+    assert(valid_position(pos));
+    assert(list != NULL);
+
+    /* Setup masks for which moves to include */
+    mask = ~pos->bb_all;
+
+    /* Generate standard moves */
+    gen_knight_moves(pos, list, mask, 0);
+    gen_diagonal_slider_moves(pos, list, mask, 0);
+    gen_straight_slider_moves(pos, list, mask, 0);
+    gen_king_moves(pos, list, mask, 0);
+    gen_pawn_moves(pos, list, ~pos->bb_all);
+
+    /* Generate castling moves */
+    gen_kingside_castling_moves(pos, list);
+    gen_queenside_castling_moves(pos, list);
+}
+
+void gen_capture_moves(struct position *pos, struct movelist *list)
+{
+    uint64_t opp_mask;
+
+    assert(valid_position(pos));
+    assert(list != NULL);
+
+    /* Setup masks for which moves to include */
+    opp_mask = pos->bb_sides[FLIP_COLOR(pos->stm)];
+
+    /* Generate piece captures */
+    gen_knight_moves(pos, list, opp_mask, CAPTURE);
+    gen_diagonal_slider_moves(pos, list, opp_mask, CAPTURE);
+    gen_straight_slider_moves(pos, list, opp_mask, CAPTURE);
+    gen_king_moves(pos, list, opp_mask, CAPTURE);
+
+    /* Generate pawn captures */
+    gen_pawn_captures(pos, list, opp_mask);
+    gen_capture_promotions(pos, list, true, opp_mask);
+
+    /* Generate en-passant captures */
+    gen_en_passant_moves(pos, list);
+}
+
+void gen_promotion_moves(struct position *pos, struct movelist *list,
+                         bool underpromote)
+{
+    assert(valid_position(pos));
+    assert(list != NULL);
+
+    gen_promotions(pos, list, underpromote, ~pos->bb_all);
 }

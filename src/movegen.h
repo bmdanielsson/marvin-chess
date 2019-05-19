@@ -47,6 +47,10 @@ void gen_legal_moves(struct position *pos, struct movelist *list);
  */
 void gen_check_evasions(struct position *pos, struct movelist *list);
 
+void gen_check_evasion_moves(struct position *pos, struct movelist *list);
+
+void gen_check_evasion_captures(struct position *pos, struct movelist *list);
+
 /*
  * Generate all normal moves. Normal moves are all moves except captures,
  * en-passant and promotions.
@@ -68,15 +72,14 @@ void gen_quiet_moves(struct position *pos, struct movelist *list);
 void gen_capture_moves(struct position *pos, struct movelist *list);
 
 /*
- * Generate all promotion moves.
+ * Generate all promotion moves (excluding captures).
  *
  * @param pos The board structure.
  * @param list The list to store the moves in. Moves are appended to the list
  *             so it must be initialized before first use.
- * @param capture Flag indicating if captures should be included.
  * @param underpromote Flag indicating if under promotions should be included.
  */
 void gen_promotion_moves(struct position *pos, struct movelist *list,
-                         bool capture, bool underpromote);
+                         bool underpromote);
 
 #endif

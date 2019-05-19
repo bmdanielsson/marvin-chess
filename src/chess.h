@@ -200,6 +200,7 @@ enum {
 #define ISKINGSIDECASTLE(m)     ((TYPE((m))&KINGSIDE_CASTLE) != 0)
 #define ISQUEENSIDECASTLE(m)    ((TYPE((m))&QUEENSIDE_CASTLE) != 0)
 #define ISNULLMOVE(m)           ((TYPE((m))&NULL_MOVE) != 0)
+#define ISTACTICAL(m)           (ISCAPTURE(m)||ISENPASSANT(m)||ISPROMOTION(m))
 #define NOMOVE                  0
 
 /* The maximum number of chess moves that can occur in a game */
@@ -253,8 +254,6 @@ struct moveinfo {
  * next move to search for a specific position.
  */
 struct moveselector {
-    /* Flags related to the position */
-    uint32_t flags;
     /* Move fetched from the transposition table for this position */
     uint32_t ttmove;
     /* Killer moves for this position */
@@ -272,6 +271,15 @@ struct moveselector {
     int idx;
     /* The current move generation phase */
     int phase;
+    /* Flag indicating if the player is in check */
+    bool in_check;
+    /* Flag indicating if underpromotions should be included */
+    bool underpromote;
+    /*
+     * Flag indicating if only tactical moves should be
+     * considered for this search.
+     */
+    bool tactical_only;
 };
 
 /* Struct for unmaking a move */
