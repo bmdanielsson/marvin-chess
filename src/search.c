@@ -750,8 +750,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* If the best move is a quiet move then update the history table */
-    if (!ISCAPTURE(best_move) && !ISENPASSANT(best_move) &&
-         (tt_flag == TT_BETA)) {
+    if (!ISTACTICAL(best_move) && (tt_flag == TT_BETA)) {
         history_update_table(worker, &quiets, depth);
     }
 
@@ -888,8 +887,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     }
 
     /* If the best move is a quiet move then update the history table */
-    if (!ISCAPTURE(best_move) && !ISENPASSANT(best_move) &&
-        (tt_flag == TT_BETA)) {
+    if (!ISTACTICAL(best_move) && (tt_flag == TT_BETA)) {
         history_update_table(worker, &quiets, depth);
     }
 
