@@ -303,10 +303,10 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score, NULL)) {
         return score;
     }
-    select_init_node(worker, true, in_check, tt_move);
 
     /* Search all moves */
     found_move = false;
+    select_init_node(worker, true, in_check, tt_move);
     while (select_get_move(worker, &move)) {
         /*
          * Don't bother searching captures that
@@ -437,7 +437,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                        &tt_item) && (tt_move != exclude_move)) {
         return tt_score;
     }
-    select_init_node(worker, false, in_check, tt_move);
 
     /* Probe tablebases */
     if (worker->state->probe_wdl &&
@@ -515,9 +514,9 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      */
     if (!pv_node && !in_check && (depth >= PROBCUT_DEPTH) &&
         board_has_non_pawn(&worker->pos, pos->stm)) {
-        select_init_node(worker, true, in_check, tt_move);
         threshold = beta + PROBCUT_MARGIN;
 
+        select_init_node(worker, true, in_check, tt_move);
         while (select_get_move(worker, &move)) {
             /*
              * Skip non-captures and captures that are not
@@ -545,7 +544,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             }
         }
     }
-    select_init_node(worker, false, in_check, tt_move);
 
     /* Check if the move from the transposition table is singular */
     is_singular = false;
@@ -562,8 +560,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         if (score < threshold) {
             is_singular = true;
         }
-
-        select_init_node(worker, false, in_check, tt_move);
     }
 
     /*
@@ -585,6 +581,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     tt_flag = TT_ALPHA;
     movenumber = 0;
     found_move = false;
+    select_init_node(worker, false, in_check, tt_move);
     while (select_get_move(worker, &move)) {
         /*
          * If this a singular extension search then skip the move
@@ -801,7 +798,6 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     tt_move = NOMOVE;
     in_check = board_in_check(pos, pos->stm);
     (void)hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &score, NULL);
-    select_init_node(worker, false, in_check, tt_move);
     best_move = tt_move;
 
     /* Search all moves */
@@ -809,6 +805,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     tt_flag = TT_ALPHA;
     best_score = -INFINITE_SCORE;
     worker->currmovenumber = 0;
+    select_init_node(worker, false, in_check, tt_move);
     while (select_get_move(worker, &move)) {
         /* Send stats for the first worker */
         worker->currmovenumber++;
