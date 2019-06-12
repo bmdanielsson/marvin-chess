@@ -127,20 +127,6 @@ static void write_result(struct gamestate *state, enum game_result result)
 	}
 }
 
-static void write_search_status(struct search_worker *worker)
-{
-	uint32_t msec;
-	char     movestr[6];
-    int      moves_left;
-
-	msec = tc_elapsed_time();
-	move2str(worker->currmove, movestr);
-    moves_left = worker->root_moves.nmoves - worker->currmovenumber;
-	engine_write_command("stat01: %d %d %d %d %d %s\n", msec/10, smp_nodes(),
-                         worker->depth, moves_left, worker->root_moves.nmoves,
-                         movestr);
-}
-
 static bool is_three_fold_repetition(struct position *pos)
 {
     int idx;
@@ -846,9 +832,7 @@ bool xboard_check_input(struct search_worker *worker)
     }
 
     /* Process command */
-    if (!strncmp(cmd, ".", 1)) {
-        write_search_status(worker);
-    } else if(!strncmp(cmd, "cores", 5)) {
+    if(!strncmp(cmd, "cores", 5)) {
         engine_set_pending_command(cmd);
         if (worker->state->pondering) {
             stop = true;

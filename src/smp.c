@@ -125,10 +125,8 @@ static bool probe_dtz_tables(struct gamestate *state, int *score)
             break;
         }
     }
-    state->root_moves.moves[0] = MOVE(from, to, promotion, flags);
-    state->root_moves.nmoves++;
-
-    assert(board_is_move_pseudo_legal(&state->pos, state->root_moves.moves[0]));
+    state->move_filter.moves[0] = MOVE(from, to, promotion, flags);
+    state->move_filter.nmoves = 1;
 
     return true;
 }
@@ -147,7 +145,6 @@ static void prepare_worker(struct search_worker *worker,
 {
     /* Copy data from game state */
     worker->pos = state->pos;
-    worker->root_moves = state->root_moves;
 
     /* Clear tables */
     history_clear_table(worker);
@@ -165,7 +162,7 @@ static void prepare_worker(struct search_worker *worker,
 
     /* Clear best move information */
     worker->ponder_move = NOMOVE;
-    worker->best_move = worker->root_moves.moves[0];
+    worker->best_move = NOMOVE;
     worker->best_score = -INFINITE_SCORE;
     worker->best_depth = 0;
 
@@ -225,6 +222,7 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     bool                 analysis;
     struct search_worker *worker;
     struct search_worker *best_worker;
+    struct movelist      legal;
 
     assert(valid_position(&state->pos));
 
@@ -236,7 +234,7 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
 	 * Try to guess if the search is part of a
 	 * game or if it is for analysis.
 	 */
-	analysis = tc_is_infinite() || (state->root_moves.nmoves > 0);
+	analysis = tc_is_infinite() || (state->move_filter.nmoves > 0);
 
     /* Try to find a move in the opening book */
     if (use_book) {
@@ -265,30 +263,28 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     state->completed_depth = 0;
 
     /* Probe tablebases for the root position */
-    if (use_tablebases &&
+    if (use_tablebases && (state->move_filter.nmoves == 0) &&
         (BITCOUNT(state->pos.bb_all) <= (int)TB_LARGEST)) {
         state->root_in_tb = probe_dtz_tables(state, &state->root_tb_score);
         state->probe_wdl = !state->root_in_tb;
-    }
-
-    /* If no root moves are specified then search all moves */
-    if (state->root_moves.nmoves == 0) {
-        gen_legal_moves(&state->pos, &state->root_moves);
-        assert(state->root_moves.nmoves > 0);
     }
 
     /*
      * Initialize the best move to the first legal root
      * move to make sure a legal move is always returned.
      */
-    state->best_move = state->root_moves.moves[0];
+    gen_legal_moves(&state->pos, &legal);
+    if (state->move_filter.nmoves == 0) {
+        state->best_move = legal.moves[0];
+    } else {
+        state->best_move = state->move_filter.moves[0];
+    }
 
     /*
      * If there is only one legal move then there is no
      * need to do a search. Instead save the time for later.
      */
-    if ((state->root_moves.nmoves == 1) && !state->pondering && !analysis &&
-        !state->root_in_tb) {
+    if ((legal.nmoves == 1) && !state->pondering && !analysis) {
         return;
     }
 
@@ -332,8 +328,10 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     }
 
     /* Copy the best move to the state struct */
-    best_worker->state->best_move = best_worker->best_move;
-    best_worker->state->ponder_move = best_worker->ponder_move;
+    if (best_worker->best_move != NOMOVE) {
+        best_worker->state->best_move = best_worker->best_move;
+        best_worker->state->ponder_move = best_worker->ponder_move;
+    }
 }
 
 uint64_t smp_nodes(void)

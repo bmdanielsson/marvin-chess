@@ -896,7 +896,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
 
 void search_reset_data(struct gamestate *state)
 {
-    state->root_moves.nmoves = 0;
+    state->move_filter.nmoves = 0;
     state->exit_on_mate = true;
     state->silent = false;
     state->sd = MAX_SEARCH_DEPTH;
@@ -1043,7 +1043,6 @@ int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
     state->silent = true;
 
     worker->pos = state->pos;
-    worker->root_moves = state->root_moves;
     worker->depth = 0;
     worker->nodes = 0;
     worker->id = 0;

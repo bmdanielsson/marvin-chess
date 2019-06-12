@@ -163,43 +163,7 @@ static uint32_t select_move(struct moveselector *ms)
     return ms->moveinfo[start].move;
 }
 
-void select_init_node(struct search_worker *worker, bool tactical_only,
-                      bool in_check, uint32_t ttmove)
-{
-    struct moveselector *ms;
-    uint32_t            prev_move;
-    int                 prev_to;
-    struct position     *pos;
-
-    pos = &worker->pos;
-    ms = &worker->ppms[pos->sply];
-    ms->phase = PHASE_TT;
-    ms->tactical_only = tactical_only;
-    ms->underpromote = !tactical_only;
-    if ((ttmove == NOMOVE) || !board_is_move_pseudo_legal(pos, ttmove)) {
-        ms->ttmove = NOMOVE;
-    } else if (ms->tactical_only && !in_check && !ISTACTICAL(ms->ttmove)) {
-        ms->ttmove = NOMOVE;
-    } else {
-        ms->ttmove = ttmove;
-    }
-    ms->in_check = in_check;
-    ms->idx = 0;
-    ms->last_idx = 0;
-    ms->nbadcaps = 0;
-    ms->killer1 = worker->killer_table[pos->sply][0];
-    ms->killer2 = worker->killer_table[pos->sply][1];
-    prev_move = pos->history[pos->ply-1].move;
-    if (!ISNULLMOVE(prev_move)) {
-        prev_to = TO(prev_move);
-        ms->counter =
-                worker->countermove_table[pos->pieces[prev_to]][prev_to];
-    } else {
-        ms->counter = NOMOVE;
-    }
-}
-
-bool select_get_move(struct search_worker *worker, uint32_t *move)
+static bool get_move(struct search_worker *worker, uint32_t *move)
 {
     struct moveselector *ms;
     struct movelist     list;
@@ -207,8 +171,6 @@ bool select_get_move(struct search_worker *worker, uint32_t *move)
     uint32_t            counter;
     int                 k;
     struct position     *pos;
-
-    assert(move != NULL);
 
     pos = &worker->pos;
     ms = &worker->ppms[pos->sply];
@@ -315,6 +277,67 @@ bool select_get_move(struct search_worker *worker, uint32_t *move)
     ms->idx++;
 
     return *move != NOMOVE;
+}
+
+void select_init_node(struct search_worker *worker, bool tactical_only,
+                      bool in_check, uint32_t ttmove)
+{
+    struct moveselector *ms;
+    uint32_t            prev_move;
+    int                 prev_to;
+    struct position     *pos;
+
+    pos = &worker->pos;
+    ms = &worker->ppms[pos->sply];
+    ms->phase = PHASE_TT;
+    ms->tactical_only = tactical_only;
+    ms->underpromote = !tactical_only;
+    if ((ttmove == NOMOVE) || !board_is_move_pseudo_legal(pos, ttmove)) {
+        ms->ttmove = NOMOVE;
+    } else if (ms->tactical_only && !in_check && !ISTACTICAL(ms->ttmove)) {
+        ms->ttmove = NOMOVE;
+    } else {
+        ms->ttmove = ttmove;
+    }
+    ms->in_check = in_check;
+    ms->idx = 0;
+    ms->last_idx = 0;
+    ms->nbadcaps = 0;
+    ms->killer1 = worker->killer_table[pos->sply][0];
+    ms->killer2 = worker->killer_table[pos->sply][1];
+    prev_move = pos->history[pos->ply-1].move;
+    if (!ISNULLMOVE(prev_move)) {
+        prev_to = TO(prev_move);
+        ms->counter =
+                worker->countermove_table[pos->pieces[prev_to]][prev_to];
+    } else {
+        ms->counter = NOMOVE;
+    }
+}
+
+bool select_get_move(struct search_worker *worker, uint32_t *move)
+{
+    int  k;
+    bool found;
+
+    assert(move != NULL);
+
+    found = false;
+    while (!found && get_move(worker, move)) {
+        if ((worker->pos.sply > 0) ||
+            (worker->state->move_filter.nmoves == 0)) {
+            found = true;
+            break;
+        }
+        for (k=0;k<worker->state->move_filter.nmoves;k++) {
+            if (*move == worker->state->move_filter.moves[k]) {
+                found = true;
+                break;
+            }
+        }
+    }
+
+    return found;
 }
 
 bool select_is_bad_capture_phase(struct search_worker *worker)

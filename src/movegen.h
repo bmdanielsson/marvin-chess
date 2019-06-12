@@ -42,13 +42,27 @@ void gen_legal_moves(struct position *pos, struct movelist *list);
  * Generate all check evasions.
  *
  * @param pos The board structure.
- * @param list The list to store the moves in. Moves are appended to the list
- *             so it must be initialized before first use.
+ * @param list The list to store the moves in.
  */
 void gen_check_evasions(struct position *pos, struct movelist *list);
 
+/*
+ * Generate all normal check evasions. Normal moves are all moves except
+ * captures and en-passant.
+ *
+ * @param pos The board structure.
+ * @param list The list to store the moves in. Moves are appended to the list
+ *             so it must be initialized before first use.
+ */
 void gen_check_evasion_moves(struct position *pos, struct movelist *list);
 
+/*
+ * Generate all capture check evasions.
+ *
+ * @param pos The board structure.
+ * @param list The list to store the moves in. Moves are appended to the list
+ *             so it must be initialized before first use.
+ */
 void gen_check_evasion_captures(struct position *pos, struct movelist *list);
 
 /*

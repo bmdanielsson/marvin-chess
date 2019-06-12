@@ -156,8 +156,8 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             if (move != NOMOVE) {
                 if (board_make_move(&state->pos, move)) {
                     board_unmake_move(&state->pos);
-                    state->root_moves.moves[state->root_moves.nmoves] = move;
-                    state->root_moves.nmoves++;
+                    state->move_filter.moves[state->move_filter.nmoves] = move;
+                    state->move_filter.nmoves++;
                 }
             }
             if (temp != NULL) {

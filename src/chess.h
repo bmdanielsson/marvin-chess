@@ -441,8 +441,6 @@ struct search_worker {
     int id;
     /* The current position */
     struct position pos;
-    /* List of moves to search */
-    struct movelist root_moves;
     /* Move selector struct for each ply in the search tree */
     struct moveselector ppms[MAX_PLY];
     /*
@@ -461,7 +459,7 @@ struct search_worker {
     struct pawntt_item *pawntt;
     /* The number of entries in the pawn transposition table */
     int pawntt_size;
-    /* Indicates if the engine is resolving a fail-low/fail-high at the root */
+    /* Indicates if the engine is resolving a fail-low at the root */
     bool resolving_root_fail;
     /* The number of nodes searched so far */
     uint64_t nodes;
@@ -497,12 +495,12 @@ struct search_worker {
 struct gamestate {
     /* The current position */
     struct position pos;
-    /* List of moves to search */
-    struct movelist root_moves;
     /* Flag indicating if the root position was found in the tablebases */
     bool root_in_tb;
     /* Score for the root position based on tablebases */
     int  root_tb_score;
+    /* List of moves to search. If the list is empty all moves are searched. */
+    struct movelist move_filter;
     /* Flag indicating if the WDL tables should be probed during search */
     bool probe_wdl;
     /*
