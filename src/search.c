@@ -927,7 +927,7 @@ void search_find_best_move(struct search_worker *worker)
         exception = setjmp(worker->env);
         if (exception == 0) {
             worker->depth = depth;
-            worker->seldepth = 0;
+            worker->seldepth = depth;
             alpha = MAX(alpha, -INFINITE_SCORE);
             beta = MIN(beta, INFINITE_SCORE);
             score = search_root(worker, depth, alpha, beta);
