@@ -480,7 +480,7 @@ struct search_worker {
     int best_score;
     int best_depth;
     uint32_t best_move;
-    uint32_t ponder_move;
+    struct pv best_pv;
 
     /* Data for the worker thread */
     thread_t thread;

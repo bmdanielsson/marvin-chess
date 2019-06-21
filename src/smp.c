@@ -161,10 +161,10 @@ static void prepare_worker(struct search_worker *worker,
     worker->tbhits = 0ULL;
 
     /* Clear best move information */
-    worker->ponder_move = NOMOVE;
     worker->best_move = NOMOVE;
     worker->best_score = -INFINITE_SCORE;
     worker->best_depth = 0;
+    worker->best_pv.length = 0;
 
     /* Initialize helper variables */
     worker->resolving_root_fail = false;
@@ -330,7 +330,8 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     /* Copy the best move to the state struct */
     if (best_worker->best_move != NOMOVE) {
         best_worker->state->best_move = best_worker->best_move;
-        best_worker->state->ponder_move = best_worker->ponder_move;
+        best_worker->state->ponder_move = (best_worker->best_pv.length > 1)?
+                                        best_worker->best_pv.moves[1]:NOMOVE;
     }
 }
 

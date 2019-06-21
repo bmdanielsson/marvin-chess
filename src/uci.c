@@ -469,14 +469,13 @@ bool uci_check_input(struct search_worker *worker)
 
 void uci_send_pv_info(struct search_worker *worker, int score)
 {
-    char      movestr[6];
-    char      buffer[1024];
-    int       msec;
-    int       nps;
-    int       k;
-    uint64_t  tbhits;
-    uint64_t  nodes;
-    struct pv *pv;
+    char     movestr[6];
+    char     buffer[1024];
+    int      msec;
+    int      nps;
+    int      k;
+    uint64_t tbhits;
+    uint64_t nodes;
 
     /* Get information about the search */
     msec = (int)tc_elapsed_time();
@@ -494,10 +493,9 @@ void uci_send_pv_info(struct search_worker *worker, int score)
     sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
             "tbhits %"PRIu64" hashfull %d score cp %d pv", worker->depth,
             worker->seldepth, nodes, msec, nps, tbhits, hash_tt_usage(), score);
-    pv = &worker->pv_table[0];
-    for (k=0;k<pv->length;k++) {
+    for (k=0;k<worker->best_pv.length;k++) {
         strcat(buffer, " ");
-        move2str(pv->moves[k], movestr);
+        move2str(worker->best_pv.moves[k], movestr);
         strcat(buffer, movestr);
     }
 
