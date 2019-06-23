@@ -400,7 +400,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     in_check = board_in_check(pos, pos->stm);
 
     /* Check if we have reached the full depth of the search */
-    if (depth <= 0) {
+    if ((depth <= 0) || (pos->sply >= MAX_SEARCH_DEPTH)) {
         return quiescence(worker, 0, alpha, beta);
     }
 
