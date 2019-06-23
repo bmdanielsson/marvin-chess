@@ -64,8 +64,10 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     /* Start the clock */
     tc_start_clock();
 
-    /* Prepare for the search */
-    search_reset_data(state);
+    /* Set default search parameters */
+    state->move_filter.nmoves = 0;
+    state->exit_on_mate = true;
+    state->sd = MAX_SEARCH_DEPTH;
 
     /*
      * Extract parameters. If an invalid parameter is

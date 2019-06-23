@@ -637,13 +637,6 @@ struct gamestate* create_game_state(void);
 void destroy_game_state(struct gamestate *state);
 
 /*
- * Reset a game state object.
- *
- * @param state The object to destroy.
- */
-void reset_game_state(struct gamestate *state);
-
-/*
  * Convert a move into a string representation.
  *
  * @param move The move.

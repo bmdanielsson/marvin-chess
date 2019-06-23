@@ -30,7 +30,6 @@
 #include "moveselect.h"
 #include "eval.h"
 #include "validation.h"
-#include "debug.h"
 #include "hash.h"
 #include "see.h"
 #include "utils.h"
@@ -893,14 +892,6 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     return best_score;
 }
 
-void search_reset_data(struct gamestate *state)
-{
-    state->move_filter.nmoves = 0;
-    state->exit_on_mate = true;
-    state->silent = false;
-    state->sd = MAX_SEARCH_DEPTH;
-}
-
 void search_find_best_move(struct search_worker *worker)
 {
     volatile int alpha;
@@ -1035,7 +1026,8 @@ int search_get_quiscence_score(struct gamestate *state, struct pv *pv)
     worker = malloc(sizeof(struct search_worker));
     memset(worker, 0, sizeof(struct search_worker));
 
-    search_reset_data(state);
+    state->move_filter.nmoves = 0;
+    state->exit_on_mate = true;
     state->pondering = false;
     state->probe_wdl = false;
     state->sd = 0;

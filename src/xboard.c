@@ -195,8 +195,9 @@ static void make_engine_move(struct gamestate *state)
         tc_start_clock();
     }
 
-    /* Prepare for search */
-    search_reset_data(state);
+    /* Set default search parameters */
+    state->exit_on_mate = true;
+    state->silent = false;
     ponder = false;
     pondering_on = NOMOVE;
 
@@ -250,7 +251,6 @@ static void make_engine_move(struct gamestate *state)
                 break;
             }
 
-            search_reset_data(state);
             ponder = true;
             pondering_on = ponder_move;
             tc_start_clock();
@@ -268,8 +268,9 @@ static void xboard_cmd_analyze(struct gamestate *state)
     tc_start_clock();
 
     while (true) {
-        /* Prepare for search */
-        search_reset_data(state);
+        /* Set default search parameters */
+        state->sd = MAX_SEARCH_DEPTH;
+        state->silent = false;
         state->exit_on_mate = false;
         engine_clear_pending_command();
         tc_configure_time_control(TC_INFINITE, 0, 0, 0);
@@ -421,9 +422,9 @@ static void xboard_cmd_hint(struct gamestate *state)
              * If all else fails do a shallow search to
              * find a resonably good move.
              */
-            search_reset_data(state);
             tc_configure_time_control(TC_INFINITE, 0, 0, 0);
-		    state->sd = 6;
+            state->exit_on_mate = true;
+            state->sd = 6;
             state->silent = true;
             smp_search(state, false, true, tablebase_mode);
             move = state->best_move;
@@ -537,12 +538,15 @@ static void xboard_cmd_memory(char *cmd)
 
 static void xboard_cmd_new(struct gamestate *state)
 {
-    reset_game_state(state);
+    board_start_position(&state->pos);
+    hash_tt_clear_table();
+
     search_depth_limit = MAX_SEARCH_DEPTH;
     engine_side = BLACK;
     analyze_mode = false;
     force_mode = false;
     game_over = false;
+
     state->exit_on_mate = true;
 }
 
@@ -725,7 +729,7 @@ static void xboard_cmd_xboard(struct gamestate *state)
     game_over = false;
 
     state->silent = false;
-    state->sd = MAX_SEARCH_DEPTH;
+    state->move_filter.nmoves = 0;
 }
 
 bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop)

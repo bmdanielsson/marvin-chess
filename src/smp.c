@@ -333,6 +333,9 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
         best_worker->state->ponder_move = (best_worker->best_pv.length > 1)?
                                         best_worker->best_pv.moves[1]:NOMOVE;
     }
+
+    /* Reset move filter since it's not needed anymore */
+    state->move_filter.nmoves = 0;
 }
 
 uint64_t smp_nodes(void)

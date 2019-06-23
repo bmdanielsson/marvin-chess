@@ -162,10 +162,11 @@ void test_run_benchmark(void)
     npos = sizeof(positions)/sizeof(char*);
     for (k=0;k<npos;k++) {
         board_setup_from_fen(&state->pos, positions[k]);
-        search_reset_data(state);
         tc_configure_time_control(TC_INFINITE, 0, 0, 0);
         state->sd = BENCH_DEPTH;
         state->silent = true;
+        state->move_filter.nmoves = 0;
+        state->exit_on_mate = true;
 
         smp_search(state, false, false, false);
         nodes += smp_nodes();

@@ -335,12 +335,6 @@ void destroy_game_state(struct gamestate *state)
     free(state);
 }
 
-void reset_game_state(struct gamestate *state)
-{
-    board_start_position(&state->pos);
-    hash_tt_clear_table();
-}
-
 void move2str(uint32_t move, char *str)
 {
     int from;

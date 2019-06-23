@@ -46,13 +46,6 @@
 #define KNOWN_LOSS  (-KNOWN_WIN)
 
 /*
- * Reset the search data to prepare for a new search.
- *
- * @param state The board structure.
- */
-void search_reset_data(struct gamestate *state);
-
-/*
  * Called to starta search for a specific worker.
  *
  * @param worker The worker.
