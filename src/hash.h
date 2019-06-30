@@ -75,25 +75,10 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
  * Lookup the current position in the main transposition table.
  *
  * @param pos The board structure.
- * @param depth The depth to which this position should be searched.
- * @param alpha The current alpha value.
- * @param beta The current beta value.
- * @param move Location to store the move at.
- * @param score Location to store the score at.
  * @param item Location to store the transposition table item at.
- * @return Returns true if the entry is good enough to trigger a cutoff.
+ * @return Returns true if an entry was found.
  */
-bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
-                    uint32_t *move, int *score, struct tt_item *item);
-
-/*
- * Lookup the current position in the main transposition table.
- *
- * @param pos The board structure.
- * @return Returns a pointer to the transposition table item or NULL if
- *         the position was not found.
- */
-struct tt_item* hash_tt_lookup_raw(struct position *pos);
+bool hash_tt_lookup(struct position *pos, struct tt_item *item);
 
 /*
  * Make sure that the PV is present in the main transposition table.

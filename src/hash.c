@@ -78,46 +78,6 @@ static void allocate_pawntt(struct search_worker *worker, int size)
     assert(worker->pawntt != NULL);
 }
 
-static bool check_tt_cutoff(struct position *pos, struct tt_item *item,
-                            int depth, int alpha, int beta, int *score)
-{
-    int  adj_score;
-    bool cutoff;
-
-    /* Adjust mate scores */
-    adj_score = item->score;
-    if (adj_score > KNOWN_WIN) {
-        adj_score -= pos->sply;
-    } else if (adj_score < -KNOWN_WIN) {
-        adj_score += pos->sply;
-    }
-    *score = adj_score;
-
-    cutoff = false;
-    if (item->depth >= depth) {
-        switch (item->type) {
-        case TT_EXACT:
-            cutoff = true;
-            break;
-        case TT_ALPHA:
-            if (adj_score <= alpha) {
-                cutoff = true;
-            }
-            break;
-        case TT_BETA:
-            if (adj_score >= beta) {
-                cutoff = true;
-            }
-            break;
-        default:
-            cutoff = false;
-            break;
-        }
-    }
-
-    return cutoff;
-}
-
 int hash_tt_max_size(void)
 {
 	return is64bit()?MAX_MAIN_HASH_SIZE_64BIT:MAX_MAIN_HASH_SIZE_32BIT;
@@ -271,22 +231,17 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
     worst_item->date = tt_date;
 }
 
-bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
-                    uint32_t *move, int *score, struct tt_item *item)
+bool hash_tt_lookup(struct position *pos, struct tt_item *item)
 {
     uint64_t         idx;
     struct tt_bucket *bucket;
     struct tt_item   *tmp;
-    bool             cutoff;
     int              k;
 
     assert(valid_position(pos));
-    assert(move != NULL);
-    assert(score != NULL);
+    assert(item != NULL);
 
     if (transposition_table == NULL) {
-        *move = NOMOVE;
-        *score = 0;
         return false;
     }
 
@@ -296,51 +251,17 @@ bool hash_tt_lookup(struct position *pos, int depth, int alpha, int beta,
 
     /*
      * Find the first item, if any, that have
-     * the same key as the current position
-     * and is good enough to cause a cutoff.
+     * the same key as the current position.
      */
-    *move = NOMOVE;
-    *score = 0;
-    cutoff = false;
     for (k=0;k<TT_BUCKET_SIZE;k++) {
         tmp = &bucket->items[k];
-
         if (KEY_EQUALS(pos->key, tmp)) {
-            *move = tmp->move;
-            if (item != NULL) {
-                memcpy(item, tmp, sizeof(struct tt_item));
-            }
-            cutoff = check_tt_cutoff(pos, tmp, depth, alpha, beta, score);
-            break;
+            memcpy(item, tmp, sizeof(struct tt_item));
+            return true;
         }
     }
 
-    return cutoff;
-}
-
-struct tt_item* hash_tt_lookup_raw(struct position *pos)
-{
-    uint64_t         idx;
-    struct tt_bucket *bucket;
-    struct tt_item   *item;
-    int              k;
-
-    assert(valid_position(pos));
-
-    if (transposition_table == NULL) {
-        return NULL;
-    }
-
-    idx = (uint64_t)(pos->key&(tt_size-1));
-    bucket = &transposition_table[idx];
-    for (k=0;k<TT_BUCKET_SIZE;k++) {
-        item = &bucket->items[k];
-        if (KEY_EQUALS(pos->key, item)) {
-            return item;
-        }
-    }
-
-    return NULL;
+    return false;
 }
 
 void hash_tt_insert_pv(struct position *pos, struct pv *pv)

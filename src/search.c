@@ -87,6 +87,34 @@ static int see_prune_margin[] = {0, -100, -200, -300, -400};
 /* Configuration constants for singular extensions */
 #define SE_DEPTH 8
 
+static bool check_tt_cutoff(struct tt_item *item, int depth, int alpha,
+                            int beta, int score)
+{
+    if (item->depth >= depth) {
+        switch (item->type) {
+        case TT_EXACT:
+            return true;
+        case TT_ALPHA:
+            return score <= alpha;
+        case TT_BETA:
+            return score >= beta;
+        default:
+            return false;
+        }
+    }
+    return false;
+}
+
+static int adjust_mate_score(struct position *pos, int score)
+{
+    if (score > KNOWN_WIN) {
+        return score - pos->sply;
+    } else if (score < -KNOWN_WIN) {
+        return score + pos->sply;
+    }
+    return score;
+}
+
 static bool is_pawn_push(struct position *pos, uint32_t move)
 {
     int from;
@@ -248,9 +276,10 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     int             best_score;
     int             static_score;
     uint32_t        move;
-    uint32_t        tt_move;
     bool            found_move;
     bool            in_check;
+    bool            tt_found;
+    struct tt_item  tt_item;
     struct position *pos;
 
     pos = &worker->pos;
@@ -297,15 +326,18 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
         }
     }
 
-    /* Initialize the move selector for this node */
-    tt_move = NOMOVE;
-    if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score, NULL)) {
-        return score;
+    /* Check if the position have been searched before */
+    tt_found = hash_tt_lookup(pos, &tt_item);
+    if (tt_found) {
+        score = adjust_mate_score(pos, tt_item.score);
+        if (check_tt_cutoff(&tt_item, 0, alpha, beta, score)) {
+            return score;
+        }
     }
-
+    
     /* Search all moves */
     found_move = false;
-    select_init_node(worker, true, in_check, tt_move);
+    select_init_node(worker, true, in_check, tt_found?tt_item.move:NOMOVE);
     while (select_get_move(worker, &move)) {
         /*
          * Don't bother searching captures that
@@ -383,6 +415,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     bool            extended;
     int             new_depth;
     struct tt_item  tt_item;
+    bool            tt_found;
     struct position *pos;
     bool            is_singular;
     struct movelist quiets;
@@ -432,9 +465,15 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * be done for this node.
      */
     tt_move = NOMOVE;
-    if (hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &tt_score,
-                       &tt_item) && (tt_move != exclude_move)) {
-        return tt_score;
+    tt_score = 0; 
+    tt_found = hash_tt_lookup(pos, &tt_item);
+    if (tt_found) {
+        tt_move = tt_item.move;
+        tt_score = adjust_mate_score(pos, tt_item.score);
+        if ((tt_move != exclude_move) &&
+            check_tt_cutoff(&tt_item, depth, alpha, beta, tt_score)) {
+            return tt_score;
+        }
     }
 
     /* Probe tablebases */
@@ -776,12 +815,13 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     int             best_score;
     uint32_t        move;
     uint32_t        best_move;
-    uint32_t        tt_move;
     int             tt_flag;
     struct position *pos;
     int             in_check;
     int             new_depth;
     struct movelist quiets;
+    bool            tt_found;
+    struct tt_item  tt_item;
 
     pos = &worker->pos;
 
@@ -790,21 +830,17 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     /* Reset the search tree for this ply */
     worker->pv_table[0].length = 0;
 
-    /*
-     * Initialize the move selector for this node. Also
-     * initialize the best move found to the PV move.
-     */
-    tt_move = NOMOVE;
+    /* Check the transposition table and initialize some helper variables */
+    tt_found = hash_tt_lookup(pos, &tt_item);
+    best_move = tt_found?tt_item.move:NOMOVE;
     in_check = board_in_check(pos, pos->stm);
-    (void)hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &score, NULL);
-    best_move = tt_move;
 
     /* Search all moves */
     quiets.nmoves = 0;
     tt_flag = TT_ALPHA;
     best_score = -INFINITE_SCORE;
     worker->currmovenumber = 0;
-    select_init_node(worker, false, in_check, tt_move);
+    select_init_node(worker, false, in_check, best_move);
     while (select_get_move(worker, &move)) {
         /* Send stats for the first worker */
         worker->currmovenumber++;

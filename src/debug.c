@@ -43,7 +43,7 @@ static mutex_t log_lock;
 static bool browse_display_move(struct position *pos, uint32_t move, int id,
                                 bool pv, int current_score)
 {
-    struct tt_item *item;
+    struct tt_item item;
     char           movestr[6];
 
     move2str(move, movestr);
@@ -56,8 +56,7 @@ static bool browse_display_move(struct position *pos, uint32_t move, int id,
 
     board_make_move(pos, move);
 
-    item = hash_tt_lookup_raw(pos);
-    if (item == NULL) {
+    if (!hash_tt_lookup(pos, &item)) {
         board_unmake_move(pos);
         if (pv) {
             printf("    %-5d\n", current_score);
@@ -67,7 +66,7 @@ static bool browse_display_move(struct position *pos, uint32_t move, int id,
         return false;
     }
 
-    switch (item->type) {
+    switch (item.type) {
     case TT_EXACT:
     case TT_PV:
         printf("     PV");
@@ -82,7 +81,7 @@ static bool browse_display_move(struct position *pos, uint32_t move, int id,
         break;
     }
 
-    printf("    %5d   %5d\n", -1*item->score, item->depth);
+    printf("    %5d   %5d\n", -1*item.score, item.depth);
 
     board_unmake_move(pos);
 
@@ -92,14 +91,13 @@ static bool browse_display_move(struct position *pos, uint32_t move, int id,
 static void browse_display_position(struct position *pos,
                                     struct movelist *list, bool *leafnodes)
 {
-    struct tt_item  *item;
-    int             k;
+    struct tt_item item;
+    int            k;
 
     printf("\n");
 
     list->nmoves = 0;
-    item = hash_tt_lookup_raw(pos);
-    if (item == NULL) {
+    if (!hash_tt_lookup(pos, &item)) {
         printf("Position not found\n");
         return;
     }
@@ -109,7 +107,7 @@ static void browse_display_position(struct position *pos,
     dbg_print_board(pos);
     printf("\n");
     printf("Node: ");
-    switch (item->type) {
+    switch (item.type) {
     case TT_EXACT:
     case TT_PV:
         printf("PV");
@@ -124,13 +122,13 @@ static void browse_display_position(struct position *pos,
         break;
     }
     printf(", Score: %d, Depth: %d, Key: %"PRIu64"\n",
-           item->score, item->depth, pos->key);
+           item.score, item.depth, pos->key);
     printf("\n");
 
     for (k=0;k<list->nmoves;k++) {
         leafnodes[k] = browse_display_move(pos, list->moves[k], k,
-                                           list->moves[k]==item->move,
-                                           item->score);
+                                           list->moves[k]==item.move,
+                                           item.score);
     }
     printf("\n");
 }

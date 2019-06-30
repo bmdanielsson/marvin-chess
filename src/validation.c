@@ -28,6 +28,35 @@
 #include "hash.h"
 #include "debug.h"
 
+static bool check_tt_cutoff(struct tt_item *item, int depth, int alpha,
+                            int beta, int score)
+{
+    if (item->depth >= depth) {
+        switch (item->type) {
+        case TT_EXACT:
+            return true;
+        case TT_ALPHA:
+            return score <= alpha;
+        case TT_BETA:
+            return score >= beta;
+        default:
+            return false;
+        }
+    }
+
+    return false;
+}
+
+static int adjust_mate_score(struct position *pos, int score)
+{
+    if (score > KNOWN_WIN) {
+        return score - pos->sply;
+    } else if (score < -KNOWN_WIN) {
+        return score + pos->sply;
+    }
+    return score;
+}
+
 static int qsearch_verification(struct search_worker *worker, int depth,
                                 int alpha, int beta)
 {
@@ -39,6 +68,7 @@ static int qsearch_verification(struct search_worker *worker, int depth,
     bool            found_move;
     bool            in_check;
     struct position *pos;
+    struct tt_item  tt_item;
 
     pos = &worker->pos;
 
@@ -65,8 +95,12 @@ static int qsearch_verification(struct search_worker *worker, int depth,
     }
 
     tt_move = NOMOVE;
-    if (hash_tt_lookup(pos, 0, alpha, beta, &tt_move, &score, NULL)) {
-        return score;
+    if (hash_tt_lookup(pos, &tt_item)) {
+        tt_move = tt_item.move;
+        score = adjust_mate_score(pos, tt_item.score);
+        if (check_tt_cutoff(&tt_item, 0, alpha, beta, score)) {
+            return score;
+        }
     }
     select_init_node(worker, false, in_check, tt_move);
 
@@ -97,13 +131,13 @@ static int search_verification(struct search_worker *worker, int depth,
                                int alpha, int beta)
 {
     int             score;
-    int             tt_score;
     int             best_score;
     uint32_t        move;
     uint32_t        tt_move;
     bool            found_move;
     bool            in_check;
     struct position *pos;
+    struct tt_item  tt_item;
 
     pos = &worker->pos;
 
@@ -118,8 +152,12 @@ static int search_verification(struct search_worker *worker, int depth,
     }
 
     tt_move = NOMOVE;
-    if (hash_tt_lookup(pos, depth, alpha, beta, &tt_move, &tt_score, NULL)) {
-        return tt_score;
+    if (hash_tt_lookup(pos, &tt_item)) {
+        tt_move = tt_item.move;
+        score = adjust_mate_score(pos, tt_item.score);
+        if (check_tt_cutoff(&tt_item, depth, alpha, beta, score)) {
+            return score;
+        }
     }
     select_init_node(worker, 0, in_check, tt_move);
 
