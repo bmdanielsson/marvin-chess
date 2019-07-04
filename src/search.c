@@ -470,7 +470,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     if (tt_found) {
         tt_move = tt_item.move;
         tt_score = adjust_mate_score(pos, tt_item.score);
-        if ((tt_move != exclude_move) &&
+        if (!pv_node && (tt_move != exclude_move) &&
             check_tt_cutoff(&tt_item, depth, alpha, beta, tt_score)) {
             return tt_score;
         }
