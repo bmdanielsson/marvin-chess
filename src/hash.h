@@ -26,8 +26,7 @@
 enum {
     TT_EXACT,
     TT_BETA,
-    TT_ALPHA,
-    TT_PV
+    TT_ALPHA
 };
 
 /*
@@ -79,14 +78,6 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
  * @return Returns true if an entry was found.
  */
 bool hash_tt_lookup(struct position *pos, struct tt_item *item);
-
-/*
- * Make sure that the PV is present in the main transposition table.
- *
- * @param pos The board structure.
- * @param pv The PV to insert.
- */
-void hash_tt_insert_pv(struct position *pos, struct pv *pv);
 
 /*
  * Get the transposition table usage.

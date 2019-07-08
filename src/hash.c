@@ -177,20 +177,10 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
         /*
          * If the same position is already stored then
          * replace it if the new search is to a greater
-         * depth or if the item have an older date. Only
-         * exception is if when inserting a PV move, in
-         * which case it is inserted it unless the existing
-         * item has the same move.
+         * depth or if the item have an older date.
          */
         if (KEY_EQUALS(pos->key, item)) {
-            if (type == TT_PV) {
-                if (move != item->move) {
-                    worst_item = item;
-                    break;
-                } else {
-                    return;
-                }
-            } else if ((depth >= item->depth) || (tt_date != item->date)) {
+            if ((depth >= item->depth) || (tt_date != item->date)) {
                 worst_item = item;
                 break;
             }
@@ -262,28 +252,6 @@ bool hash_tt_lookup(struct position *pos, struct tt_item *item)
     }
 
     return false;
-}
-
-void hash_tt_insert_pv(struct position *pos, struct pv *pv)
-{
-    int      k;
-    uint32_t move;
-
-    assert(valid_position(pos));
-
-    if (transposition_table == NULL) {
-        return;
-    }
-
-    for (k=0;k<pv->length;k++) {
-        move = pv->moves[k];
-        hash_tt_store(pos, move, 0, 0, TT_PV);
-        board_make_move(pos, move);
-    }
-
-    for (;k>0;k--) {
-        board_unmake_move(pos);
-    }
 }
 
 /* Transposition table usage is estimated based on the first 1000 buckets */

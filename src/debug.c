@@ -68,7 +68,6 @@ static bool browse_display_move(struct position *pos, uint32_t move, int id,
 
     switch (item.type) {
     case TT_EXACT:
-    case TT_PV:
         printf("     PV");
         break;
     case TT_BETA:
@@ -109,7 +108,6 @@ static void browse_display_position(struct position *pos,
     printf("Node: ");
     switch (item.type) {
     case TT_EXACT:
-    case TT_PV:
         printf("PV");
         break;
     case TT_BETA:

@@ -385,10 +385,12 @@ int smp_complete_iteration(struct search_worker *worker)
 
     mutex_lock(&state_lock);
 
-    /* Check if this the first time completing this depth */
+    /*
+     * If this isd the first time completing this depth then
+     * update the completed_depth counter.
+     */
     if (worker->depth > worker->state->completed_depth) {
         worker->state->completed_depth = worker->depth;
-        hash_tt_insert_pv(&worker->pos, &worker->pv_table[0]);
     }
 
     /* Calculate the next depth for this worker to search */
