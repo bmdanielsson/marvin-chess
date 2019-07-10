@@ -24,4 +24,4 @@ The easiest way to build Marvin is to use GCC and the included Makefile. Running
 
 The source code is provided under the GPL3 license. For details see the LICENSE file.
 
-Marvin uses the Fathom library (https://github.com/basil00/Fathom) for probing Syzygy tablebases. The Fathom library is licensed under the MIT license. For details see the LICENSE file in the import/fathom folder.
+Marvin uses the Fathom library (https://github.com/jdart1/Fathom) for probing Syzygy tablebases. The Fathom library is licensed under the MIT license. For details see the LICENSE file in the import/fathom folder.
