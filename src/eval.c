@@ -62,6 +62,7 @@ struct eval {
     int king_preassure[NPHASES][NSIDES];
     int positional[NPHASES][NSIDES];
     int mobility[NPHASES][NSIDES];
+    int space[NPHASES][NSIDES];
 
 #ifdef TRACE
     struct eval_trace *trace;
@@ -161,6 +162,26 @@ static int king_distance(int from, int to)
     nmoves += (file_delta + rank_delta);
 
     return nmoves;
+}
+
+/*
+ * Space is defined as the number of squares that meet the
+ * following conditions:
+ * - in the "space area"
+ * - not occupied by friendly pawn
+ * - not attacked by the enemy opponent
+ * - in the rear span of a friendly pawn
+ */
+static void evaluate_space(struct position *pos, struct eval *eval,
+                           int side)
+{
+    uint64_t squares;
+
+    squares = space_eval_squares[side] & eval->pawntt.rear_span[side] &
+                (~pos->bb_pieces[side+PAWN]) &
+                (~eval->coverage[FLIP_COLOR(side)]);
+    eval->space[MIDDLEGAME][side] = BITCOUNT(squares)*SPACE_SQUARE;
+    TRACE_M_M(SPACE_SQUARE, BITCOUNT(squares));
 }
 
 static void evaluate_pawn_shield(struct position *pos, struct eval *eval,
@@ -367,6 +388,9 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
 
         /* Update pawn coverage */
         item->coverage[side] |= bb_pawn_attacks_from(sq, side);
+
+        /* Update rear span information */
+        item->rear_span[side] |= rear_span[side][sq];
     }
 
     /* Look for double pawns */
@@ -924,6 +948,8 @@ static void do_eval(struct search_worker *worker, struct position *pos,
     evaluate_king(pos, eval, BLACK);
     evaluate_passers(pos, eval, WHITE);
     evaluate_passers(pos, eval, BLACK);
+    evaluate_space(pos, eval, WHITE);
+    evaluate_space(pos, eval, BLACK);
 
     /*
      * Update the evaluation scores with information from
@@ -1066,6 +1092,7 @@ int eval_evaluate(struct search_worker *worker)
         score[k] += eval.king_preassure[k][WHITE];
         score[k] += eval.positional[k][WHITE];
         score[k] += eval.mobility[k][WHITE];
+        score[k] += eval.space[k][WHITE];
 
         score[k] -= eval.material[k][BLACK];
         score[k] -= eval.material_adj[k][BLACK];
@@ -1075,6 +1102,7 @@ int eval_evaluate(struct search_worker *worker)
         score[k] -= eval.king_preassure[k][BLACK];
         score[k] -= eval.positional[k][BLACK];
         score[k] -= eval.mobility[k][BLACK];
+        score[k] -= eval.space[k][BLACK];
 
         score[k] = (worker->pos.stm == WHITE)?score[k]:-score[k];
     }
@@ -1100,6 +1128,7 @@ int eval_evaluate_full(struct position *pos, bool display)
     int         king_preassure[NPHASES];
     int         positional[NPHASES];
     int         mobility[NPHASES];
+    int         space[NPHASES];
 
     assert(valid_position(pos));
     assert(valid_scores(pos));
@@ -1144,6 +1173,9 @@ int eval_evaluate_full(struct position *pos, bool display)
 
         mobility[k] = eval.mobility[k][WHITE];
         mobility[k] -= eval.mobility[k][BLACK];
+
+        space[k] = eval.space[k][WHITE];
+        space[k] -= eval.space[k][BLACK];
     }
 
     /* Summarize the evaluation terms for each side */
@@ -1152,12 +1184,14 @@ int eval_evaluate_full(struct position *pos, bool display)
                         eval.psq[k][WHITE] + eval.pawn_structure[k][WHITE] +
                         eval.king_safety[k][WHITE] +
                         eval.king_preassure[k][WHITE] +
-                        eval.positional[k][WHITE] + eval.mobility[k][WHITE];
+                        eval.positional[k][WHITE] + eval.mobility[k][WHITE] +
+                        eval.space[k][WHITE];
         sum[k][BLACK] = eval.material[k][BLACK] + eval.material_adj[k][BLACK] +
                         eval.psq[k][BLACK] + eval.pawn_structure[k][BLACK] +
                         eval.king_safety[k][BLACK] +
                         eval.king_preassure[k][BLACK] +
-                        eval.positional[k][BLACK] + eval.mobility[k][BLACK];
+                        eval.positional[k][BLACK] + eval.mobility[k][BLACK] +
+                        eval.space[k][BLACK];
         sum_white_pov[k] = sum[k][WHITE] - sum[k][BLACK];
     }
 
@@ -1215,6 +1249,10 @@ int eval_evaluate_full(struct position *pos, bool display)
            eval.mobility[MIDDLEGAME][WHITE], eval.mobility[ENDGAME][WHITE],
            eval.mobility[MIDDLEGAME][BLACK], eval.mobility[ENDGAME][BLACK],
            mobility[MIDDLEGAME], mobility[ENDGAME]);
+    printf("Space               %5d  %5d %5d  %5d %5d   %5d\n",
+           eval.space[MIDDLEGAME][WHITE], eval.space[ENDGAME][WHITE],
+           eval.space[MIDDLEGAME][BLACK], eval.space[ENDGAME][BLACK],
+           space[MIDDLEGAME], space[ENDGAME]);
     printf("-------------------------------------------------------------\n");
     printf("Total                                         %5d   %5d\n",
            sum_white_pov[MIDDLEGAME], sum_white_pov[ENDGAME]);
@@ -1453,5 +1491,9 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
     evaluate_king(pos, &eval, BLACK);
     evaluate_passers(pos, &eval, WHITE);
     evaluate_passers(pos, &eval, BLACK);
+
+    /* Trace space evaluation */
+    evaluate_space(pos, &eval, WHITE);
+    evaluate_space(pos, &eval, BLACK);
 }
 #endif

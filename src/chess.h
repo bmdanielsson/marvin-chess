@@ -374,6 +374,8 @@ struct pawntt_item {
     uint64_t candidates;
     /* Bitboard of all squares covered by pawns */
     uint64_t coverage[NSIDES];
+    /* Combined rear span of all pawns */
+    uint64_t rear_span[NSIDES];
     /* Description of all potential pawn shields */
     uint8_t pawn_shield[NSIDES][2][3];
     /* The score of pawn related terms for each side */
@@ -384,7 +386,7 @@ struct pawntt_item {
      * Padding added to make sure that the
      * size of the struct is a power-of-2.
      */
-    uint8_t padding[56];
+    uint8_t padding[40];
 };
 
 /* Internal representation of a chess position */
@@ -591,6 +593,21 @@ extern uint64_t rear_attackspan[NSIDES][NSQUARES];
 extern uint64_t front_span[NSIDES][NSQUARES];
 
 /*
+ * Bitboard of the rear span of a specific square
+ *
+ * ........
+ * ........
+ * ........
+ * .w......
+ * .x......
+ * .x......
+ * .x......
+ * .x......
+ * .x......
+ */
+extern uint64_t rear_span[NSIDES][NSQUARES];
+
+/*
  * Masks for the king attack zone for all sides/squares. The attack zone
  * is defined as illustrated below:
  *
@@ -618,6 +635,20 @@ extern int sq_color[NSQUARES];
 
 /* Masks of squares that are considered possible outposts */
 extern uint64_t outpost_squares[NSIDES];
+
+/*
+ * Bitboard of the squares considered for space evaluation
+ *
+ * ........
+ * ........
+ * ........
+ * ........
+ * .xxxxxx.
+ * .xxxxxx.
+ * .xxxxxx.
+ * ........
+ */
+extern uint64_t space_eval_squares[NSIDES];
 
 /* Initialize chess data */
 void chess_data_init(void);

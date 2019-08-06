@@ -48,6 +48,8 @@ uint64_t rear_attackspan[NSIDES][NSQUARES];
 
 uint64_t front_span[NSIDES][NSQUARES];
 
+uint64_t rear_span[NSIDES][NSQUARES];
+
 uint64_t king_attack_zone[NSIDES][NSQUARES];
 
 char piece2char[NPIECES+1] = {
@@ -90,6 +92,8 @@ int sq_color[NSQUARES] = {
 };
 
 uint64_t outpost_squares[NSIDES];
+
+uint64_t space_eval_squares[NSIDES];
 
 static void init_king_attack_zones(void)
 {
@@ -302,11 +306,40 @@ void chess_data_init(void)
         }
     }
 
+    /* Initialize the rear span masks */
+    for (sq=0;sq<NSQUARES;sq++) {
+        rear_span[WHITE][sq] = 0ULL;
+        rear_span[BLACK][sq] = 0ULL;
+
+        if ((sq >= 56) || (sq <= 7)) {
+            continue;
+        }
+
+        for (k=sq-8;k>=0;k-=8) {
+            rear_span[WHITE][sq] |= sq_mask[k];
+        }
+        for (k=sq+8;k<=63;k+=8) {
+            rear_span[BLACK][sq] |= sq_mask[k];
+        }
+    }
+
     /* Outpost squares */
     outpost_squares[WHITE] =
                         rank_mask[RANK_4]|rank_mask[RANK_5]|rank_mask[RANK_6];
     outpost_squares[BLACK] =
                         rank_mask[RANK_5]|rank_mask[RANK_4]|rank_mask[RANK_3];
+
+    /* Space evaluation squares */
+    space_eval_squares[WHITE] =
+                        rank_mask[RANK_2]|rank_mask[RANK_3]|rank_mask[RANK_4];
+    space_eval_squares[BLACK] =
+                        rank_mask[RANK_5]|rank_mask[RANK_6]|rank_mask[RANK_7];
+    space_eval_squares[WHITE] &= (file_mask[FILE_B]|file_mask[FILE_C]|
+                                  file_mask[FILE_D]|file_mask[FILE_E]|
+                                  file_mask[FILE_F]|file_mask[FILE_G]);
+    space_eval_squares[BLACK] &= (file_mask[FILE_B]|file_mask[FILE_C]|
+                                  file_mask[FILE_D]|file_mask[FILE_E]|
+                                  file_mask[FILE_F]|file_mask[FILE_G]);
 
     /* Initialize king attack zone masks */
     init_king_attack_zones();
