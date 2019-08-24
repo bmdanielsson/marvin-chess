@@ -505,6 +505,7 @@ static void adam(struct tuningset *tuningset, struct trainingset *trainingset,
     if (regularize) {
         printf("Applying L2 regularization\n");
     }
+    printf("\n");
 
     for (niterations=1;niterations<=max_iterations;niterations++) {
         if (stop_optimization) {
@@ -574,6 +575,7 @@ static void local_search(struct tuningset *tuningset,
     printf("Initial error: %f\n", best_e);
 
     /* Loop until no more improvements are found */
+    printf("\nOptimizing using local search\n\n");
     delta = 1;
     niterations = 0;
     improved = true;
@@ -1102,7 +1104,7 @@ static void verify_trace(char *training_file)
     destroy_game_state(state);
 }
 
-static void print_error(char *training_file, char *parameter_file, int nthreads)
+static void print_error(char *training_file, int nthreads)
 {
     struct tuningset    *tuningset;
     struct trainingset  *trainingset;
@@ -1110,17 +1112,9 @@ static void print_error(char *training_file, char *parameter_file, int nthreads)
     double              error;
 
     assert(training_file != NULL);
-    assert(parameter_file != NULL);
 
     /* Create game state */
     state = create_game_state();
-
-    /* Read tuning set */
-    tuningset = read_tuningset(parameter_file);
-    if (tuningset == NULL) {
-        printf("Error: failed to read tuning set\n");
-        return;
-    }
 
     /* Read training set */
     trainingset = read_trainingset(state, training_file);
@@ -1128,6 +1122,12 @@ static void print_error(char *training_file, char *parameter_file, int nthreads)
         printf("Error: failed to read training set\n");
         return;
     }
+
+    /* Allocate a tuningset with current parameter values */
+    tuningset = malloc(sizeof(struct tuningset));
+    tuningset->params = tuning_param_create_list();
+    tuningset->size = NUM_TUNING_PARAMS;
+    tuningset->nactive = NUM_TUNING_PARAMS;
 
     /* Setup worker threads */
     nworkerthreads = nthreads;
@@ -1157,7 +1157,7 @@ static void print_usage(void)
     printf("\t-k <training file>\n\tCalculate the tuning constant K\n\n");
     printf("\t-v <training file>\n\tVerify evaluation tracing\n\n");
     printf("\t-t <training file> <parameter file>\n\tTune parameters\n\n");
-    printf("\t-e <training file> <parameter file>\n\tCalculate error\n\n");
+    printf("\t-e <training file>\n\tCalculate error\n\n");
     printf("\t-p <output file>\n\tPrint all tunable parameters\n\n");
     printf("\t-n <nthreads>\n\tThe number of threads to use\n\n");
     printf("\t-i <niterations>\n\tThe number of iterations to run\n\n");
@@ -1304,13 +1304,6 @@ int main(int argc, char *argv[])
                 exit(1);
             }
             training_file = argv[iter];
-            iter++;
-            if (iter == argc) {
-                printf("Invalid argument\n");
-                print_usage();
-                exit(1);
-            }
-            parameter_file = argv[iter];
         } else {
             printf("Invalid argument\n");
             print_usage();
@@ -1335,7 +1328,7 @@ int main(int argc, char *argv[])
         verify_trace(training_file);
         break;
     case 4:
-        print_error(training_file, parameter_file, nthreads);
+        print_error(training_file, nthreads);
         break;
     default:
         print_usage();
