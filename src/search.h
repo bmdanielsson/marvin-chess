@@ -52,13 +52,4 @@
  */
 void search_find_best_move(struct search_worker *worker);
 
-/*
- * Get a quiscence score for the current position.
- *
- * @param sate The chess board structure.
- * @param pv Location to store the pv at.
- * @return Returns the score.
- */
-int search_get_quiscence_score(struct gamestate *state, struct pv *pv);
-
 #endif

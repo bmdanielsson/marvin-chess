@@ -92,7 +92,6 @@ struct eval_equation {
 /* Training position */
 struct trainingpos {
     char                 *epd;
-    char                 *fen_quiet;
     double               result;
     struct eval_equation equation;
 };
@@ -264,8 +263,6 @@ static thread_retval_t trace_positions_func(void *data)
     int                  iter;
     struct eval_trace    *trace;
     struct pv            *pv;
-    int                  k;
-    char                 fenstr[FEN_MAX_LENGTH];
 
     worker = (struct tuning_worker*)data;
     state = create_game_state();
@@ -280,24 +277,10 @@ static thread_retval_t trace_positions_func(void *data)
         (void)fen_setup_board(&state->pos, trainingset->positions[iter].epd,
                               true);
 
-        /* Do a quiscence search to get the pv */
-        (void)search_get_quiscence_score(state, pv);
-
-        /* Find the position at the end of the pv */
-        for (k=0;k<pv->length;k++) {
-           board_make_move(&state->pos, pv->moves[k]);
-        }
-        fen_build_string(&state->pos, fenstr);
-        free(trainingset->positions[iter].fen_quiet);
-        trainingset->positions[iter].fen_quiet = strdup(fenstr);
-
         /*
          * Trace the evaluation function for this position
          * and create a corresponding equation
          */
-        board_reset(&state->pos);
-        (void)fen_setup_board(&state->pos,
-                              trainingset->positions[iter].fen_quiet, true);
         trace = malloc(sizeof(struct eval_trace));
         eval_generate_trace(&state->pos, trace);
         setup_eval_equation(trace, &trainingset->positions[iter].equation);
@@ -746,7 +729,6 @@ static struct trainingset* read_trainingset(struct gamestate *state, char *file)
 
         /* Update training set */
         trainingset->positions[trainingset->size].epd = strdup(buffer);
-        trainingset->positions[trainingset->size].fen_quiet = NULL;
         trainingset->size++;
 
         /* Next position */
