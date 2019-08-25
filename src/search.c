@@ -302,7 +302,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     }
 
     /* Evaluate the position */
-    static_score = eval_evaluate(worker);
+    static_score = eval_evaluate(pos);
 
     /* If we have reached the maximum depth then we stop */
     if (pos->sply >= MAX_PLY) {
@@ -488,7 +488,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * Evaluate the position in order to get a score
      * to use for pruning decisions.
      */
-    static_score = eval_evaluate(worker);
+    static_score = eval_evaluate(pos);
 
     /* Reverse futility pruning */
     if ((depth <= FUTILITY_DEPTH) &&

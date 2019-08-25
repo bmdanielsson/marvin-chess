@@ -907,8 +907,7 @@ static int do_eval_psq(struct position *pos, struct eval *eval, int side,
     return score;
 }
 
-static void do_eval(struct search_worker *worker, struct position *pos,
-                    struct eval *eval)
+static void do_eval(struct position *pos, struct eval *eval)
 {
     int k;
 
@@ -923,8 +922,8 @@ static void do_eval(struct search_worker *worker, struct position *pos,
     }
 
     /* Check if the position is present in the pawn transposition table */
-    eval->in_pawntt = (worker != NULL)?
-                                hash_pawntt_lookup(worker, &eval->pawntt):false;
+    eval->in_pawntt = (pos->worker != NULL)?
+                        hash_pawntt_lookup(pos->worker, &eval->pawntt):false;
 
     /* Evaluate the position from each sides pov */
     if (!eval->in_pawntt) {
@@ -963,8 +962,8 @@ static void do_eval(struct search_worker *worker, struct position *pos,
     }
 
     /* Update the pawn hash table */
-    if (!eval->in_pawntt && (worker != NULL)) {
-        hash_pawntt_store(worker, &eval->pawntt);
+    if (!eval->in_pawntt && (pos->worker != NULL)) {
+        hash_pawntt_store(pos->worker, &eval->pawntt);
     }
 }
 
@@ -1059,26 +1058,26 @@ void eval_reset(void)
     material_values_eg[BLACK_KING] = 20000;
 }
 
-int eval_evaluate(struct search_worker *worker)
+int eval_evaluate(struct position *pos)
 {
     struct eval eval;
     int         k;
     int         phase;
     int         score[NPHASES];
 
-    assert(valid_position(&worker->pos));
-    assert(valid_scores(&worker->pos));
+    assert(valid_position(pos));
+    assert(valid_scores(pos));
 
     /*
      * If no player have enough material left
      * to checkmate then it's a draw.
      */
-    if (eval_is_material_draw(&worker->pos)) {
+    if (eval_is_material_draw(pos)) {
         return 0;
     }
 
     /* Evaluate the position */
-    do_eval(worker, &worker->pos, &eval);
+    do_eval(pos, &eval);
 
     /* Summarize each evaluation term from side to moves's pov */
     for (k=0;k<NPHASES;k++) {
@@ -1104,11 +1103,11 @@ int eval_evaluate(struct search_worker *worker)
         score[k] -= eval.mobility[k][BLACK];
         score[k] -= eval.space[k][BLACK];
 
-        score[k] = (worker->pos.stm == WHITE)?score[k]:-score[k];
+        score[k] = (pos->stm == WHITE)?score[k]:-score[k];
     }
 
     /* Return score adjusted for game phase */
-    phase = calculate_game_phase(&worker->pos);
+    phase = calculate_game_phase(pos);
     return calculate_tapered_eval(phase, score[MIDDLEGAME], score[ENDGAME]);
 }
 
@@ -1146,7 +1145,7 @@ int eval_evaluate_full(struct position *pos, bool display)
     }
 
     /* Evaluate the position */
-    do_eval(NULL, pos, &eval);
+    do_eval(pos, &eval);
 
     /* Summarize each evaluation term from white's pov */
     for (k=0;k<NPHASES;k++) {

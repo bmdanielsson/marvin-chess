@@ -34,11 +34,11 @@ void eval_reset(void);
 /*
  * Evaluate the position and assign a static score to it.
  *
- * @param worker The worker.
+ * @param worker The position.
  * @return Returns the score assigned to the position from the side
  *         to move point of view.
  */
-int eval_evaluate(struct search_worker *worker);
+int eval_evaluate(struct position *pos);
 
 /*
  * Evaluate the position and assign a static score to it. It doesn't use any

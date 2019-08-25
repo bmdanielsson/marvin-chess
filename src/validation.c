@@ -76,7 +76,7 @@ static int qsearch_verification(struct search_worker *worker, int depth,
         return 0;
     }
 
-    static_score = eval_evaluate(worker);
+    static_score = eval_evaluate(pos);
 
     if (pos->sply >= MAX_PLY) {
         return static_score;
