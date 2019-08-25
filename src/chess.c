@@ -472,13 +472,3 @@ uint32_t str2move(char *str, struct position *pos)
 
     return NOMOVE;
 }
-
-void copy_pv(struct pv *from, struct pv *to)
-{
-    int k;
-
-    to->length = from->length;
-    for (k=0;k<from->length;k++) {
-        to->moves[k] = from->moves[k];
-    }
-}

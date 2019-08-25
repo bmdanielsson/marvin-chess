@@ -684,12 +684,4 @@ void move2str(uint32_t move, char *str);
  */
 uint32_t str2move(char *str, struct position *pos);
 
-/*
- * Copy one pv to another.
- *
- * @param from The pv to copy from.
- * @param to The pv to copy to.
- */
-void copy_pv(struct pv *from, struct pv *to);
-
 #endif
