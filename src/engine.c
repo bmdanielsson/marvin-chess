@@ -35,6 +35,7 @@
 #include "timectl.h"
 #include "thread.h"
 #include "smp.h"
+#include "board.h"
 
 /* Size of the receive buffer */
 #define RX_BUFFER_SIZE 4096
@@ -134,6 +135,29 @@ static void cmd_perft(char *cmd, struct gamestate *state)
     test_run_perft(&state->pos, depth);
 }
 
+/*
+ * Custom command
+ * Syntax: quiet
+ */
+static void cmd_quiet(struct gamestate *state)
+{
+    struct position pos;
+    struct pv       pv;
+    int             k;
+    char            movestr[6];
+
+    pv.length = 0;
+    pos = state->pos;
+    board_quiet(&pos, &pv);
+
+    printf("pv");
+    for (k=0;k<pv.length;k++) {
+        move2str(pv.moves[k], movestr);
+        printf(" %s", movestr);
+    }
+    printf("\n");
+}
+
 void engine_loop(struct gamestate *state)
 {
     char *cmd;
@@ -168,6 +192,8 @@ void engine_loop(struct gamestate *state)
             cmd_eval(state);
         } else if (!strncmp(cmd, "perft", 5)) {
             cmd_perft(cmd, state);
+        } else if (!strncmp(cmd, "quiet", 5)) {
+            cmd_quiet(state);
         } else {
             handled = false;
         }

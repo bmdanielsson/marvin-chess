@@ -70,18 +70,4 @@ bool valid_move(uint32_t move);
  */
 bool valid_scores(struct position *pos);
 
-/*
- * Check if a pruning of a move is ok by performing a verification search.
- *
- * @param worker The current worker.
- * @param move The move being pruned.
- * @param depth The depth at which the move is pruned.
- * @param alpha The current alpha value.
- * @param beta The current beta value.
- * @return Returns true if the verification search returned a score equal to
- *         or larger than alpha.
- */
-bool valid_pruning(struct search_worker *worker, uint32_t move, int depth,
-                   int alpha, int beta);
-
 #endif

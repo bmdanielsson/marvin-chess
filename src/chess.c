@@ -27,6 +27,8 @@
 #include "board.h"
 #include "bitboard.h"
 #include "engine.h"
+#include "search.h"
+#include "eval.h"
 
 uint64_t sq_mask[NSQUARES];
 

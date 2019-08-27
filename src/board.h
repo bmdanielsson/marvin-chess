@@ -119,4 +119,20 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move);
  */
 bool board_move_gives_check(struct position *pos, uint32_t move);
 
+/* Calcualte the point value balance for a position.
+ *
+ * @param pos The position.
+ * @return Returns the point value balance from the side to
+ *         moves point of view.
+ */
+int board_point_value(struct position *pos);
+
+/*
+ * Find the path to a quiet position.
+ *
+ * @param pos The position.
+ * @param pv Location to store the principle variation at.
+ */
+void board_quiet(struct position *pos, struct pv *pv);
+
 #endif
