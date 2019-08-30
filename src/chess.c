@@ -459,7 +459,7 @@ uint32_t str2move(char *str, struct position *pos)
      * that the move is among them.
      */
     gen_moves(pos, &list);
-    for (k=0;k<list.nmoves;k++) {
+    for (k=0;k<list.size;k++) {
         move = list.moves[k];
         if ((from == FROM(move)) && (to == TO(move))) {
             if (ISPROMOTION(move)) {

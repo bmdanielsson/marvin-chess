@@ -72,7 +72,7 @@ static int point_value(struct position *pos)
     return pos->stm == WHITE?wp-bp:-(wp-bp);
 }
 
-static int quiet(struct position *pos, int alpha, int beta, struct pv *pv)
+static int quiet(struct position *pos, int alpha, int beta, struct movelist *pv)
 {
     int             score;
     int             best_score;
@@ -80,7 +80,7 @@ static int quiet(struct position *pos, int alpha, int beta, struct pv *pv)
     uint32_t        move;
     struct movelist list;
     int             k;
-    struct pv       line;
+    struct movelist line;
     bool            in_check;
 
     in_check = board_in_check(pos, pos->stm);
@@ -97,22 +97,22 @@ static int quiet(struct position *pos, int alpha, int beta, struct pv *pv)
         }
     }
 
-    list.nmoves = 0;
+    list.size = 0;
     if (in_check) {
         gen_legal_moves(pos, &list);
-        if (list.nmoves == 0) {
+        if (list.size == 0) {
             return -CHECKMATE;
         }
     } else {
         gen_capture_moves(pos, &list);
         gen_promotion_moves(pos, &list, false);
     }
-    for (k=0;k<list.nmoves;k++) {
+    for (k=0;k<list.size;k++) {
         move = list.moves[k];
         if (!board_make_move(pos, move)) {
             continue;
         }
-        line.length = 0;
+        line.size = 0;
         score = -quiet(pos, -beta, -alpha, &line);
         board_unmake_move(pos);
 
@@ -124,8 +124,8 @@ static int quiet(struct position *pos, int alpha, int beta, struct pv *pv)
                 }
                 alpha = score;
                 pv->moves[0] = move;
-                memcpy(pv->moves+1, line.moves, line.length*sizeof(uint32_t));
-                pv->length = line.length + 1;
+                memcpy(pv->moves+1, line.moves, line.size*sizeof(uint32_t));
+                pv->size = line.size + 1;
             }
         }
     }
@@ -784,8 +784,8 @@ bool board_move_gives_check(struct position *pos, uint32_t move)
     return gives_check;
 }
 
-void board_quiet(struct position *pos, struct pv *pv)
+void board_quiet(struct position *pos, struct movelist *pv)
 {
-    pv->length = 0;
+    pv->size = 0;
     (void)quiet(pos, -INFINITE_SCORE, INFINITE_SCORE, pv);
 }

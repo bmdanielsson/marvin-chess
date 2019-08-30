@@ -65,7 +65,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     tc_start_clock();
 
     /* Set default search parameters */
-    state->move_filter.nmoves = 0;
+    state->move_filter.size = 0;
     state->exit_on_mate = true;
     state->sd = MAX_SEARCH_DEPTH;
 
@@ -158,8 +158,8 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             if (move != NOMOVE) {
                 if (board_make_move(&state->pos, move)) {
                     board_unmake_move(&state->pos);
-                    state->move_filter.moves[state->move_filter.nmoves] = move;
-                    state->move_filter.nmoves++;
+                    state->move_filter.moves[state->move_filter.size] = move;
+                    state->move_filter.size++;
                 }
             }
             if (temp != NULL) {
@@ -495,7 +495,7 @@ void uci_send_pv_info(struct search_worker *worker, int score)
     sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
             "tbhits %"PRIu64" hashfull %d score cp %d pv", worker->depth,
             worker->seldepth, nodes, msec, nps, tbhits, hash_tt_usage(), score);
-    for (k=0;k<worker->best_pv.length;k++) {
+    for (k=0;k<worker->best_pv.size;k++) {
         strcat(buffer, " ");
         move2str(worker->best_pv.moves[k], movestr);
         strcat(buffer, movestr);

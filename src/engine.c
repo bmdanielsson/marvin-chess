@@ -142,16 +142,16 @@ static void cmd_perft(char *cmd, struct gamestate *state)
 static void cmd_quiet(struct gamestate *state)
 {
     struct position pos;
-    struct pv       pv;
+    struct movelist pv;
     int             k;
     char            movestr[6];
 
-    pv.length = 0;
+    pv.size = 0;
     pos = state->pos;
     board_quiet(&pos, &pv);
 
     printf("pv");
-    for (k=0;k<pv.length;k++) {
+    for (k=0;k<pv.size;k++) {
         move2str(pv.moves[k], movestr);
         printf(" %s", movestr);
     }
@@ -297,12 +297,12 @@ bool engine_wait_for_input(struct search_worker *worker)
 
 void engine_send_pv_info(struct search_worker *worker, int score)
 {
-    char      movestr[6];
-    char      buffer[1024];
-    int       msec;
-    int       k;
-    int       nlines;
-    struct pv *pv;
+    char            movestr[6];
+    char            buffer[1024];
+    int             msec;
+    int             k;
+    int             nlines;
+    struct movelist *pv;
 
     if (worker->state->silent) {
         return;
@@ -323,12 +323,12 @@ void engine_send_pv_info(struct search_worker *worker, int score)
     nlines = 1;
     strcat(buffer, "  ");
     pv = &worker->pv_table[0];
-    for (k=0;k<pv->length;k++) {
+    for (k=0;k<pv->size;k++) {
         strcat(buffer, " ");
         move2str(pv->moves[k], movestr);
         strcat(buffer, movestr);
         if (((int)strlen(buffer) > (nlines*70)) &&
-            ((k+1) < pv->length)) {
+            ((k+1) < pv->size)) {
             strcat(buffer, "\n  ");
             nlines++;
         }

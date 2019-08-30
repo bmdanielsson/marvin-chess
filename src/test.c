@@ -86,7 +86,7 @@ static void perft(struct position *pos, int depth, uint32_t *nleafs)
 
     /* Search all moves */
     gen_moves(pos, &list);
-    for (k=0;k<list.nmoves;k++) {
+    for (k=0;k<list.size;k++) {
         if (!board_make_move(pos, list.moves[k])) {
             continue;
         }
@@ -126,7 +126,7 @@ void test_run_divide(struct position *pos, int depth)
 
     ntotal = 0;
     gen_moves(pos, &list);
-    for (k=0;k<list.nmoves;k++) {
+    for (k=0;k<list.size;k++) {
         if (!board_make_move(pos, list.moves[k])) {
             continue;
         }
@@ -138,7 +138,7 @@ void test_run_divide(struct position *pos, int depth)
         board_unmake_move(pos);
     }
 
-    printf("Moves: %d\n", list.nmoves);
+    printf("Moves: %d\n", list.size);
     printf("Leafs: %u\n", ntotal);
 }
 
@@ -165,7 +165,7 @@ void test_run_benchmark(void)
         tc_configure_time_control(TC_INFINITE, 0, 0, 0);
         state->sd = BENCH_DEPTH;
         state->silent = true;
-        state->move_filter.nmoves = 0;
+        state->move_filter.size = 0;
         state->exit_on_mate = true;
 
         smp_search(state, false, false, false);

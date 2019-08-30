@@ -266,8 +266,8 @@ static thread_retval_t trace_positions_func(void *data)
 
     worker = (struct tuning_worker*)data;
     state = create_game_state();
-    pv = malloc(sizeof(struct pv));
-    memset(pv, 0, sizeof(struct pv));
+    pv = malloc(sizeof(struct movelist));
+    memset(pv, 0, sizeof(struct movelist));
     trainingset = worker->trainingset;
 
     /* Iterate over all training positions assigned to this worker */

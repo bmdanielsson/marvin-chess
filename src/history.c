@@ -45,14 +45,14 @@ void history_update_table(struct search_worker *worker, struct movelist *list,
     struct position *pos;
 
     assert(list != NULL);
-    assert(list->nmoves > 0);
+    assert(list->size > 0);
     assert(depth > 0);
 
     /* Update history table */
-    best_move = list->moves[list->nmoves-1];
+    best_move = list->moves[list->size-1];
     rescale = false;
     pos = &worker->pos;
-    for (k=0;k<list->nmoves;k++) {
+    for (k=0;k<list->size;k++) {
         move = list->moves[k];
         piece = pos->pieces[FROM(move)];
         to = TO(move);

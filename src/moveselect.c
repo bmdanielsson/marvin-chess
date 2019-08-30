@@ -185,14 +185,14 @@ static bool get_move(struct search_worker *worker, uint32_t *move)
         /* Fall through */
     case PHASE_GEN_TACTICAL:
         /* Generate all possible captures for this position */
-        list.nmoves = 0;
+        list.size = 0;
         if (ms->in_check) {
             gen_check_evasion_captures(pos, &list);
         } else {
             gen_capture_moves(pos, &list);
             gen_promotion_moves(pos, &list, ms->underpromote);
         }
-        for (k=0;k<list.nmoves;k++) {
+        for (k=0;k<list.size;k++) {
             add_move(worker, ms, &list, k);
         }
         ms->phase++;
@@ -238,13 +238,13 @@ static bool get_move(struct search_worker *worker, uint32_t *move)
         /* Fall through */
     case PHASE_GEN_MOVES:
         /* Generate all possible moves for this position */
-        list.nmoves = 0;
+        list.size = 0;
         if (ms->in_check) {
             gen_check_evasion_moves(pos, &list);
         } else {
             gen_quiet_moves(pos, &list);
         }
-        for (k=0;k<list.nmoves;k++) {
+        for (k=0;k<list.size;k++) {
             add_move(worker, ms, &list, k);
         }
         ms->phase++;
@@ -325,11 +325,11 @@ bool select_get_move(struct search_worker *worker, uint32_t *move)
     found = false;
     while (!found && get_move(worker, move)) {
         if ((worker->pos.sply > 0) ||
-            (worker->state->move_filter.nmoves == 0)) {
+            (worker->state->move_filter.size == 0)) {
             found = true;
             break;
         }
-        for (k=0;k<worker->state->move_filter.nmoves;k++) {
+        for (k=0;k<worker->state->move_filter.size;k++) {
             if (*move == worker->state->move_filter.moves[k]) {
                 found = true;
                 break;

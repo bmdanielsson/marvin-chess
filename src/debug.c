@@ -95,7 +95,7 @@ static void browse_display_position(struct position *pos,
 
     printf("\n");
 
-    list->nmoves = 0;
+    list->size = 0;
     if (!hash_tt_lookup(pos, &item)) {
         printf("Position not found\n");
         return;
@@ -123,7 +123,7 @@ static void browse_display_position(struct position *pos,
            item.score, item.depth, pos->key);
     printf("\n");
 
-    for (k=0;k<list->nmoves;k++) {
+    for (k=0;k<list->size;k++) {
         leafnodes[k] = browse_display_move(pos, list->moves[k], k,
                                            list->moves[k]==item.move,
                                            item.score);
@@ -272,26 +272,11 @@ void dbg_print_movelist(struct movelist *list)
     int  k;
     char movestr[6];
 
-    for (k=0;k<list->nmoves;k++) {
+    for (k=0;k<list->size;k++) {
         if ((k != 0) && (k%10) == 0) {
             printf("\n");
         }
         move2str(list->moves[k], movestr);
-        printf("%s ", movestr);
-    }
-    printf("\n");
-}
-
-void dbg_print_pv(struct pv *pv)
-{
-    int  k;
-    char movestr[6];
-
-    for (k=0;k<pv->length;k++) {
-        if ((k != 0) && (k%10) == 0) {
-            printf("\n");
-        }
-        move2str(pv->moves[k], movestr);
         printf("%s ", movestr);
     }
     printf("\n");
@@ -311,8 +296,8 @@ void dbg_browse_transposition_table(struct position *pos)
     while (!stop) {
         browse_display_position(pos, &list, leafnodes);
 
-        if (list.nmoves > 0) {
-            printf("Move: 1-%d, q=quit, u=up\n", list.nmoves);
+        if (list.size > 0) {
+            printf("Move: 1-%d, q=quit, u=up\n", list.size);
         } else {
             printf("q=quit, u=up\n");
         }
@@ -330,7 +315,7 @@ void dbg_browse_transposition_table(struct position *pos)
                 board_unmake_move(pos);
             }
         } else {
-            if ((sscanf(buffer, "%d", &id) == 1) && (id <= list.nmoves) &&
+            if ((sscanf(buffer, "%d", &id) == 1) && (id <= list.size) &&
                 leafnodes[id-1]) {
                 depth++;
                 board_make_move(pos, list.moves[id-1]);

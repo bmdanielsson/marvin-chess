@@ -208,12 +208,12 @@ static bool probe_wdl_tables(struct search_worker *worker, int alpha, int beta,
     return cutoff;
 }
 
-static void copy_pv(struct pv *from, struct pv *to)
+static void copy_pv(struct movelist *from, struct movelist *to)
 {
     int k;
 
-    to->length = from->length;
-    for (k=0;k<from->length;k++) {
+    to->size = from->size;
+    for (k=0;k<from->size;k++) {
         to->moves[k] = from->moves[k];
     }
 }
@@ -226,9 +226,8 @@ static void update_pv(struct search_worker *worker, uint32_t move)
     worker->pv_table[pos->sply].moves[0] = move;
     memcpy(&worker->pv_table[pos->sply].moves[1],
            &worker->pv_table[pos->sply+1].moves[0],
-           worker->pv_table[pos->sply+1].length*sizeof(uint32_t));
-    worker->pv_table[pos->sply].length =
-                                    worker->pv_table[pos->sply+1].length + 1;
+           worker->pv_table[pos->sply+1].size*sizeof(uint32_t));
+    worker->pv_table[pos->sply].size = worker->pv_table[pos->sply+1].size + 1;
 }
 
 static void checkup(struct search_worker *worker)
@@ -304,7 +303,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     checkup(worker);
 
     /* Reset the search tree for this ply */
-    worker->pv_table[pos->sply].length = 0;
+    worker->pv_table[pos->sply].size = 0;
 
     /* Check if we should considered the game as a draw */
     if (board_is_repetition(pos) || (pos->fifty >= 100)) {
@@ -455,7 +454,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Reset the search tree for this ply */
-    worker->pv_table[pos->sply].length = 0;
+    worker->pv_table[pos->sply].size = 0;
 
     /*
      * Check if the game should be considered a draw. A position is
@@ -623,7 +622,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Search all moves */
-    quiets.nmoves = 0;
+    quiets.size = 0;
     best_score = -INFINITE_SCORE;
     best_move = NOMOVE;
     tt_flag = TT_ALPHA;
@@ -645,7 +644,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
 
         /* Remeber all quiet moves */
         if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
-            quiets.moves[quiets.nmoves++] = move;
+            quiets.moves[quiets.size++] = move;
         }
 
         /*
@@ -838,7 +837,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     checkup(worker);
 
     /* Reset the search tree for this ply */
-    worker->pv_table[0].length = 0;
+    worker->pv_table[0].size = 0;
 
     /* Check the transposition table and initialize some helper variables */
     tt_found = hash_tt_lookup(pos, &tt_item);
@@ -846,7 +845,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     in_check = board_in_check(pos, pos->stm);
 
     /* Search all moves */
-    quiets.nmoves = 0;
+    quiets.size = 0;
     tt_flag = TT_ALPHA;
     best_score = -INFINITE_SCORE;
     worker->currmovenumber = 0;
@@ -861,7 +860,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
 
         /* Remeber all quiet moves */
         if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
-            quiets.moves[quiets.nmoves++] = move;
+            quiets.moves[quiets.size++] = move;
         }
 
         /* Make the move */

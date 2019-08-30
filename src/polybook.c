@@ -383,7 +383,7 @@ static uint32_t poly2engine_move(struct position *pos, struct movelist *list,
         to = 62;
     }
 
-    for (k=0;k<list->nmoves;k++) {
+    for (k=0;k<list->size;k++) {
         move = list->moves[k];
         if ((TO(move) == to) && (FROM(move) == from)) {
             if ((promotion >= WHITE_KNIGHT) && (PROMOTION(move) == promotion)) {

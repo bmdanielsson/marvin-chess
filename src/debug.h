@@ -84,13 +84,6 @@ void dbg_print_move(uint32_t move);
 void dbg_print_movelist(struct movelist *list);
 
 /*
- * Print a principle variation.
- *
- * @param pv The PV to print.
- */
-void dbg_print_pv(struct pv *pv);
-
-/*
  * Interactivly browse the trasposition table.
  *
  * @param pos The board structure.

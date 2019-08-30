@@ -133,6 +133,6 @@ int board_point_value(struct position *pos);
  * @param pos The position.
  * @param pv Location to store the principle variation at.
  */
-void board_quiet(struct position *pos, struct pv *pv);
+void board_quiet(struct position *pos, struct movelist *pv);
 
 #endif

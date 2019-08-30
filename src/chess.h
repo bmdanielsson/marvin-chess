@@ -225,20 +225,12 @@ enum {
  */
 #define PAWN_BASE_VALUE 100
 
-/* Data structure used to keep track of the principle variation */
-struct pv {
-    /* The moves that makes up the principle variation */
-    uint32_t moves[MAX_PLY];
-    /* The length of the principle variation */
-    int length;
-};
-
 /* List of moves */
 struct movelist {
     /* The list of moves */
     uint32_t moves[MAX_MOVES];
     /* The number of moves in the list */
-    int nmoves;
+    int size;
 };
 
 /* Move with extended information */
@@ -450,7 +442,7 @@ struct search_worker {
      * principle variation at a certain depth. After the search the
      * complete variation can be found in pv_table[0].
      */
-    struct pv pv_table[MAX_PLY];
+    struct movelist pv_table[MAX_PLY];
     /* Tables used for killer heuristics */
     uint32_t killer_table[MAX_PLY][2];
     /* Table used for counter move heuristics */
@@ -482,7 +474,7 @@ struct search_worker {
     int best_score;
     int best_depth;
     uint32_t best_move;
-    struct pv best_pv;
+    struct movelist best_pv;
 
     /* Data for the worker thread */
     thread_t thread;

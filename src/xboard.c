@@ -168,7 +168,7 @@ static enum game_result is_game_over(struct position *pos)
 
 	/* Check for checkmate and stalemate */
     gen_legal_moves(pos, &list);
-    if (list.nmoves == 0) {
+    if (list.size == 0) {
         return board_in_check(pos, pos->stm)?RESULT_CHECKMATE:RESULT_STALEMATE;
     }
 
@@ -729,7 +729,7 @@ static void xboard_cmd_xboard(struct gamestate *state)
     game_over = false;
 
     state->silent = false;
-    state->move_filter.nmoves = 0;
+    state->move_filter.size = 0;
 }
 
 bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop)
@@ -909,11 +909,11 @@ bool xboard_check_input(struct search_worker *worker)
 
 void xboard_send_pv_info(struct search_worker *worker,  int score)
 {
-	char      buffer[1024];
-	int       k;
-	char      movestr[6];
-	uint32_t  msec;
-    struct pv *pv;
+	char            buffer[1024];
+	int             k;
+	char            movestr[6];
+	uint32_t        msec;
+    struct movelist *pv;
 
 	/* Only display thinking in post mode */
 	if (!post_mode) {
@@ -931,7 +931,7 @@ void xboard_send_pv_info(struct search_worker *worker,  int score)
 	sprintf(buffer, "%3d %6d %7d %9"PRIu64"", worker->depth, score, msec/10,
             smp_nodes());
     pv = &worker->pv_table[0];
-	for (k=0;k<pv->length;k++) {
+	for (k=0;k<pv->size;k++) {
 		strcat(buffer, " ");
         move2str(pv->moves[k], movestr);
 		strcat(buffer, movestr);

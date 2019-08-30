@@ -23,7 +23,7 @@
 #include "validation.h"
 #include "debug.h"
 
-#define ADD_MOVE(l,f,t,p,fl) l->moves[l->nmoves++] = MOVE((f), (t), (p), (fl))
+#define ADD_MOVE(l,f,t,p,fl) l->moves[l->size++] = MOVE((f), (t), (p), (fl))
 
 static void gen_en_passant_moves(struct position *pos, struct movelist *list)
 {
@@ -276,7 +276,7 @@ void gen_moves(struct position *pos, struct movelist *list)
     assert(valid_position(pos));
     assert(list != NULL);
 
-    list->nmoves = 0;
+    list->size = 0;
 
     /* If the side to move is in check then generate evasions */
     if (board_in_check(pos, pos->stm)) {
@@ -299,14 +299,14 @@ void gen_legal_moves(struct position *pos, struct movelist *list)
     assert(valid_position(pos));
     assert(list != NULL);
 
-    list->nmoves = 0;
+    list->size = 0;
     count = 0;
     gen_moves(pos, &temp_list);
-    for (k=0;k<temp_list.nmoves;k++) {
+    for (k=0;k<temp_list.size;k++) {
         move = temp_list.moves[k];
         if (board_make_move(pos, move)) {
             list->moves[count++] = move;
-            list->nmoves++;
+            list->size++;
             board_unmake_move(pos);
         }
     }
@@ -317,7 +317,7 @@ void gen_check_evasions(struct position *pos, struct movelist *list)
     assert(valid_position(pos));
     assert(list != NULL);
 
-    list->nmoves = 0;
+    list->size = 0;
 
     gen_check_evasion_moves(pos, list);
     gen_check_evasion_captures(pos, list);
