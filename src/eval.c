@@ -774,8 +774,8 @@ static void evaluate_king(struct position *pos, struct eval *eval, int side)
         }
     } else if (kingside[side]&pos->bb_pieces[KING+side]) {
         if (!((pos->bb_pieces[ROOK+side]&kingside[side]) &&
-              (LSB(pos->bb_pieces[ROOK+side]&kingside[side]) >
-               LSB(pos->bb_pieces[KING+side])))) {
+              (MSB(pos->bb_pieces[ROOK+side]&kingside[side]) >
+               MSB(pos->bb_pieces[KING+side])))) {
             shield = true;
             castling_side = KINGSIDE;
         }
