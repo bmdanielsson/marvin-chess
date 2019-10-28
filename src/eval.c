@@ -315,6 +315,7 @@ static bool is_backward_pawn(struct position *pos, int side, int sq)
  * - candidate passed pawns
  * - backward pawn
  * - pawn shield
+ * - connected
  */
 static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
                                     int side)
@@ -331,6 +332,7 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
     uint64_t            defenders;
     uint64_t            helpers;
     uint64_t            sentries;
+    uint64_t            neighbours;
     struct pawntt_item  *item;
 
     item = &eval->pawntt;
@@ -384,6 +386,15 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
             item->score[MIDDLEGAME][side] += BACKWARD_PAWN_MG;
             item->score[ENDGAME][side] += BACKWARD_PAWN_EG;
             TRACE_M(BACKWARD_PAWN_MG, BACKWARD_PAWN_EG, 1);
+        }
+
+        /* Check if the pawn is connected */
+        neighbours = rear_attackspan[side][sq]&pos->bb_pieces[side+PAWN];
+        if (!ISEMPTY(neighbours&rank_mask[rank]) ||
+            !ISEMPTY(neighbours&bb_pawn_attacks_to(sq, side))) {
+            item->score[MIDDLEGAME][side] += CONNECTED_PAWNS_MG[rel_rank];
+            item->score[ENDGAME][side] += CONNECTED_PAWNS_EG[rel_rank];
+            TRACE_OM(CONNECTED_PAWNS_MG, CONNECTED_PAWNS_EG, rel_rank, 1);
         }
 
         /* Update pawn coverage */

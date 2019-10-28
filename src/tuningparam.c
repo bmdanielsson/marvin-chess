@@ -147,7 +147,9 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"backward_pawn_eg", 832, 832, -30, 0},
     {"free_passed_pawn_mg", 833, 833, 0, 200},
     {"free_passed_pawn_eg", 834, 834, 0, 200},
-    {"space_square", 835, 835, 0, 50}
+    {"space_square", 835, 835, 0, 50},
+    {"connected_pawns_mg", 836, 842, 0, 200},
+    {"connected_pawns_eg", 843, 849, 0, 200}
 };
 
 static void validate_value(FILE *fp, char *name, struct tuning_param *param)
@@ -247,6 +249,8 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN(FREE_PASSED_PAWN_MG)
     ASSIGN(FREE_PASSED_PAWN_EG)
     ASSIGN(SPACE_SQUARE)
+    ASSIGN_MULTIPLE(CONNECTED_PAWNS_MG)
+    ASSIGN_MULTIPLE(CONNECTED_PAWNS_EG)
 
     eval_reset();
 }
@@ -340,6 +344,8 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE(FREE_PASSED_PAWN_MG)
     DEFINE(FREE_PASSED_PAWN_EG)
     DEFINE(SPACE_SQUARE)
+    DEFINE_MULTIPLE(CONNECTED_PAWNS_MG)
+    DEFINE_MULTIPLE(CONNECTED_PAWNS_EG)
 
     return params;
 }

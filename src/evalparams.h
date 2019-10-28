@@ -100,5 +100,7 @@ extern int BACKWARD_PAWN_EG;
 extern int FREE_PASSED_PAWN_MG;
 extern int FREE_PASSED_PAWN_EG;
 extern int SPACE_SQUARE;
+extern int CONNECTED_PAWNS_MG[7];
+extern int CONNECTED_PAWNS_EG[7];
 
 #endif

@@ -205,3 +205,9 @@ int BACKWARD_PAWN_EG = -2;
 int FREE_PASSED_PAWN_MG = 170;
 int FREE_PASSED_PAWN_EG = 80;
 int SPACE_SQUARE = 4;
+int CONNECTED_PAWNS_MG[7] = {
+    0, 7, 10, 12, 18, 4, 51
+};
+int CONNECTED_PAWNS_EG[7] = {
+    0, 0, 4, 1, 6, 58, 65
+};
