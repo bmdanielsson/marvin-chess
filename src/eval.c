@@ -217,6 +217,10 @@ static void evaluate_pawn_shield(struct position *pos, struct eval *eval,
     }
 }
 
+/*
+ * A backward pawn is a pawn that can't be protected by friendly
+ * pawns and that cannot safely advance.
+ */
 static bool is_backward_pawn(struct position *pos, int side, int sq)
 {
     int      oside;
@@ -308,15 +312,6 @@ static bool is_backward_pawn(struct position *pos, int side, int sq)
     return false;
 }
 
-/*
- * - double pawns
- * - isolated pawns
- * - passed pawns
- * - candidate passed pawns
- * - backward pawn
- * - pawn shield
- * - connected
- */
 static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
                                     int side)
 {
@@ -420,6 +415,10 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
     evaluate_pawn_shield(pos, eval, side);
 }
 
+/*
+ * A free passed pawn is a passed pawn on the 6th or 7th rank
+ * that can safly advance at least one square.
+ */
 static bool is_free_pawn(struct position *pos, struct eval *eval, int side,
                          int sq)
 {
@@ -447,8 +446,6 @@ static bool is_free_pawn(struct position *pos, struct eval *eval, int side,
 /*
  * Evaluate interaction between passed pawns and other pieces. The parts that
  * only depend on other pawns are evaluated by evaluate_pawn_structure.
- *
- * - king distance
  */
 static void evaluate_passers(struct position *pos, struct eval *eval, int side)
 {
@@ -480,6 +477,7 @@ static void evaluate_passers(struct position *pos, struct eval *eval, int side)
         TRACE_M_E(FRIENDLY_KING_PASSER_DIST, dist);
         TRACE_M_E(OPPONENT_KING_PASSER_DIST, odist);
 
+        /* Free pawn */
         if (is_free_pawn(pos, eval, side, sq)) {
             eval->positional[MIDDLEGAME][side] += FREE_PASSED_PAWN_MG;
             eval->positional[ENDGAME][side] += FREE_PASSED_PAWN_EG;
@@ -488,10 +486,6 @@ static void evaluate_passers(struct position *pos, struct eval *eval, int side)
     }
 }
 
-/*
- * - mobility
- * - outposts
- */
 static void evaluate_knights(struct position *pos, struct eval *eval, int side)
 {
     uint64_t pieces;
@@ -545,10 +539,6 @@ static void evaluate_knights(struct position *pos, struct eval *eval, int side)
     eval->coverage[side] |= coverage;
 }
 
-/*
- * - bishop pair
- * - mobility
- */
 static void evaluate_bishops(struct position *pos, struct eval *eval, int side)
 {
     uint64_t pieces;
@@ -604,10 +594,6 @@ static void evaluate_bishops(struct position *pos, struct eval *eval, int side)
     eval->coverage[side] |= coverage;
 }
 
-/*
- * - open and half-open files
- * - mobility
- */
 static void evaluate_rooks(struct position *pos, struct eval *eval, int side)
 {
     const uint64_t rank7[NSIDES] = {rank_mask[RANK_7], rank_mask[RANK_2]};
@@ -679,10 +665,6 @@ static void evaluate_rooks(struct position *pos, struct eval *eval, int side)
     eval->coverage[side] |= coverage;
 }
 
-/*
- * - open and half-open files
- * - mobility
- */
 static void evaluate_queens(struct position *pos, struct eval *eval, int side)
 {
     uint64_t pieces;
@@ -744,10 +726,6 @@ static void evaluate_queens(struct position *pos, struct eval *eval, int side)
     eval->coverage[side] |= coverage;
 }
 
-/*
- * - pawn shield
- * - king preassure
- */
 static void evaluate_king(struct position *pos, struct eval *eval, int side)
 {
     uint64_t            queenside[NSIDES] = {
