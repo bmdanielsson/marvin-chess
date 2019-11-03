@@ -1049,7 +1049,7 @@ static void verify_trace(char *training_file)
                               true);
 
         /* Evaluate the position */
-        score = eval_evaluate_full(&state->pos, false);
+        score = eval_evaluate(&state->pos);
 
         /* Generate a trace for this function */
         trace = malloc(sizeof(struct eval_trace));

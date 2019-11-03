@@ -110,7 +110,13 @@ static void cmd_divide(char *cmd, struct gamestate *state)
  */
 static void cmd_eval(struct gamestate *state)
 {
-    eval_evaluate_full(&state->pos, true);
+    int phase;
+    int score;
+
+    phase = eval_game_phase(&state->pos);
+    score = eval_evaluate(&state->pos);
+    printf("Phase: %d (256)\n", phase);
+    printf("Score: %d (for white)\n", state->pos.stm == WHITE?score:-score);
 }
 
 /*

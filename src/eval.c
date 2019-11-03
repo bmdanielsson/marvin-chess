@@ -53,16 +53,7 @@ struct eval {
     uint64_t piece_coverage[NPIECES];
     uint64_t coverage[NSIDES];
     int nbr_king_attackers[NPIECES];
-
-    int material[NPHASES][NSIDES];
-    int material_adj[NPHASES][NSIDES];
-    int psq[NPHASES][NSIDES];
-    int pawn_structure[NPHASES][NSIDES];
-    int king_safety[NPHASES][NSIDES];
-    int king_preassure[NPHASES][NSIDES];
-    int positional[NPHASES][NSIDES];
-    int mobility[NPHASES][NSIDES];
-    int space[NPHASES][NSIDES];
+    int score[NPHASES][NSIDES];
 
 #ifdef TRACE
     struct eval_trace *trace;
@@ -106,35 +97,6 @@ static int nbr_attackers_weight[6] = {
 };
 
 /*
- * Calculate a numerical value between 0 and 256 for
- * the current phase of the game. The formula is taken from
- * https://chessprogramming.wikispaces.com/Tapered+Eval
- */
-static int calculate_game_phase(struct position *pos)
-{
-    int total_phase;
-    int phase;
-
-    total_phase = 24;
-    phase = total_phase;
-    phase -= BITCOUNT(pos->bb_pieces[WHITE_KNIGHT]);
-    phase -= BITCOUNT(pos->bb_pieces[BLACK_KNIGHT]);
-    phase -= BITCOUNT(pos->bb_pieces[WHITE_BISHOP]);
-    phase -= BITCOUNT(pos->bb_pieces[BLACK_BISHOP]);
-    phase -= 2*BITCOUNT(pos->bb_pieces[WHITE_ROOK]);
-    phase -= 2*BITCOUNT(pos->bb_pieces[BLACK_ROOK]);
-    phase -= 4*BITCOUNT(pos->bb_pieces[WHITE_QUEEN]);
-    phase -= 4*BITCOUNT(pos->bb_pieces[BLACK_QUEEN]);
-    phase = (phase*256 + (total_phase/2))/total_phase;
-
-    /*
-     * Guard against negative phase values. The phase value might
-     * become negative in case of promotion.
-     */
-    return MAX(phase, 0);
-}
-
-/*
  * Calculate a score that is an interpolation of the middlegame and endgame
  * based on the current phase of the game.
  */
@@ -172,16 +134,18 @@ static int king_distance(int from, int to)
  * - not attacked by the enemy opponent
  * - in the rear span of a friendly pawn
  */
-static void evaluate_space(struct position *pos, struct eval *eval,
-                           int side)
+static void evaluate_space(struct position *pos, struct eval *eval)
 {
     uint64_t squares;
+    int side;
 
-    squares = space_eval_squares[side] & eval->pawntt.rear_span[side] &
-                (~pos->bb_pieces[side+PAWN]) &
-                (~eval->coverage[FLIP_COLOR(side)]);
-    eval->space[MIDDLEGAME][side] = BITCOUNT(squares)*SPACE_SQUARE;
-    TRACE_M_M(SPACE_SQUARE, BITCOUNT(squares));
+    for (side=0;side<NSIDES;side++) {
+        squares = space_eval_squares[side] & eval->pawntt.rear_span[side] &
+                    (~pos->bb_pieces[side+PAWN]) &
+                    (~eval->coverage[FLIP_COLOR(side)]);
+        eval->score[MIDDLEGAME][side] += BITCOUNT(squares)*SPACE_SQUARE;
+        TRACE_M_M(SPACE_SQUARE, BITCOUNT(squares));
+    }
 }
 
 static void evaluate_pawn_shield(struct position *pos, struct eval *eval,
@@ -312,14 +276,15 @@ static bool is_backward_pawn(struct position *pos, int side, int sq)
     return false;
 }
 
-static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
-                                    int side)
+static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
 {
     uint64_t            pieces;
     int                 sq;
+    int                 index;
     int                 file;
     int                 rank;
     int                 rel_rank;
+    int                 side;
     int                 oside;
     bool                isolated;
     uint64_t            attackspan;
@@ -331,14 +296,26 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
     struct pawntt_item  *item;
 
     item = &eval->pawntt;
-    oside = FLIP_COLOR(side);
-    pieces = pos->bb_pieces[PAWN+side];
+    pieces = pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN];
     while (pieces != 0ULL) {
         isolated = false;
         sq = POPBIT(&pieces);
+        side = COLOR(pos->pieces[sq]);
+        oside = FLIP_COLOR(side);
         rank = RANKNR(sq);
         rel_rank = (side==WHITE)?rank:7-rank;
         attackspan = rear_attackspan[side][sq]|front_attackspan[side][sq];
+
+        /* Material */
+        item->score[MIDDLEGAME][side] += material_values_mg[PAWN+side];
+        item->score[ENDGAME][side] += material_values_eg[PAWN+side];
+        TRACE_CONST(PAWN_BASE_VALUE);
+
+        /* Piece/square tables */
+        index = (side == BLACK)?MIRROR(sq):sq;
+        item->score[MIDDLEGAME][side] += PSQ_TABLE_PAWN_MG[index];
+        item->score[ENDGAME][side] += PSQ_TABLE_PAWN_EG[index];
+        TRACE_OM(PSQ_TABLE_PAWN_MG, PSQ_TABLE_PAWN_EG, index, 1);
 
         /* Look for isolated pawns */
         if ((attackspan&pos->bb_pieces[side+PAWN]) == 0ULL) {
@@ -399,20 +376,22 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval,
         item->rear_span[side] |= rear_span[side][sq];
     }
 
-    /* Look for double pawns */
-    for (file=0;file<NFILES;file++) {
-        if (BITCOUNT(pos->bb_pieces[side+PAWN]&file_mask[file]) >= 2) {
-            item->score[MIDDLEGAME][side] += DOUBLE_PAWNS_MG;
-            item->score[ENDGAME][side] += DOUBLE_PAWNS_EG;
-            TRACE_M(DOUBLE_PAWNS_MG, DOUBLE_PAWNS_EG, 1);
+    for (side=0;side<NSIDES;side++) {
+        /* Look for double pawns */
+        for (file=0;file<NFILES;file++) {
+            if (BITCOUNT(pos->bb_pieces[side+PAWN]&file_mask[file]) >= 2) {
+                item->score[MIDDLEGAME][side] += DOUBLE_PAWNS_MG;
+                item->score[ENDGAME][side] += DOUBLE_PAWNS_EG;
+                TRACE_M(DOUBLE_PAWNS_MG, DOUBLE_PAWNS_EG, 1);
+            }
         }
-    }
 
-    /*
-     * Calculate a pawnshield score. This score will be used
-     * later when evaluating king safety.
-     */
-    evaluate_pawn_shield(pos, eval, side);
+        /*
+         * Calculate a pawnshield score. This score will be used
+         * later when evaluating king safety.
+         */
+        evaluate_pawn_shield(pos, eval, side);
+    }
 }
 
 /*
@@ -447,21 +426,23 @@ static bool is_free_pawn(struct position *pos, struct eval *eval, int side,
  * Evaluate interaction between passed pawns and other pieces. The parts that
  * only depend on other pawns are evaluated by evaluate_pawn_structure.
  */
-static void evaluate_passers(struct position *pos, struct eval *eval, int side)
+static void evaluate_passers(struct position *pos, struct eval *eval)
 {
     struct pawntt_item *item;
     uint64_t           passers;
     int                sq;
     int                to;
+    int                side;
     int                dist;
     int                odist;
 
     item = &eval->pawntt;
 
     /* Iterate over all passers */
-    passers = item->passers&pos->bb_sides[side];
+    passers = item->passers;
     while (passers != 0ULL) {
         sq = POPBIT(&passers);
+        side = COLOR(pos->pieces[sq]);
 
         /*
          * Find the distance from each king to the square
@@ -472,49 +453,60 @@ static void evaluate_passers(struct position *pos, struct eval *eval, int side)
         odist = king_distance(LSB(pos->bb_pieces[KING+FLIP_COLOR(side)]), to);
 
         /* Calculate a score based on the distance to each king */
-        eval->positional[ENDGAME][side] += OPPONENT_KING_PASSER_DIST*odist;
-        eval->positional[ENDGAME][side] += FRIENDLY_KING_PASSER_DIST*dist;
+        eval->score[ENDGAME][side] += OPPONENT_KING_PASSER_DIST*odist;
+        eval->score[ENDGAME][side] += FRIENDLY_KING_PASSER_DIST*dist;
         TRACE_M_E(FRIENDLY_KING_PASSER_DIST, dist);
         TRACE_M_E(OPPONENT_KING_PASSER_DIST, odist);
 
         /* Free pawn */
         if (is_free_pawn(pos, eval, side, sq)) {
-            eval->positional[MIDDLEGAME][side] += FREE_PASSED_PAWN_MG;
-            eval->positional[ENDGAME][side] += FREE_PASSED_PAWN_EG;
+            eval->score[MIDDLEGAME][side] += FREE_PASSED_PAWN_MG;
+            eval->score[ENDGAME][side] += FREE_PASSED_PAWN_EG;
             TRACE_M(FREE_PASSED_PAWN_MG, FREE_PASSED_PAWN_EG, 1);
         }
     }
 }
 
-static void evaluate_knights(struct position *pos, struct eval *eval, int side)
+static void evaluate_knights(struct position *pos, struct eval *eval)
 {
     uint64_t pieces;
     uint64_t moves;
     uint64_t safe_moves;
     uint64_t coverage;
     int      sq;
+    int      index;
     int      king_sq;
+    int      side;
     int      opp_side;
 
-    /* Calculate mobility */
-    coverage = 0ULL;
-    pieces = pos->bb_pieces[KNIGHT+side];
-    opp_side = FLIP_COLOR(side);
-    king_sq = LSB(pos->bb_pieces[KING+opp_side]);
+    pieces = pos->bb_pieces[WHITE_KNIGHT]|pos->bb_pieces[BLACK_KNIGHT];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
+        side = COLOR(pos->pieces[sq]);
+        opp_side = FLIP_COLOR(side);
+        king_sq = LSB(pos->bb_pieces[KING+opp_side]);
         moves = bb_knight_moves(sq);
-        coverage |= moves;
+        coverage = moves;
         moves &= (~pos->bb_sides[side]);
+
+        /* Material */
+        eval->score[MIDDLEGAME][side] += material_values_mg[KNIGHT+side];
+        eval->score[ENDGAME][side] += material_values_eg[KNIGHT+side];
+        TRACE_M(KNIGHT_MATERIAL_VALUE_MG, KNIGHT_MATERIAL_VALUE_EG, 1);
+
+        /* Piece/square tables */
+        index = (side == BLACK)?MIRROR(sq):sq;
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_KNIGHT_MG[index];
+        eval->score[ENDGAME][side] += PSQ_TABLE_KNIGHT_EG[index];
+        TRACE_OM(PSQ_TABLE_KNIGHT_MG, PSQ_TABLE_KNIGHT_EG, index, 1);
 
         /* Mobility */
         safe_moves = moves&(~eval->piece_coverage[PAWN+FLIP_COLOR(side)]);
-        eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
+        eval->score[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_mg[KNIGHT+side]);
-        eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
+        eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[KNIGHT+side]);
-        TRACE_M(KNIGHT_MOBILITY_MG, KNIGHT_MOBILITY_EG,
-                BITCOUNT(safe_moves));
+        TRACE_M(KNIGHT_MOBILITY_MG, KNIGHT_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
         if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
@@ -525,28 +517,30 @@ static void evaluate_knights(struct position *pos, struct eval *eval, int side)
         if (sq_mask[sq]&outpost_squares[side] &&
             ((front_attackspan[side][sq]&pos->bb_pieces[opp_side+PAWN]) == 0)) {
             if (eval->piece_coverage[PAWN+side]&sq_mask[sq]) {
-                eval->positional[MIDDLEGAME][side] += PROTECTED_KNIGHT_OUTPOST;
+                eval->score[MIDDLEGAME][side] += PROTECTED_KNIGHT_OUTPOST;
                 TRACE_M_M(PROTECTED_KNIGHT_OUTPOST, 1);
             } else {
-                eval->positional[MIDDLEGAME][side] += KNIGHT_OUTPOST;
+                eval->score[MIDDLEGAME][side] += KNIGHT_OUTPOST;
                 TRACE_M_M(KNIGHT_OUTPOST, 1);
             }
         }
-    }
 
-    /* Update coverage */
-    eval->piece_coverage[KNIGHT+side] |= coverage;
-    eval->coverage[side] |= coverage;
+        /* Update coverage */
+        eval->piece_coverage[KNIGHT+side] |= coverage;
+        eval->coverage[side] |= coverage;
+    }
 }
 
-static void evaluate_bishops(struct position *pos, struct eval *eval, int side)
+static void evaluate_bishops(struct position *pos, struct eval *eval)
 {
     uint64_t pieces;
     uint64_t moves;
     uint64_t safe_moves;
     uint64_t coverage;
     int      sq;
+    int      index;
     int      king_sq;
+    int      side;
     int      opp_side;
 
     /*
@@ -557,44 +551,55 @@ static void evaluate_bishops(struct position *pos, struct eval *eval, int side)
      * to a bishop. This is so unlikely that it should be safe to assume
      * that the bishops operate on different color squares.
      */
-    if (BITCOUNT(pos->bb_pieces[side+BISHOP]) >= 2) {
-        eval->material_adj[MIDDLEGAME][side] += BISHOP_PAIR_MG;
-        eval->material_adj[ENDGAME][side] += BISHOP_PAIR_EG;
-        TRACE_M(BISHOP_PAIR_MG, BISHOP_PAIR_EG, 1);
+    for (side=0;side<NSIDES;side++) {
+        if (BITCOUNT(pos->bb_pieces[side+BISHOP]) >= 2) {
+            eval->score[MIDDLEGAME][side] += BISHOP_PAIR_MG;
+            eval->score[ENDGAME][side] += BISHOP_PAIR_EG;
+            TRACE_M(BISHOP_PAIR_MG, BISHOP_PAIR_EG, 1);
+        }
     }
 
-    /* Calculate mobility */
-    coverage = 0ULL;
-    pieces = pos->bb_pieces[BISHOP+side];
-    opp_side = FLIP_COLOR(side);
-    king_sq = LSB(pos->bb_pieces[KING+opp_side]);
+    pieces = pos->bb_pieces[WHITE_BISHOP]|pos->bb_pieces[BLACK_BISHOP];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
+        side = COLOR(pos->pieces[sq]);
+        opp_side = FLIP_COLOR(side);
+        king_sq = LSB(pos->bb_pieces[KING+opp_side]);
         moves = bb_bishop_moves(pos->bb_all, sq);
-        coverage |= moves;
+        coverage = moves;
         moves &= (~pos->bb_sides[side]);
+
+        /* Material */
+        eval->score[MIDDLEGAME][side] += material_values_mg[BISHOP+side];
+        eval->score[ENDGAME][side] += material_values_eg[BISHOP+side];
+        TRACE_M(BISHOP_MATERIAL_VALUE_MG, BISHOP_MATERIAL_VALUE_EG, 1);
+
+        /* Piece/square tables */
+        index = (side == BLACK)?MIRROR(sq):sq;
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_BISHOP_MG[index];
+        eval->score[ENDGAME][side] += PSQ_TABLE_BISHOP_EG[index];
+        TRACE_OM(PSQ_TABLE_BISHOP_MG, PSQ_TABLE_BISHOP_EG, index, 1);
 
         /* Mobility */
         safe_moves = moves&(~eval->piece_coverage[PAWN+FLIP_COLOR(side)]);
-        eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
+        eval->score[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_mg[BISHOP+side]);
-        eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
+        eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[BISHOP+side]);
-        TRACE_M(BISHOP_MOBILITY_MG, BISHOP_MOBILITY_EG,
-                BITCOUNT(safe_moves));
+        TRACE_M(BISHOP_MOBILITY_MG, BISHOP_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
         if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
             eval->nbr_king_attackers[BISHOP+side]++;
         }
-    }
 
-    /* Update coverage */
-    eval->piece_coverage[BISHOP+side] |= coverage;
-    eval->coverage[side] |= coverage;
+        /* Update coverage */
+        eval->piece_coverage[BISHOP+side] |= coverage;
+        eval->coverage[side] |= coverage;
+    }
 }
 
-static void evaluate_rooks(struct position *pos, struct eval *eval, int side)
+static void evaluate_rooks(struct position *pos, struct eval *eval)
 {
     const uint64_t rank7[NSIDES] = {rank_mask[RANK_7], rank_mask[RANK_2]};
     const uint64_t rank8[NSIDES] = {rank_mask[RANK_8], rank_mask[RANK_1]};
@@ -604,30 +609,43 @@ static void evaluate_rooks(struct position *pos, struct eval *eval, int side)
     uint64_t safe_moves;
     uint64_t coverage;
     int      sq;
+    int      index;
     int      file;
     int      king_sq;
+    int      side;
     int      opp_side;
 
-    coverage = 0ULL;
     all_pawns = pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN];
-    pieces = pos->bb_pieces[ROOK+side];
-    opp_side = FLIP_COLOR(side);
-    king_sq = LSB(pos->bb_pieces[KING+opp_side]);
+    pieces = pos->bb_pieces[WHITE_ROOK]|pos->bb_pieces[BLACK_ROOK];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
+        side = COLOR(pos->pieces[sq]);
+        opp_side = FLIP_COLOR(side);
+        king_sq = LSB(pos->bb_pieces[KING+opp_side]);
         file = FILENR(sq);
         moves = bb_rook_moves(pos->bb_all, sq);
-        coverage |= moves;
+        coverage = moves;
         moves &= (~pos->bb_sides[side]);
+
+        /* Material */
+        eval->score[MIDDLEGAME][side] += material_values_mg[ROOK+side];
+        eval->score[ENDGAME][side] += material_values_eg[ROOK+side];
+        TRACE_M(ROOK_MATERIAL_VALUE_MG, ROOK_MATERIAL_VALUE_EG, 1);
+
+        /* Piece/square tables */
+        index = (side == BLACK)?MIRROR(sq):sq;
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_ROOK_MG[index];
+        eval->score[ENDGAME][side] += PSQ_TABLE_ROOK_EG[index];
+        TRACE_OM(PSQ_TABLE_ROOK_MG, PSQ_TABLE_ROOK_EG, index, 1);
 
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
-            eval->positional[MIDDLEGAME][side] += ROOK_OPEN_FILE_MG;
-            eval->positional[ENDGAME][side] += ROOK_OPEN_FILE_EG;
+            eval->score[MIDDLEGAME][side] += ROOK_OPEN_FILE_MG;
+            eval->score[ENDGAME][side] += ROOK_OPEN_FILE_EG;
             TRACE_M(ROOK_OPEN_FILE_MG, ROOK_OPEN_FILE_EG, 1);
         } else if ((file_mask[file]&pos->bb_pieces[PAWN+side]) == 0ULL) {
-            eval->positional[MIDDLEGAME][side] += ROOK_HALF_OPEN_FILE_MG;
-            eval->positional[ENDGAME][side] += ROOK_HALF_OPEN_FILE_EG;
+            eval->score[MIDDLEGAME][side] += ROOK_HALF_OPEN_FILE_MG;
+            eval->score[ENDGAME][side] += ROOK_HALF_OPEN_FILE_EG;
             TRACE_M(ROOK_HALF_OPEN_FILE_MG, ROOK_HALF_OPEN_FILE_EG, 1);
         }
 
@@ -639,33 +657,32 @@ static void evaluate_rooks(struct position *pos, struct eval *eval, int side)
              */
             if ((pos->bb_pieces[KING+FLIP_COLOR(side)]&rank8[side]) ||
                 (pos->bb_pieces[PAWN+FLIP_COLOR(side)]&rank7[side])) {
-                eval->positional[MIDDLEGAME][side] += ROOK_ON_7TH_MG;
-                eval->positional[ENDGAME][side] += ROOK_ON_7TH_EG;
+                eval->score[MIDDLEGAME][side] += ROOK_ON_7TH_MG;
+                eval->score[ENDGAME][side] += ROOK_ON_7TH_EG;
                 TRACE_M(ROOK_ON_7TH_MG, ROOK_ON_7TH_EG, 1);
             }
         }
 
         /* Mobility */
         safe_moves = moves&(~eval->piece_coverage[PAWN+FLIP_COLOR(side)]);
-        eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
+        eval->score[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_mg[ROOK+side]);
-        eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
+        eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[ROOK+side]);
-        TRACE_M(ROOK_MOBILITY_MG, ROOK_MOBILITY_EG,
-                BITCOUNT(safe_moves));
+        TRACE_M(ROOK_MOBILITY_MG, ROOK_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
         if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
             eval->nbr_king_attackers[ROOK+side]++;
         }
-    }
 
-    /* Update coverage */
-    eval->piece_coverage[ROOK+side] |= coverage;
-    eval->coverage[side] |= coverage;
+        /* Update coverage */
+        eval->piece_coverage[ROOK+side] |= coverage;
+        eval->coverage[side] |= coverage;
+    }
 }
 
-static void evaluate_queens(struct position *pos, struct eval *eval, int side)
+static void evaluate_queens(struct position *pos, struct eval *eval)
 {
     uint64_t pieces;
     uint64_t all_pawns;
@@ -675,58 +692,69 @@ static void evaluate_queens(struct position *pos, struct eval *eval, int side)
     uint64_t unsafe;
     int      opp_side;
     int      sq;
+    int      index;
     int      file;
     int      king_sq;
+    int      side;
 
-    coverage = 0ULL;
-    opp_side = FLIP_COLOR(side);
-    unsafe = eval->piece_coverage[PAWN+opp_side]|
-             eval->piece_coverage[KNIGHT+opp_side]|
-             eval->piece_coverage[BISHOP+opp_side]|
-             eval->piece_coverage[ROOK+opp_side];
     all_pawns = pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN];
-    pieces = pos->bb_pieces[QUEEN+side];
-    opp_side = FLIP_COLOR(side);
-    king_sq = LSB(pos->bb_pieces[KING+opp_side]);
+    pieces = pos->bb_pieces[WHITE_QUEEN]|pos->bb_pieces[BLACK_QUEEN];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
+        side = COLOR(pos->pieces[sq]);
+        opp_side = FLIP_COLOR(side);
         file = FILENR(sq);
         moves = bb_queen_moves(pos->bb_all, sq);
-        coverage |= moves;
+        coverage = moves;
         moves &= (~pos->bb_sides[side]);
+        king_sq = LSB(pos->bb_pieces[KING+opp_side]);
+        unsafe = eval->piece_coverage[PAWN+opp_side]|
+                 eval->piece_coverage[KNIGHT+opp_side]|
+                 eval->piece_coverage[BISHOP+opp_side]|
+                 eval->piece_coverage[ROOK+opp_side];
+
+        /* Material */
+        eval->score[MIDDLEGAME][side] += material_values_mg[QUEEN+side];
+        eval->score[ENDGAME][side] += material_values_eg[QUEEN+side];
+        TRACE_M(QUEEN_MATERIAL_VALUE_MG, QUEEN_MATERIAL_VALUE_EG, 1);
+
+        /* Piece/square tables */
+        index = (side == BLACK)?MIRROR(sq):sq;
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_QUEEN_MG[index];
+        eval->score[ENDGAME][side] += PSQ_TABLE_QUEEN_EG[index];
+        TRACE_OM(PSQ_TABLE_QUEEN_MG, PSQ_TABLE_QUEEN_EG, index, 1);
 
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
-            eval->positional[MIDDLEGAME][side] += QUEEN_OPEN_FILE_MG;
-            eval->positional[ENDGAME][side] += QUEEN_OPEN_FILE_EG;
+            eval->score[MIDDLEGAME][side] += QUEEN_OPEN_FILE_MG;
+            eval->score[ENDGAME][side] += QUEEN_OPEN_FILE_EG;
             TRACE_M(QUEEN_OPEN_FILE_MG, QUEEN_OPEN_FILE_EG, 1);
         } else if ((file_mask[file]&pos->bb_pieces[PAWN+side]) == 0ULL) {
-            eval->positional[MIDDLEGAME][side] += QUEEN_HALF_OPEN_FILE_MG;
-            eval->positional[ENDGAME][side] += QUEEN_HALF_OPEN_FILE_EG;
+            eval->score[MIDDLEGAME][side] += QUEEN_HALF_OPEN_FILE_MG;
+            eval->score[ENDGAME][side] += QUEEN_HALF_OPEN_FILE_EG;
             TRACE_M(QUEEN_HALF_OPEN_FILE_MG, QUEEN_HALF_OPEN_FILE_EG, 1);
         }
 
         /* Mobility */
         safe_moves = moves&(~unsafe);
-        eval->mobility[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
+        eval->score[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_mg[QUEEN+side]);
-        eval->mobility[ENDGAME][side] += (BITCOUNT(safe_moves)*
+        eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*
                                                 mobility_table_eg[QUEEN+side]);
-        TRACE_M(QUEEN_MOBILITY_MG, QUEEN_MOBILITY_EG,
-                BITCOUNT(safe_moves));
+        TRACE_M(QUEEN_MOBILITY_MG, QUEEN_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
         if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
             eval->nbr_king_attackers[QUEEN+side]++;
         }
-    }
 
-    /* Update coverage */
-    eval->piece_coverage[QUEEN+side] |= coverage;
-    eval->coverage[side] |= coverage;
+        /* Update coverage */
+        eval->piece_coverage[QUEEN+side] |= coverage;
+        eval->coverage[side] |= coverage;
+    }
 }
 
-static void evaluate_king(struct position *pos, struct eval *eval, int side)
+static void evaluate_kings(struct position *pos, struct eval *eval)
 {
     uint64_t            queenside[NSIDES] = {
                                         sq_mask[A1]|sq_mask[B1]|sq_mask[C1],
@@ -745,155 +773,83 @@ static void evaluate_king(struct position *pos, struct eval *eval, int side)
     int                 type;
     int                 k;
     int                 sq;
+    int                 index;
+    int                 side;
+    uint64_t            pieces;
 
-    /*
-     * If the king has moved to the side then it is good to keep a
-     * shield of pawns in front of it. The only exception is if
-     * there is a rook between the king and the corner. In this case
-     * keeping a pawn shield will get the rook trapped.
-     */
-    shield = false;
-    item = &eval->pawntt;
-    if (queenside[side]&pos->bb_pieces[KING+side]) {
-        if (!((pos->bb_pieces[ROOK+side]&queenside[side]) &&
-              (LSB(pos->bb_pieces[ROOK+side]&queenside[side]) <
-               LSB(pos->bb_pieces[KING+side])))) {
-            shield = true;
-            castling_side = QUEENSIDE;
-        }
-    } else if (kingside[side]&pos->bb_pieces[KING+side]) {
-        if (!((pos->bb_pieces[ROOK+side]&kingside[side]) &&
-              (MSB(pos->bb_pieces[ROOK+side]&kingside[side]) >
-               MSB(pos->bb_pieces[KING+side])))) {
-            shield = true;
-            castling_side = KINGSIDE;
-        }
-    }
-    if (shield) {
-        for (k=0;k<3;k++) {
-            type = item->pawn_shield[side][castling_side][k];
-            switch (type) {
-            case 0:
-                eval->king_safety[MIDDLEGAME][side] += scores[type];
-                TRACE_M_M(PAWN_SHIELD_HOLE, 1);
-                break;
-            case 1:
-            case 2:
-                eval->king_safety[MIDDLEGAME][side] += scores[type];
-                TRACE_OM_M(PAWN_SHIELD_RANK1, type-1, 1);
-                break;
-            default:
-                break;
-            }
-        }
-    }
-
-    /*
-     * In the end game it's more important to have an active king so
-     * don't try to hide it behind a pawn shield.
-     */
-    eval->king_safety[ENDGAME][side] = 0;
-
-    /* Calculate preassure on the enemy king */
-    nattackers = 0;
-    score = 0;
-    eval->king_preassure[MIDDLEGAME][side] = 0;
-    eval->king_preassure[ENDGAME][side] = 0;
-    for (piece=KNIGHT+side;piece<NPIECES;piece+=2) {
-        score += piece_attack_weights[piece]*eval->nbr_king_attackers[piece];
-        nattackers += eval->nbr_king_attackers[piece];
-    }
-    if (nattackers >= (int)(sizeof(nbr_attackers_weight)/sizeof(int))) {
-        nattackers = (sizeof(nbr_attackers_weight)/sizeof(int)) - 1;
-    }
-    score *= nbr_attackers_weight[nattackers];
-    eval->king_preassure[MIDDLEGAME][side] = (score*KING_ATTACK_SCALE_MG)/100;
-    eval->king_preassure[ENDGAME][side] = (score*KING_ATTACK_SCALE_EG)/100;
-    TRACE_MD(KING_ATTACK_SCALE_MG, KING_ATTACK_SCALE_EG, score, 100);
-
-    /* Update coverage */
-    sq = LSB(pos->bb_pieces[KING+side]);
-    eval->piece_coverage[KING+side] |= bb_king_moves(sq);
-    eval->coverage[side] |= eval->piece_coverage[KING+side];
-}
-
-static int do_eval_material(struct position *pos, struct eval *eval, int side,
-                            bool endgame)
-{
-    int score;
-    int piece;
-
-    assert(valid_position(pos));
-    assert(valid_side(side));
-
-    (void)eval;
-
-    score = 0;
-    for (piece=side;piece<NPIECES;piece+=2) {
-        if (!endgame) {
-            score += BITCOUNT(pos->bb_pieces[piece])*material_values_mg[piece];
-        } else {
-            score += BITCOUNT(pos->bb_pieces[piece])*material_values_eg[piece];
-        }
-        TRACE_MATERIAL(piece, endgame, BITCOUNT(pos->bb_pieces[piece]));
-    }
-
-    return score;
-}
-
-static int do_eval_psq(struct position *pos, struct eval *eval, int side,
-                       bool endgame)
-{
-    int      score;
-    uint64_t pieces;
-    int      sq;
-    int      piece;
-
-    assert(valid_position(pos));
-    assert(valid_side(side));
-
-    (void)eval;
-
-    score = 0;
-    pieces = pos->bb_sides[side];
+    pieces = pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
-        piece = pos->pieces[sq];
-        if (side == BLACK) {
-            sq = MIRROR(sq);
-        }
-        switch (piece) {
-        case WHITE_PAWN:
-        case BLACK_PAWN:
-            score += endgame?PSQ_TABLE_PAWN_EG[sq]:PSQ_TABLE_PAWN_MG[sq];
-            break;
-        case WHITE_KNIGHT:
-        case BLACK_KNIGHT:
-            score += endgame?PSQ_TABLE_KNIGHT_EG[sq]:PSQ_TABLE_KNIGHT_MG[sq];
-            break;
-        case WHITE_BISHOP:
-        case BLACK_BISHOP:
-            score += endgame?PSQ_TABLE_BISHOP_EG[sq]:PSQ_TABLE_BISHOP_MG[sq];
-            break;
-        case WHITE_ROOK:
-        case BLACK_ROOK:
-            score += endgame?PSQ_TABLE_ROOK_EG[sq]:PSQ_TABLE_ROOK_MG[sq];
-            break;
-        case WHITE_QUEEN:
-        case BLACK_QUEEN:
-            score += endgame?PSQ_TABLE_QUEEN_EG[sq]:PSQ_TABLE_QUEEN_MG[sq];
-            break;
-        case WHITE_KING:
-        case BLACK_KING:
-            score += endgame?PSQ_TABLE_KING_EG[sq]:PSQ_TABLE_KING_MG[sq];
-            break;
-        default:
-            break;
-        }
-        TRACE_PSQ(piece, sq, endgame);
-    }
+        side = COLOR(pos->pieces[sq]);
 
-    return score;
+        /* Piece/square tables */
+        index = (side == BLACK)?MIRROR(sq):sq;
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_KING_MG[index];
+        eval->score[ENDGAME][side] += PSQ_TABLE_KING_EG[index];
+        TRACE_OM(PSQ_TABLE_KING_MG, PSQ_TABLE_KING_EG, index, 1);
+
+        /*
+         * If the king has moved to the side then it is good to keep a
+         * shield of pawns in front of it. The only exception is if
+         * there is a rook between the king and the corner. In this case
+         * keeping a pawn shield will get the rook trapped.
+         */
+        shield = false;
+        item = &eval->pawntt;
+        if (queenside[side]&pos->bb_pieces[KING+side]) {
+            if (!((pos->bb_pieces[ROOK+side]&queenside[side]) &&
+                 (LSB(pos->bb_pieces[ROOK+side]&queenside[side]) <
+                  LSB(pos->bb_pieces[KING+side])))) {
+                shield = true;
+                castling_side = QUEENSIDE;
+            }
+        } else if (kingside[side]&pos->bb_pieces[KING+side]) {
+            if (!((pos->bb_pieces[ROOK+side]&kingside[side]) &&
+                  (MSB(pos->bb_pieces[ROOK+side]&kingside[side]) >
+                   MSB(pos->bb_pieces[KING+side])))) {
+                shield = true;
+                castling_side = KINGSIDE;
+            }
+        }
+        if (shield) {
+            for (k=0;k<3;k++) {
+                type = item->pawn_shield[side][castling_side][k];
+                switch (type) {
+                case 0:
+                    eval->score[MIDDLEGAME][side] += scores[type];
+                    TRACE_M_M(PAWN_SHIELD_HOLE, 1);
+                    break;
+                case 1:
+                case 2:
+                    eval->score[MIDDLEGAME][side] += scores[type];
+                    TRACE_OM_M(PAWN_SHIELD_RANK1, type-1, 1);
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
+
+        /* Calculate preassure on the enemy king */
+        nattackers = 0;
+        score = 0;
+        for (piece=KNIGHT+side;piece<NPIECES;piece+=2) {
+            score +=
+                    piece_attack_weights[piece]*eval->nbr_king_attackers[piece];
+            nattackers += eval->nbr_king_attackers[piece];
+        }
+        if (nattackers >= (int)(sizeof(nbr_attackers_weight)/sizeof(int))) {
+            nattackers = (sizeof(nbr_attackers_weight)/sizeof(int)) - 1;
+        }
+        score *= nbr_attackers_weight[nattackers];
+        eval->score[MIDDLEGAME][side] += (score*KING_ATTACK_SCALE_MG)/100;
+        eval->score[ENDGAME][side] += (score*KING_ATTACK_SCALE_EG)/100;
+        TRACE_MD(KING_ATTACK_SCALE_MG, KING_ATTACK_SCALE_EG, score, 100);
+
+        /* Update coverage */
+        eval->piece_coverage[KING+side] |= bb_king_moves(sq);
+        eval->coverage[side] |= eval->piece_coverage[KING+side];
+    }
 }
 
 static void do_eval(struct position *pos, struct eval *eval)
@@ -902,42 +858,26 @@ static void do_eval(struct position *pos, struct eval *eval)
 
     memset(eval, 0, sizeof(struct eval));
 
-    /* Copy scores that were updated iteratively to the eval struct */
-    for (k=0;k<NPHASES;k++) {
-        eval->psq[k][WHITE] = pos->psq[k][WHITE];
-        eval->psq[k][BLACK] = pos->psq[k][BLACK];
-        eval->material[k][WHITE] = pos->material[k][WHITE];
-        eval->material[k][BLACK] = pos->material[k][BLACK];
-    }
-
     /* Check if the position is present in the pawn transposition table */
     eval->in_pawntt = (pos->worker != NULL)?
                         hash_pawntt_lookup(pos->worker, &eval->pawntt):false;
 
-    /* Evaluate the position from each sides pov */
+    /* Evaluate the position */
     if (!eval->in_pawntt) {
         hash_pawntt_init_item(&eval->pawntt);
-        evaluate_pawn_structure(pos, eval, WHITE);
-        evaluate_pawn_structure(pos, eval, BLACK);
+        evaluate_pawn_structure(pos, eval);
     }
     eval->piece_coverage[WHITE_PAWN] |= eval->pawntt.coverage[WHITE];
     eval->piece_coverage[BLACK_PAWN] |= eval->pawntt.coverage[BLACK];
     eval->coverage[WHITE] |= eval->pawntt.coverage[WHITE];
     eval->coverage[BLACK] |= eval->pawntt.coverage[BLACK];
-    evaluate_knights(pos, eval, WHITE);
-    evaluate_knights(pos, eval, BLACK);
-    evaluate_bishops(pos, eval, WHITE);
-    evaluate_bishops(pos, eval, BLACK);
-    evaluate_rooks(pos, eval, WHITE);
-    evaluate_rooks(pos, eval, BLACK);
-    evaluate_queens(pos, eval, WHITE);
-    evaluate_queens(pos, eval, BLACK);
-    evaluate_king(pos, eval, WHITE);
-    evaluate_king(pos, eval, BLACK);
-    evaluate_passers(pos, eval, WHITE);
-    evaluate_passers(pos, eval, BLACK);
-    evaluate_space(pos, eval, WHITE);
-    evaluate_space(pos, eval, BLACK);
+    evaluate_knights(pos, eval);
+    evaluate_bishops(pos, eval);
+    evaluate_rooks(pos, eval);
+    evaluate_queens(pos, eval);
+    evaluate_kings(pos, eval);
+    evaluate_passers(pos, eval);
+    evaluate_space(pos, eval);
 
     /*
      * Update the evaluation scores with information from
@@ -946,8 +886,8 @@ static void do_eval(struct position *pos, struct eval *eval)
      * evaluation and therefore contains the correct information.
      */
     for (k=0;k<NPHASES;k++) {
-        eval->pawn_structure[k][WHITE] = eval->pawntt.score[k][WHITE];
-        eval->pawn_structure[k][BLACK] = eval->pawntt.score[k][BLACK];
+        eval->score[k][WHITE] += eval->pawntt.score[k][WHITE];
+        eval->score[k][BLACK] += eval->pawntt.score[k][BLACK];
     }
 
     /* Update the pawn hash table */
@@ -1055,7 +995,6 @@ int eval_evaluate(struct position *pos)
     int         score[NPHASES];
 
     assert(valid_position(pos));
-    assert(valid_scores(pos));
 
     /*
      * If no player have enough material left
@@ -1072,301 +1011,15 @@ int eval_evaluate(struct position *pos)
     for (k=0;k<NPHASES;k++) {
         score[k] = 0;
 
-        score[k] += eval.material[k][WHITE];
-        score[k] += eval.material_adj[k][WHITE];
-        score[k] += eval.psq[k][WHITE];
-        score[k] += eval.pawn_structure[k][WHITE];
-        score[k] += eval.king_safety[k][WHITE];
-        score[k] += eval.king_preassure[k][WHITE];
-        score[k] += eval.positional[k][WHITE];
-        score[k] += eval.mobility[k][WHITE];
-        score[k] += eval.space[k][WHITE];
-
-        score[k] -= eval.material[k][BLACK];
-        score[k] -= eval.material_adj[k][BLACK];
-        score[k] -= eval.psq[k][BLACK];
-        score[k] -= eval.pawn_structure[k][BLACK];
-        score[k] -= eval.king_safety[k][BLACK];
-        score[k] -= eval.king_preassure[k][BLACK];
-        score[k] -= eval.positional[k][BLACK];
-        score[k] -= eval.mobility[k][BLACK];
-        score[k] -= eval.space[k][BLACK];
+        score[k] += eval.score[k][WHITE];
+        score[k] -= eval.score[k][BLACK];
 
         score[k] = (pos->stm == WHITE)?score[k]:-score[k];
     }
 
     /* Return score adjusted for game phase */
-    phase = calculate_game_phase(pos);
+    phase = eval_game_phase(pos);
     return calculate_tapered_eval(phase, score[MIDDLEGAME], score[ENDGAME]);
-}
-
-int eval_evaluate_full(struct position *pos, bool display)
-{
-    struct eval eval;
-    int         k;
-    int         phase;
-    int         score;
-    int         sum[NPHASES][NSIDES];
-    int         sum_white_pov[NPHASES];
-    int         material[NPHASES];
-    int         material_adj[NPHASES];
-    int         psq[NPHASES];
-    int         pawn_structure[NPHASES];
-    int         king_safety[NPHASES];
-    int         king_preassure[NPHASES];
-    int         positional[NPHASES];
-    int         mobility[NPHASES];
-    int         space[NPHASES];
-
-    assert(valid_position(pos));
-    assert(valid_scores(pos));
-
-    /*
-     * If no player have enough material left
-     * to checkmate then it's a draw.
-     */
-    if (eval_is_material_draw(pos)) {
-        if (display) {
-            printf("Draw by insufficient material\n");
-            printf("Score: 0\n");
-        }
-        return 0;
-    }
-
-    /* Evaluate the position */
-    do_eval(pos, &eval);
-
-    /* Summarize each evaluation term from white's pov */
-    for (k=0;k<NPHASES;k++) {
-        material[k] = eval.material[k][WHITE];
-        material[k] -= eval.material[k][BLACK];
-
-        material_adj[k] = eval.material_adj[k][WHITE];
-        material_adj[k] -= eval.material_adj[k][BLACK];
-
-        psq[k] = eval.psq[k][WHITE];
-        psq[k] -= eval.psq[k][BLACK];
-
-        pawn_structure[k] = eval.pawn_structure[k][WHITE];
-        pawn_structure[k] -= eval.pawn_structure[k][BLACK];
-
-        king_safety[k] = eval.king_safety[k][WHITE];
-        king_safety[k] -= eval.king_safety[k][BLACK];
-
-        king_preassure[k] = eval.king_preassure[k][WHITE];
-        king_preassure[k] -= eval.king_preassure[k][BLACK];
-
-        positional[k] = eval.positional[k][WHITE];
-        positional[k] -= eval.positional[k][BLACK];
-
-        mobility[k] = eval.mobility[k][WHITE];
-        mobility[k] -= eval.mobility[k][BLACK];
-
-        space[k] = eval.space[k][WHITE];
-        space[k] -= eval.space[k][BLACK];
-    }
-
-    /* Summarize the evaluation terms for each side */
-    for (k=0;k<NPHASES;k++) {
-        sum[k][WHITE] = eval.material[k][WHITE] + eval.material_adj[k][WHITE] +
-                        eval.psq[k][WHITE] + eval.pawn_structure[k][WHITE] +
-                        eval.king_safety[k][WHITE] +
-                        eval.king_preassure[k][WHITE] +
-                        eval.positional[k][WHITE] + eval.mobility[k][WHITE] +
-                        eval.space[k][WHITE];
-        sum[k][BLACK] = eval.material[k][BLACK] + eval.material_adj[k][BLACK] +
-                        eval.psq[k][BLACK] + eval.pawn_structure[k][BLACK] +
-                        eval.king_safety[k][BLACK] +
-                        eval.king_preassure[k][BLACK] +
-                        eval.positional[k][BLACK] + eval.mobility[k][BLACK] +
-                        eval.space[k][BLACK];
-        sum_white_pov[k] = sum[k][WHITE] - sum[k][BLACK];
-    }
-
-    /* Adjust score for game phase */
-    phase = calculate_game_phase(pos);
-    score = calculate_tapered_eval(phase, sum_white_pov[MIDDLEGAME],
-                                   sum_white_pov[ENDGAME]);
-    if (!display) {
-        return (pos->stm == WHITE)?score:-score;
-    }
-
-    /* Print the evaluation */
-    printf("  Evaluation Term       White        Black         Total\n");
-    printf("                      MG     EG    MG     EG     MG     EG\n");
-    printf("-------------------------------------------------------------\n");
-    printf("Material                                      %5d   %5d\n",
-           material[MIDDLEGAME], material[ENDGAME]);
-    printf("Material adjustment %5d  %5d %5d  %5d %5d   %5d\n",
-           eval.material_adj[MIDDLEGAME][WHITE],
-           eval.material_adj[ENDGAME][WHITE],
-           eval.material_adj[MIDDLEGAME][BLACK],
-           eval.material_adj[ENDGAME][BLACK],
-           material_adj[MIDDLEGAME],
-           material_adj[ENDGAME]);
-    printf("Piece/square tables %5d  %5d %5d  %5d %5d   %5d\n",
-           eval.psq[MIDDLEGAME][WHITE], eval.psq[ENDGAME][WHITE],
-           eval.psq[MIDDLEGAME][BLACK], eval.psq[ENDGAME][BLACK],
-           psq[MIDDLEGAME], psq[ENDGAME]);
-    printf("Pawn structure      %5d  %5d %5d  %5d %5d   %5d\n",
-           eval.pawn_structure[MIDDLEGAME][WHITE],
-           eval.pawn_structure[ENDGAME][WHITE],
-           eval.pawn_structure[MIDDLEGAME][BLACK],
-           eval.pawn_structure[ENDGAME][BLACK],
-           pawn_structure[MIDDLEGAME],
-           pawn_structure[ENDGAME]);
-    printf("King safety         %5d  %5d %5d  %5d %5d   %5d\n",
-           eval.king_safety[MIDDLEGAME][WHITE],
-           eval.king_safety[ENDGAME][WHITE],
-           eval.king_safety[MIDDLEGAME][BLACK],
-           eval.king_safety[ENDGAME][BLACK],
-           king_safety[MIDDLEGAME],
-           king_safety[ENDGAME]);
-    printf("King preassure      %5d  %5d %5d  %5d %5d   %5d\n",
-           eval.king_preassure[MIDDLEGAME][WHITE],
-           eval.king_preassure[ENDGAME][WHITE],
-           eval.king_preassure[MIDDLEGAME][BLACK],
-           eval.king_preassure[ENDGAME][BLACK],
-           king_preassure[MIDDLEGAME],
-           king_preassure[ENDGAME]);
-    printf("Positional themes   %5d  %5d %5d  %5d %5d   %5d\n",
-           eval.positional[MIDDLEGAME][WHITE], eval.positional[ENDGAME][WHITE],
-           eval.positional[MIDDLEGAME][BLACK], eval.positional[ENDGAME][BLACK],
-           positional[MIDDLEGAME], positional[ENDGAME]);
-    printf("Mobility            %5d  %5d %5d  %5d %5d   %5d\n",
-           eval.mobility[MIDDLEGAME][WHITE], eval.mobility[ENDGAME][WHITE],
-           eval.mobility[MIDDLEGAME][BLACK], eval.mobility[ENDGAME][BLACK],
-           mobility[MIDDLEGAME], mobility[ENDGAME]);
-    printf("Space               %5d  %5d %5d  %5d %5d   %5d\n",
-           eval.space[MIDDLEGAME][WHITE], eval.space[ENDGAME][WHITE],
-           eval.space[MIDDLEGAME][BLACK], eval.space[ENDGAME][BLACK],
-           space[MIDDLEGAME], space[ENDGAME]);
-    printf("-------------------------------------------------------------\n");
-    printf("Total                                         %5d   %5d\n",
-           sum_white_pov[MIDDLEGAME], sum_white_pov[ENDGAME]);
-    printf("\n");
-    printf("Game phase: %d [0, 256]\n", phase);
-    printf("Score:      %d (for white)\n", score);
-
-    return (pos->stm == WHITE)?score:-score;
-}
-
-int eval_material(struct position *pos, int side, bool endgame)
-{
-#ifdef TRACE
-    struct eval eval;
-
-    memset(&eval, 0, sizeof(struct eval));
-    return do_eval_material(pos, &eval, side, endgame);
-#else
-    return do_eval_material(pos, NULL, side, endgame);
-#endif
-}
-
-void eval_update_material_score(struct position *pos, int add, int piece)
-{
-    int delta;
-    int color;
-
-    assert(valid_position(pos));
-    assert(valid_piece(piece));
-
-    delta = add?1:-1;
-    color = COLOR(piece);
-    switch (piece) {
-    case WHITE_PAWN:
-    case BLACK_PAWN:
-        pos->material[MIDDLEGAME][color] += (delta*material_values_mg[piece]);
-        pos->material[ENDGAME][color] += (delta*material_values_eg[piece]);
-        break;
-    case WHITE_KNIGHT:
-    case BLACK_KNIGHT:
-        pos->material[MIDDLEGAME][color] += (delta*material_values_mg[piece]);
-        pos->material[ENDGAME][color] += (delta*material_values_eg[piece]);
-        break;
-    case WHITE_BISHOP:
-    case BLACK_BISHOP:
-        pos->material[MIDDLEGAME][color] += (delta*material_values_mg[piece]);
-        pos->material[ENDGAME][color] += (delta*material_values_eg[piece]);
-        break;
-    case WHITE_ROOK:
-    case BLACK_ROOK:
-        pos->material[MIDDLEGAME][color] += (delta*material_values_mg[piece]);
-        pos->material[ENDGAME][color] += (delta*material_values_eg[piece]);
-        break;
-    case WHITE_QUEEN:
-    case BLACK_QUEEN:
-        pos->material[MIDDLEGAME][color] += (delta*material_values_mg[piece]);
-        pos->material[ENDGAME][color] += (delta*material_values_eg[piece]);
-        break;
-    case WHITE_KING:
-    case BLACK_KING:
-        break;
-    default:
-        assert(false);
-        break;
-    }
-}
-
-int eval_psq(struct position *pos, int side, bool endgame)
-{
-#ifdef TRACE
-    struct eval eval;
-
-    memset(&eval, 0, sizeof(struct eval));
-    return do_eval_psq(pos, &eval, side, endgame);
-#else
-    return do_eval_psq(pos, NULL, side, endgame);
-#endif
-}
-
-void eval_update_psq_score(struct position *pos, int add, int piece, int sq)
-{
-    int delta;
-    int color;
-
-    assert(valid_position(pos));
-    assert(valid_piece(piece));
-    assert(valid_square(sq));
-
-    delta = add?1:-1;
-    sq = (COLOR(piece)==WHITE)?sq:MIRROR(sq);
-    color = COLOR(piece);
-    switch (piece) {
-    case WHITE_PAWN:
-    case BLACK_PAWN:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_PAWN_MG[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_PAWN_EG[sq]);
-        break;
-    case WHITE_KNIGHT:
-    case BLACK_KNIGHT:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_KNIGHT_MG[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_KNIGHT_EG[sq]);
-        break;
-    case WHITE_BISHOP:
-    case BLACK_BISHOP:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_BISHOP_MG[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_BISHOP_EG[sq]);
-        break;
-    case WHITE_ROOK:
-    case BLACK_ROOK:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_ROOK_MG[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_ROOK_EG[sq]);
-        break;
-    case WHITE_QUEEN:
-    case BLACK_QUEEN:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_QUEEN_MG[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_QUEEN_EG[sq]);
-        break;
-    case WHITE_KING:
-    case BLACK_KING:
-        pos->psq[MIDDLEGAME][color] += (delta*PSQ_TABLE_KING_MG[sq]);
-        pos->psq[ENDGAME][color] += (delta*PSQ_TABLE_KING_EG[sq]);
-        break;
-    default:
-        assert(false);
-        break;
-    }
 }
 
 /*
@@ -1422,6 +1075,34 @@ bool eval_is_material_draw(struct position *pos)
     return false;
 }
 
+/*
+ * The formula is taken from
+ * https://chessprogramming.wikispaces.com/Tapered+Eval
+ */
+int eval_game_phase(struct position *pos)
+{
+    int total_phase;
+    int phase;
+
+    total_phase = 24;
+    phase = total_phase;
+    phase -= BITCOUNT(pos->bb_pieces[WHITE_KNIGHT]);
+    phase -= BITCOUNT(pos->bb_pieces[BLACK_KNIGHT]);
+    phase -= BITCOUNT(pos->bb_pieces[WHITE_BISHOP]);
+    phase -= BITCOUNT(pos->bb_pieces[BLACK_BISHOP]);
+    phase -= 2*BITCOUNT(pos->bb_pieces[WHITE_ROOK]);
+    phase -= 2*BITCOUNT(pos->bb_pieces[BLACK_ROOK]);
+    phase -= 4*BITCOUNT(pos->bb_pieces[WHITE_QUEEN]);
+    phase -= 4*BITCOUNT(pos->bb_pieces[BLACK_QUEEN]);
+    phase = (phase*256 + (total_phase/2))/total_phase;
+
+    /*
+     * Guard against negative phase values. The phase value might
+     * become negative in case of promotion.
+     */
+    return MAX(phase, 0);
+}
+
 #ifdef TRACE
 void eval_generate_trace(struct position *pos, struct eval_trace *trace)
 {
@@ -1436,52 +1117,32 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
     eval.trace = trace;
 
     /* Calculate game phase */
-    trace->phase_factor = calculate_game_phase(pos);
+    trace->phase_factor = eval_game_phase(pos);
 
     /* If there is insufficiernt mating material there is nothing to do */
     if (eval_is_material_draw(pos)) {
         return;
     }
 
-    /* Trace material evaluation */
-    pos->material[MIDDLEGAME][WHITE] = do_eval_material(pos, &eval, WHITE,
-                                                        false);
-    pos->material[MIDDLEGAME][BLACK] = do_eval_material(pos, &eval, BLACK,
-                                                        false);
-    pos->material[ENDGAME][WHITE] = do_eval_material(pos, &eval, WHITE, true);
-    pos->material[ENDGAME][BLACK] = do_eval_material(pos, &eval, BLACK, true);
-
-    /* Trace psq evaluation */
-    pos->psq[MIDDLEGAME][WHITE] = do_eval_psq(pos, &eval, WHITE, false);
-    pos->psq[MIDDLEGAME][BLACK] = do_eval_psq(pos, &eval, BLACK, false);
-    pos->psq[ENDGAME][WHITE] = do_eval_psq(pos, &eval, WHITE, true);
-    pos->psq[ENDGAME][BLACK] = do_eval_psq(pos, &eval, BLACK, true);
-
     /* Trace pawn structure evaluation */
     hash_pawntt_init_item(&eval.pawntt);
-    evaluate_pawn_structure(pos, &eval, WHITE);
-    evaluate_pawn_structure(pos, &eval, BLACK);
+    evaluate_pawn_structure(pos, &eval);
     eval.piece_coverage[WHITE_PAWN] |= eval.pawntt.coverage[WHITE];
     eval.piece_coverage[BLACK_PAWN] |= eval.pawntt.coverage[BLACK];
     eval.coverage[WHITE] |= eval.pawntt.coverage[WHITE];
     eval.coverage[BLACK] |= eval.pawntt.coverage[BLACK];
 
     /* Trace piece evaluation */
-    evaluate_knights(pos, &eval, WHITE);
-    evaluate_knights(pos, &eval, BLACK);
-    evaluate_bishops(pos, &eval, WHITE);
-    evaluate_bishops(pos, &eval, BLACK);
-    evaluate_rooks(pos, &eval, WHITE);
-    evaluate_rooks(pos, &eval, BLACK);
-    evaluate_queens(pos, &eval, WHITE);
-    evaluate_queens(pos, &eval, BLACK);
-    evaluate_king(pos, &eval, WHITE);
-    evaluate_king(pos, &eval, BLACK);
-    evaluate_passers(pos, &eval, WHITE);
-    evaluate_passers(pos, &eval, BLACK);
+    evaluate_knights(pos, &eval);
+    evaluate_bishops(pos, &eval);
+    evaluate_rooks(pos, &eval);
+    evaluate_queens(pos, &eval);
+    evaluate_kings(pos, &eval);
+
+    /* Trace passed pawn evaluation */
+    evaluate_passers(pos, &eval);
 
     /* Trace space evaluation */
-    evaluate_space(pos, &eval, WHITE);
-    evaluate_space(pos, &eval, BLACK);
+    evaluate_space(pos, &eval);
 }
 #endif

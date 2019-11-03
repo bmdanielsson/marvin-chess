@@ -41,64 +41,20 @@ void eval_reset(void);
 int eval_evaluate(struct position *pos);
 
 /*
- * Evaluate the position and assign a static score to it. It doesn't use any
- * stored data such as pawn transposition tables.
- *
- * @param pos The position.
- * @param display Flag indicating if detailed evaluation information should
- *                be printed.
- * @return Returns the score assigned to the position from the side
- *         to move point of view.
- */
-int eval_evaluate_full(struct position *pos, bool display);
-
-/*
- * Calculate the material for a specific side.
- *
- * @param pos The board structure.
- * @param side The side to calculate material for.
- * @param endgame If the score should be or the endgame.
- * @return Returns the material score.
- */
-int eval_material(struct position *pos, int side, bool endgame);
-
-/*
- * Incrementally update the material score for a piece.
- *
- * @param add Indicates if the piece was added or removed.
- * @param pos The board structure.
- * @param piece The piece.
- */
-void eval_update_material_score(struct position *pos, int add, int piece);
-
-/*
- * Calculate the piece/square table score for a specific side.
- *
- * @param pos The board structure.
- * @param side The side to calculate the score for.
- * @param endgame If the score should be or the endgame.
- * @return Returns the piece/square table score.
- */
-int eval_psq(struct position *pos, int side, bool endgame);
-
-/*
- * Incrementally update the piece/square table score for a piece
- * on a specific square.
- *
- * @param add Indicates if the piece was added or removed.
- * @param pos The board structure.
- * @param piece The piece.
- * @param sq The square.
- */
-void eval_update_psq_score(struct position *pos, int add, int piece, int sq);
-
-/*
  * Check if the position is a draw by insufficient material.
  *
  * @param pos The board structure.
  * @return Returns true if the position is a draw.
  */
 bool eval_is_material_draw(struct position *pos);
+
+/*
+ * Calculate a numerical game phase value for the given poition.
+ *
+ * @param pos The board structure.
+ * @return Returns a game phase value between 0 and 256.
+ */
+int eval_game_phase(struct position *pos);
 
 #ifdef TRACE
 /*

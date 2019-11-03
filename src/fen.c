@@ -227,16 +227,6 @@ bool fen_setup_board(struct position *pos, char *fenstr, bool epd)
     pos->key = key_generate(pos);
     pos->pawnkey = key_generate_pawnkey(pos);
 
-    /* Calculate material for each side */
-    pos->material[MIDDLEGAME][WHITE] = eval_material(pos, WHITE, false);
-    pos->material[MIDDLEGAME][BLACK] = eval_material(pos, BLACK, false);
-    pos->material[ENDGAME][WHITE] = eval_material(pos, WHITE, true);
-    pos->material[ENDGAME][BLACK] = eval_material(pos, BLACK, true);
-    pos->psq[MIDDLEGAME][WHITE] = eval_psq(pos, WHITE, false);
-    pos->psq[MIDDLEGAME][BLACK] = eval_psq(pos, BLACK, false);
-    pos->psq[ENDGAME][WHITE] = eval_psq(pos, WHITE, true);
-    pos->psq[ENDGAME][BLACK] = eval_psq(pos, BLACK, true);
-
     return true;
 }
 

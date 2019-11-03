@@ -417,12 +417,6 @@ struct position {
     int fullmove;
     /* Game history used for undoing moves */
     struct unmake history[MAX_HISTORY_SIZE];
-    /*
-     * The material score and piece/square table score for each
-     * player. These value is incrementally updated during the search.
-     */
-    int material[NPHASES][NSIDES];
-    int psq[NPHASES][NSIDES];
 
     /* Pointers to the owning worker and the active game state */
     struct search_worker *worker;

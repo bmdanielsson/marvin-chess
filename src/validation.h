@@ -62,12 +62,4 @@ bool valid_piece(int piece);
  */
 bool valid_move(uint32_t move);
 
-/*
- * Check if incrementally updated score are correct.
- *
- * @param pos The chess position.
- * @return Returns true if the scores are correct.
- */
-bool valid_scores(struct position *pos);
-
 #endif

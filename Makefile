@@ -2,6 +2,7 @@
 popcnt = yes
 memalign = yes
 prefetch = yes
+trace = no
 variant = release
 
 # Command line arguments
@@ -30,6 +31,10 @@ endif
 .PHONY : prefetch
 ifeq ($(prefetch), yes)
     CPPFLAGS += -DHAS_PREFETCH
+endif
+.PHONY : trace
+ifeq ($(trace), yes)
+    CPPFLAGS += -DTRACE
 endif
 .PHONY : variant
 ifeq ($(variant), release)
@@ -131,6 +136,10 @@ TUNER_SOURCES = src/bitboard.c \
                 src/validation.c \
                 src/xboard.c \
                 import/fathom/tbprobe.c
+.PHONY : trace
+ifeq ($(trace), yes)
+    SOURCES += src/trace.c src/tuningparam.c
+endif
 
 # Intermediate files
 OBJECTS = $(SOURCES:%.c=%.o)

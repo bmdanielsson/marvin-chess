@@ -139,8 +139,6 @@ static void add_piece(struct position *pos, int piece, int square)
     SETBIT(pos->bb_sides[COLOR(piece)], square);
     SETBIT(pos->bb_all, square);
     pos->pieces[square] = piece;
-    eval_update_material_score(pos, true, piece);
-    eval_update_psq_score(pos, true, piece, square);
 }
 
 static void remove_piece(struct position *pos, int piece, int square)
@@ -149,8 +147,6 @@ static void remove_piece(struct position *pos, int piece, int square)
     CLEARBIT(pos->bb_sides[COLOR(piece)], square);
     CLEARBIT(pos->bb_all, square);
     pos->pieces[square] = NO_PIECE;
-    eval_update_material_score(pos, false, piece);
-    eval_update_psq_score(pos, false, piece, square);
 }
 
 static void move_piece(struct position *pos, int piece, int from, int to)
@@ -364,7 +360,6 @@ bool board_make_move(struct position *pos, uint32_t move)
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
-    assert(valid_scores(pos));
 
     return true;
 }
@@ -438,7 +433,6 @@ void board_unmake_move(struct position *pos)
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
-    assert(valid_scores(pos));
 }
 
 void board_make_null_move(struct position *pos)

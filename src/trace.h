@@ -20,8 +20,7 @@
 
 #ifndef TRACE
 
-#define TRACE_MATERIAL(p, e, a)
-#define TRACE_PSQ(p, s, e)
+#define TRACE_CONST(c)
 #define TRACE_M(tm, te, m)
 #define TRACE_M_M(tm, m)
 #define TRACE_M_E(te, m)
@@ -50,9 +49,7 @@ struct eval_trace {
     struct trace_param  params[NUM_TUNING_PARAMS];
 };
 
-#define TRACE_MATERIAL(p, e, c) \
-                    trace_material(eval->trace, side, (p), (e), (c));
-#define TRACE_PSQ(p, s, e) trace_psq(eval->trace, side, (p), (s), (e))
+#define TRACE_CONST(c) trace_const(eval->trace, side, (c))
 
 #define TRACE_M(tm, te, m) \
             trace_param(eval->trace, side, (TP_ ## tm), (TP_ ## te), 0, (m), 0)
@@ -76,27 +73,13 @@ struct eval_trace {
         trace_param(eval->trace, side, -1, (TP_ ## te), (o), (m), 0)
 
 /*
- * Add a material trace for a piece.
+ * Add a constant value to the trace.
  *
  * @param trace The evaluation trace.
  * @param side The side.
- * @param piece The piece.
- * @param endgame Indicates if this is for the endgame.
- * @param count The number of pieces of this type.
+ * @param const_val The constant value.
  */
-void trace_material(struct eval_trace *trace, int side, int piece, bool endgame,
-                    int count);
-/*
- * Add a piece/square table trace for a piece.
- *
- * @param trace The evaluation trace.
- * @param side The side.
- * @param piece The piece.
- * @param square The square.
- * @param endgame Indicates if this is for the endgame.
- */
-void trace_psq(struct eval_trace *trace, int side, int piece, int sq,
-               bool endgame);
+void trace_const(struct eval_trace *trace, int side, int const_val);
 
 /*
  * Add a trace for a specific parameter.
