@@ -985,6 +985,7 @@ void search_find_best_move(struct search_worker *worker)
         if (score >= beta) {
             bwindex++;
             beta = score + aspiration_window[bwindex];
+            worker->resolving_root_fail = true;
             if (worker->id == 0) {
                 engine_send_bound_info(worker, score, true);
             }
