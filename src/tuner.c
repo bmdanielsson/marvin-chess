@@ -1176,7 +1176,7 @@ int main(int argc, char *argv[])
     parameter_file = NULL;
     output_file = NULL;
     nthreads = 1;
-    optalgo = OPT_LOCAL_SEARCH;
+    optalgo = OPT_ADAM;
     zero_params = false;
     niterations = DEFAULT_ITERATIONS;
 
