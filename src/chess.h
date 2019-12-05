@@ -25,6 +25,9 @@
 
 #include "thread.h"
 
+/* The maximum length of the string representation of a move */
+#define MAX_MOVESTR_LENGTH 7
+
 /* The number of sides */
 #define NSIDES 2
 

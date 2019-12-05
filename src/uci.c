@@ -51,8 +51,8 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     int      winc = 0;
     int      binc = 0;
     int      movestogo = 0;
-    char     best_movestr[6];
-    char     ponder_movestr[6];
+    char     best_movestr[MAX_MOVESTR_LENGTH];
+    char     ponder_movestr[MAX_MOVESTR_LENGTH];
     bool     infinite = false;
     int      depth = 0;
     bool     in_movelist = false;
@@ -471,7 +471,7 @@ bool uci_check_input(struct search_worker *worker)
 
 void uci_send_pv_info(struct search_worker *worker, int score)
 {
-    char     movestr[6];
+    char     movestr[MAX_MOVESTR_LENGTH];
     char     buffer[1024];
     int      msec;
     int      nps;
@@ -537,7 +537,7 @@ void uci_send_bound_info(struct search_worker *worker, int score, bool lower)
 
 void uci_send_move_info(struct search_worker *worker)
 {
-    char movestr[6];
+    char movestr[MAX_MOVESTR_LENGTH];
     int  msec;
 
     /* Get the currently searched time */

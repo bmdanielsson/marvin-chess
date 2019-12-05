@@ -274,6 +274,10 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
      * move to make sure a legal move is always returned.
      */
     gen_legal_moves(&state->pos, &legal);
+    if (legal.size == 0) {
+        state->best_move = NOMOVE;
+        return;
+    }
     if (state->move_filter.size == 0) {
         state->best_move = legal.moves[0];
     } else {

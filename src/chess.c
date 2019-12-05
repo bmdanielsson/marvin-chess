@@ -384,7 +384,10 @@ void move2str(uint32_t move, char *str)
     promotion = PROMOTION(move);
 
     if (ISNULLMOVE(move)) {
-        strcpy(str, "null");
+        strcpy(str, "0000");
+        return;
+    } else if (move == NOMOVE) {
+        strcpy(str, "(none)");
         return;
     }
 

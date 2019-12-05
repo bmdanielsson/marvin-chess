@@ -150,7 +150,7 @@ static void cmd_quiet(struct gamestate *state)
     struct position pos;
     struct movelist pv;
     int             k;
-    char            movestr[6];
+    char            movestr[MAX_MOVESTR_LENGTH];
 
     pv.size = 0;
     pos = state->pos;
@@ -303,7 +303,7 @@ bool engine_wait_for_input(struct search_worker *worker)
 
 void engine_send_pv_info(struct search_worker *worker, int score)
 {
-    char            movestr[6];
+    char            movestr[MAX_MOVESTR_LENGTH];
     char            buffer[1024];
     int             msec;
     int             k;

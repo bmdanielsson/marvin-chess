@@ -44,7 +44,7 @@ static bool browse_display_move(struct position *pos, uint32_t move, int id,
                                 bool pv, int current_score)
 {
     struct tt_item item;
-    char           movestr[6];
+    char           movestr[MAX_MOVESTR_LENGTH];
 
     move2str(move, movestr);
 
@@ -261,7 +261,7 @@ void dbg_print_bitboard(uint64_t bb)
 
 void dbg_print_move(uint32_t move)
 {
-    char movestr[6];
+    char movestr[MAX_MOVESTR_LENGTH];
 
     move2str(move, movestr);
     printf("%s\n", movestr);
@@ -270,7 +270,7 @@ void dbg_print_move(uint32_t move)
 void dbg_print_movelist(struct movelist *list)
 {
     int  k;
-    char movestr[6];
+    char movestr[MAX_MOVESTR_LENGTH];
 
     for (k=0;k<list->size;k++) {
         if ((k != 0) && (k%10) == 0) {

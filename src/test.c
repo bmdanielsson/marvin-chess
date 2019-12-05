@@ -116,7 +116,7 @@ void test_run_divide(struct position *pos, int depth)
     uint32_t        nleafs;
     uint32_t        ntotal;
     int             k;
-    char            movestr[6];
+    char            movestr[MAX_MOVESTR_LENGTH];
     char            fenstr[FEN_MAX_LENGTH];
 
     assert(valid_position(pos));

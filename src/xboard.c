@@ -185,7 +185,7 @@ static enum game_result is_game_over(struct position *pos)
 static void make_engine_move(struct gamestate *state)
 {
     uint32_t         best_move;
-    char             best_movestr[6];
+    char             best_movestr[MAX_MOVESTR_LENGTH];
     uint32_t         ponder_move;
     enum game_result result;
     bool             ponder;
@@ -307,7 +307,7 @@ static void xboard_cmd_bk(struct gamestate *state)
     struct book_entry *entries;
     int               nentries;
     int               k;
-    char              movestr[16];
+    char              movestr[MAX_MOVESTR_LENGTH];
     int               sum;
 
     /* Find all book moves for this position */
@@ -404,7 +404,7 @@ static void xboard_cmd_hard(void)
 static void xboard_cmd_hint(struct gamestate *state)
 {
     uint32_t move;
-    char     movestr[6];
+    char     movestr[MAX_MOVESTR_LENGTH];
 
     /* Check the opening book */
     move = polybook_probe(&state->pos);
@@ -825,7 +825,7 @@ bool xboard_check_input(struct search_worker *worker)
 {
     char *cmd;
     bool stop = false;
-    char movestr[6];
+    char movestr[MAX_MOVESTR_LENGTH];
     char *iter;
 
     /* Read command */
@@ -911,7 +911,7 @@ void xboard_send_pv_info(struct search_worker *worker,  int score)
 {
 	char            buffer[1024];
 	int             k;
-	char            movestr[6];
+	char            movestr[MAX_MOVESTR_LENGTH];
 	uint32_t        msec;
     struct movelist *pv;
 
