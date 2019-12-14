@@ -38,16 +38,12 @@
 #define ACTION_EXIT 1
 #define ACTION_RUN 2
 
-/* Constants used for stoping workers */
-#define ALL_WORKERS 0xFFFFFFFFFFFFFFFFULL
-#define ABORT       0xFFFFFFFFFFFFFFFFULL
-
 /* Lock for updating the state struct during search */
 static mutex_t state_lock;
 
 /* Variables used to signal to workers to stop searching */
 static mutex_t stop_lock;
-static atomic_uint_fast64_t stop_mask = 0ULL;
+static atomic_bool should_stop = false;
 
 /* Data for worker threads */
 static int number_of_workers = 0;
@@ -298,7 +294,7 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     }
 
     /* Start helpers */
-    stop_mask = 0ULL;
+    should_stop = false;
     for (k=1;k<number_of_workers;k++) {
         thread_create(&workers[k].thread, (thread_func_t)worker_thread_func,
                       &workers[k]);
@@ -369,16 +365,13 @@ uint64_t smp_tbhits(void)
 void smp_stop_all(void)
 {
     mutex_lock(&stop_lock);
-    stop_mask = ALL_WORKERS;
+    should_stop = true;
     mutex_unlock(&stop_lock);
 }
 
-bool smp_should_stop(struct search_worker *worker)
+bool smp_should_stop(void)
 {
-    uint64_t mask;
-
-    mask = atomic_load_explicit(&stop_mask, memory_order_relaxed);
-    return (mask&(1ULL << worker->id)) != 0ULL;
+    return atomic_load_explicit(&should_stop, memory_order_relaxed);
 }
 
 int smp_complete_iteration(struct search_worker *worker)

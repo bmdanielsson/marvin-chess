@@ -67,12 +67,11 @@ uint64_t smp_tbhits(void);
 void smp_stop_all(void);
 
 /*
- * Check if a worker should stop.
+ * Check if searching should stop.
  *
- * @param worker The worker.
- * @return Returns true if the worker should stop.
+ * @return Returns true if searching should stop.
  */
-bool smp_should_stop(struct search_worker *worker);
+bool smp_should_stop(void);
 
 /*
  * Called by workers when they have finished a search iteration.

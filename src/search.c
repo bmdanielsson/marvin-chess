@@ -233,7 +233,7 @@ static void update_pv(struct search_worker *worker, uint32_t move)
 static void checkup(struct search_worker *worker)
 {
     /* Check if the worker is requested to stop */
-    if (smp_should_stop(worker)) {
+    if (smp_should_stop()) {
         longjmp(worker->env, EXCEPTION_STOP);
     }
 
