@@ -46,7 +46,7 @@ static mutex_t stop_lock;
 static atomic_bool should_stop = false;
 
 /* Data for worker threads */
-static int number_of_workers = 0;
+static int number_of_workers = 1;
 static struct search_worker workers[MAX_WORKERS];
 
 static bool probe_dtz_tables(struct gamestate *state, int *score)
@@ -208,7 +208,12 @@ void smp_destroy_workers(void)
         hash_pawntt_destroy_table(&workers[k]);
     }
 
-    number_of_workers = 0;
+    number_of_workers = 1;
+}
+
+int smp_number_of_workers(void)
+{
+    return number_of_workers;
 }
 
 void smp_search(struct gamestate *state, bool pondering, bool use_book,

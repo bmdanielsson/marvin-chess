@@ -126,11 +126,13 @@ int main(int argc, char *argv[])
     eval_reset();
     see_init();
     polybook_open(BOOKFILE_NAME);
-    hash_tt_create_table(engine_default_hash_size);
 
     /* Setup SMP */
     smp_init();
     smp_create_workers(engine_default_num_threads);
+
+    /* Setup main transposition table */
+    hash_tt_create_table(engine_default_hash_size);
 
     /* Handle command line options */
     if ((argc == 2) &&

@@ -37,6 +37,13 @@ void smp_create_workers(int nthreads);
 void smp_destroy_workers(void);
 
 /*
+ * Get the number of workers being used.
+ *
+ * @return Returns the number of workers.
+ */
+int smp_number_of_workers(void);
+
+/*
  * Start a new search.
  *
  * @param state The game state.

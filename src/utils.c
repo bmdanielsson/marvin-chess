@@ -18,6 +18,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 #include <assert.h>
+#include <string.h>
 #if defined(WINDOWS)
 #include <windows.h>
 #include <sys/timeb.h>
@@ -30,6 +31,22 @@
 #endif
 
 #include "utils.h"
+#include "thread.h"
+
+struct memset_task {
+    thread_t thread;
+    void *start;
+    size_t size;
+    uint8_t value;
+};
+
+static thread_retval_t memset_func(void *data)
+{
+    struct memset_task *task = data;
+
+    memset(task->start, task->value, task->size);
+    return NULL;
+}
 
 #if HAS_POPCNT && __GNUC__
 int pop_count (uint64_t v)
@@ -308,6 +325,33 @@ void aligned_free(void *ptr)
 #else
     free(ptr);
 #endif
+}
+
+void parallel_memset(void *memory, uint8_t value, size_t size, int nthreads)
+{
+    int k;
+    size_t size_per_thread;
+    size_t remaining_size;
+    struct memset_task *task_list;
+
+    size_per_thread = size/nthreads;
+    remaining_size = size%nthreads;
+
+    task_list = malloc(sizeof(struct memset_task)*nthreads);
+    for (k=0;k<nthreads;k++) {
+        task_list[k].start = memory + size_per_thread*k;
+        task_list[k].size = size_per_thread;
+        task_list[k].value = value;
+        thread_create(&task_list[k].thread, memset_func, &task_list[k]);
+    }
+
+    for (k=0;k<nthreads;k++) {
+        thread_join(&task_list[k].thread);
+    }
+
+    memset(memory+size_per_thread*nthreads, value, remaining_size);
+
+    free(task_list);
 }
 
 /*

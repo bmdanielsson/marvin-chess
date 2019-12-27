@@ -27,6 +27,7 @@
 #include "search.h"
 #include "board.h"
 #include "utils.h"
+#include "smp.h"
 #include "config.h"
 
 /* Macros for managing the hash key stored in struct tt_item */
@@ -105,7 +106,8 @@ void hash_tt_clear_table(void)
 {
     assert(transposition_table != NULL);
 
-    memset(transposition_table, 0, tt_size*sizeof(struct tt_bucket));
+    parallel_memset(transposition_table, 0, tt_size*sizeof(struct tt_bucket),
+                    smp_number_of_workers());
 }
 
 void hash_tt_age_table(void)

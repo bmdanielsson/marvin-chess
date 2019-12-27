@@ -148,6 +148,16 @@ void* aligned_malloc(int alignment, uint64_t size);
 void aligned_free(void *ptr);
 
 /*
+ * Parallel version of memset.
+ *
+ * @param memory Pointer to the memory to set.
+ * @param value The value to write
+ * @param size The number of bytes to write.
+ * @param nthreads The number of threads to use.
+ */
+void parallel_memset(void *memory, uint8_t value, size_t size, int nthreads);
+
+/*
  * Check this is a 64-bit build.
  *
  * @return Returns true if this is a 64-bit build.
