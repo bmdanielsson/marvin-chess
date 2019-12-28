@@ -60,27 +60,6 @@ struct eval {
 #endif
 };
 
-/*
- * Table with mobility scores for the different pieces. The table is
- * initialized by the eval_reset function.
- */
-static int mobility_table_mg[NPIECES];
-static int mobility_table_eg[NPIECES];
-
-/*
- * Table with scores for passed pawns based on rank. The table is
- * initialized by the eval_reset function.
- */
-static int passed_pawn_scores_mg[NRANKS];
-static int passed_pawn_scores_eg[NRANKS];
-
-/*
- * Table with scores for candidate passed pawns based on rank. The table is
- * initialized by the eval_reset function.
- */
-static int candidate_passed_pawn_scores_mg[NRANKS];
-static int candidate_passed_pawn_scores_eg[NRANKS];
-
 /* Table of attack weights for all pieces */
 static int piece_attack_weights[NPIECES] = {
     0, 0,
@@ -307,8 +286,8 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
         attackspan = rear_attackspan[side][sq]|front_attackspan[side][sq];
 
         /* Material */
-        item->score[MIDDLEGAME][side] += material_values_mg[PAWN+side];
-        item->score[ENDGAME][side] += material_values_eg[PAWN+side];
+        item->score[MIDDLEGAME][side] += PAWN_BASE_VALUE;
+        item->score[ENDGAME][side] += PAWN_BASE_VALUE;
         TRACE_CONST(PAWN_BASE_VALUE);
 
         /* Piece/square tables */
@@ -329,10 +308,9 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
         if (ISEMPTY(front_attackspan[side][sq]&pos->bb_pieces[oside+PAWN]) &&
             ISEMPTY(front_span[side][sq]&pos->bb_pieces[oside+PAWN])) {
             SETBIT(item->passers, sq);
-            item->score[MIDDLEGAME][side] += passed_pawn_scores_mg[rel_rank];
-            item->score[ENDGAME][side] += passed_pawn_scores_eg[rel_rank];
-            TRACE_OM(PASSED_PAWN_RANK2_MG, PASSED_PAWN_RANK2_EG,
-                     rel_rank-1, 1);
+            item->score[MIDDLEGAME][side] += PASSED_PAWN_MG[rel_rank];
+            item->score[ENDGAME][side] += PASSED_PAWN_EG[rel_rank];
+            TRACE_OM(PASSED_PAWN_MG, PASSED_PAWN_EG, rel_rank, 1);
         }
 
         /* Look for candidate passed pawns */
@@ -345,12 +323,10 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
             (BITCOUNT(helpers) >= BITCOUNT(sentries)) &&
             (BITCOUNT(defenders) >= BITCOUNT(attackers))) {
             SETBIT(item->candidates, sq);
-            item->score[MIDDLEGAME][side] +=
-                                    candidate_passed_pawn_scores_mg[rel_rank];
-            item->score[ENDGAME][side] +=
-                                    candidate_passed_pawn_scores_eg[rel_rank];
-            TRACE_OM(CANDIDATE_PASSED_PAWN_RANK2_MG,
-                     CANDIDATE_PASSED_PAWN_RANK2_EG, rel_rank-1, 1);
+            item->score[MIDDLEGAME][side] += CANDIDATE_PASSED_PAWN_MG[rel_rank];
+            item->score[ENDGAME][side] += CANDIDATE_PASSED_PAWN_EG[rel_rank];
+            TRACE_OM(CANDIDATE_PASSED_PAWN_MG, CANDIDATE_PASSED_PAWN_EG,
+                     rel_rank, 1);
         }
 
         /* Check if the pawn is considered backward */
@@ -490,8 +466,8 @@ static void evaluate_knights(struct position *pos, struct eval *eval)
         moves &= (~pos->bb_sides[side]);
 
         /* Material */
-        eval->score[MIDDLEGAME][side] += material_values_mg[KNIGHT+side];
-        eval->score[ENDGAME][side] += material_values_eg[KNIGHT+side];
+        eval->score[MIDDLEGAME][side] += KNIGHT_MATERIAL_VALUE_MG;
+        eval->score[ENDGAME][side] += KNIGHT_MATERIAL_VALUE_EG;
         TRACE_M(KNIGHT_MATERIAL_VALUE_MG, KNIGHT_MATERIAL_VALUE_EG, 1);
 
         /* Piece/square tables */
@@ -503,9 +479,8 @@ static void evaluate_knights(struct position *pos, struct eval *eval)
         /* Mobility */
         safe_moves = moves&(~eval->piece_coverage[PAWN+FLIP_COLOR(side)]);
         eval->score[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
-                                                mobility_table_mg[KNIGHT+side]);
-        eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*
-                                                mobility_table_eg[KNIGHT+side]);
+                                                            KNIGHT_MOBILITY_MG);
+        eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*KNIGHT_MOBILITY_EG);
         TRACE_M(KNIGHT_MOBILITY_MG, KNIGHT_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
@@ -570,8 +545,8 @@ static void evaluate_bishops(struct position *pos, struct eval *eval)
         moves &= (~pos->bb_sides[side]);
 
         /* Material */
-        eval->score[MIDDLEGAME][side] += material_values_mg[BISHOP+side];
-        eval->score[ENDGAME][side] += material_values_eg[BISHOP+side];
+        eval->score[MIDDLEGAME][side] += BISHOP_MATERIAL_VALUE_MG;
+        eval->score[ENDGAME][side] += BISHOP_MATERIAL_VALUE_EG;
         TRACE_M(BISHOP_MATERIAL_VALUE_MG, BISHOP_MATERIAL_VALUE_EG, 1);
 
         /* Piece/square tables */
@@ -583,9 +558,9 @@ static void evaluate_bishops(struct position *pos, struct eval *eval)
         /* Mobility */
         safe_moves = moves&(~eval->piece_coverage[PAWN+FLIP_COLOR(side)]);
         eval->score[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
-                                                mobility_table_mg[BISHOP+side]);
+                                                            BISHOP_MOBILITY_MG);
         eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*
-                                                mobility_table_eg[BISHOP+side]);
+                                                            BISHOP_MOBILITY_EG);
         TRACE_M(BISHOP_MOBILITY_MG, BISHOP_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
@@ -628,8 +603,8 @@ static void evaluate_rooks(struct position *pos, struct eval *eval)
         moves &= (~pos->bb_sides[side]);
 
         /* Material */
-        eval->score[MIDDLEGAME][side] += material_values_mg[ROOK+side];
-        eval->score[ENDGAME][side] += material_values_eg[ROOK+side];
+        eval->score[MIDDLEGAME][side] += ROOK_MATERIAL_VALUE_MG;
+        eval->score[ENDGAME][side] += ROOK_MATERIAL_VALUE_EG;
         TRACE_M(ROOK_MATERIAL_VALUE_MG, ROOK_MATERIAL_VALUE_EG, 1);
 
         /* Piece/square tables */
@@ -666,9 +641,8 @@ static void evaluate_rooks(struct position *pos, struct eval *eval)
         /* Mobility */
         safe_moves = moves&(~eval->piece_coverage[PAWN+FLIP_COLOR(side)]);
         eval->score[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
-                                                mobility_table_mg[ROOK+side]);
-        eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*
-                                                mobility_table_eg[ROOK+side]);
+                                                            ROOK_MOBILITY_MG);
+        eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*ROOK_MOBILITY_EG);
         TRACE_M(ROOK_MOBILITY_MG, ROOK_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
@@ -714,8 +688,8 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
                  eval->piece_coverage[ROOK+opp_side];
 
         /* Material */
-        eval->score[MIDDLEGAME][side] += material_values_mg[QUEEN+side];
-        eval->score[ENDGAME][side] += material_values_eg[QUEEN+side];
+        eval->score[MIDDLEGAME][side] += QUEEN_MATERIAL_VALUE_MG;
+        eval->score[ENDGAME][side] += QUEEN_MATERIAL_VALUE_EG;
         TRACE_M(QUEEN_MATERIAL_VALUE_MG, QUEEN_MATERIAL_VALUE_EG, 1);
 
         /* Piece/square tables */
@@ -738,9 +712,8 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
         /* Mobility */
         safe_moves = moves&(~unsafe);
         eval->score[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
-                                                mobility_table_mg[QUEEN+side]);
-        eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*
-                                                mobility_table_eg[QUEEN+side]);
+                                                            QUEEN_MOBILITY_MG);
+        eval->score[ENDGAME][side] += (BITCOUNT(safe_moves)*QUEEN_MOBILITY_EG);
         TRACE_M(QUEEN_MOBILITY_MG, QUEEN_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
@@ -894,97 +867,6 @@ static void do_eval(struct position *pos, struct eval *eval)
     if (!eval->in_pawntt && (pos->worker != NULL)) {
         hash_pawntt_store(pos->worker, &eval->pawntt);
     }
-}
-
-void eval_reset(void)
-{
-    /* Initialize the mobility table */
-    mobility_table_mg[WHITE_PAWN] = 0;
-    mobility_table_mg[BLACK_PAWN] = 0;
-    mobility_table_mg[WHITE_KNIGHT] = KNIGHT_MOBILITY_MG;
-    mobility_table_mg[BLACK_KNIGHT] = KNIGHT_MOBILITY_MG;
-    mobility_table_mg[WHITE_BISHOP] = BISHOP_MOBILITY_MG;
-    mobility_table_mg[BLACK_BISHOP] = BISHOP_MOBILITY_MG;
-    mobility_table_mg[WHITE_ROOK] = ROOK_MOBILITY_MG;
-    mobility_table_mg[BLACK_ROOK] = ROOK_MOBILITY_MG;
-    mobility_table_mg[WHITE_QUEEN] = QUEEN_MOBILITY_MG;
-    mobility_table_mg[BLACK_QUEEN] = QUEEN_MOBILITY_MG;
-    mobility_table_mg[WHITE_KING] = 0;
-    mobility_table_mg[BLACK_KING] = 0;
-    mobility_table_eg[WHITE_PAWN] = 0;
-    mobility_table_eg[BLACK_PAWN] = 0;
-    mobility_table_eg[WHITE_KNIGHT] = KNIGHT_MOBILITY_EG;
-    mobility_table_eg[BLACK_KNIGHT] = KNIGHT_MOBILITY_EG;
-    mobility_table_eg[WHITE_BISHOP] = BISHOP_MOBILITY_EG;
-    mobility_table_eg[BLACK_BISHOP] = BISHOP_MOBILITY_EG;
-    mobility_table_eg[WHITE_ROOK] = ROOK_MOBILITY_EG;
-    mobility_table_eg[BLACK_ROOK] = ROOK_MOBILITY_EG;
-    mobility_table_eg[WHITE_QUEEN] = QUEEN_MOBILITY_EG;
-    mobility_table_eg[BLACK_QUEEN] = QUEEN_MOBILITY_EG;
-    mobility_table_eg[WHITE_KING] = 0;
-    mobility_table_eg[BLACK_KING] = 0;
-
-    /* Initialize the passed pawns table */
-    passed_pawn_scores_mg[RANK_1] = 0;
-    passed_pawn_scores_mg[RANK_2] = PASSED_PAWN_RANK2_MG;
-    passed_pawn_scores_mg[RANK_3] = PASSED_PAWN_RANK3_MG;
-    passed_pawn_scores_mg[RANK_4] = PASSED_PAWN_RANK4_MG;
-    passed_pawn_scores_mg[RANK_5] = PASSED_PAWN_RANK5_MG;
-    passed_pawn_scores_mg[RANK_6] = PASSED_PAWN_RANK6_MG;
-    passed_pawn_scores_mg[RANK_7] = PASSED_PAWN_RANK7_MG;
-    passed_pawn_scores_mg[RANK_8] = 0;
-    passed_pawn_scores_eg[RANK_1] = 0;
-    passed_pawn_scores_eg[RANK_2] = PASSED_PAWN_RANK2_EG;
-    passed_pawn_scores_eg[RANK_3] = PASSED_PAWN_RANK3_EG;
-    passed_pawn_scores_eg[RANK_4] = PASSED_PAWN_RANK4_EG;
-    passed_pawn_scores_eg[RANK_5] = PASSED_PAWN_RANK5_EG;
-    passed_pawn_scores_eg[RANK_6] = PASSED_PAWN_RANK6_EG;
-    passed_pawn_scores_eg[RANK_7] = PASSED_PAWN_RANK7_EG;
-    passed_pawn_scores_eg[RANK_8] = 0;
-
-    /* Initialize the candidate pawns table */
-    candidate_passed_pawn_scores_mg[RANK_1] = 0;
-    candidate_passed_pawn_scores_mg[RANK_2] = CANDIDATE_PASSED_PAWN_RANK2_MG;
-    candidate_passed_pawn_scores_mg[RANK_3] = CANDIDATE_PASSED_PAWN_RANK3_MG;
-    candidate_passed_pawn_scores_mg[RANK_4] = CANDIDATE_PASSED_PAWN_RANK4_MG;
-    candidate_passed_pawn_scores_mg[RANK_5] = CANDIDATE_PASSED_PAWN_RANK5_MG;
-    candidate_passed_pawn_scores_mg[RANK_6] = CANDIDATE_PASSED_PAWN_RANK6_MG;
-    candidate_passed_pawn_scores_mg[RANK_7] = 0;
-    candidate_passed_pawn_scores_mg[RANK_8] = 0;
-    candidate_passed_pawn_scores_eg[RANK_1] = 0;
-    candidate_passed_pawn_scores_eg[RANK_2] = CANDIDATE_PASSED_PAWN_RANK2_EG;
-    candidate_passed_pawn_scores_eg[RANK_3] = CANDIDATE_PASSED_PAWN_RANK3_EG;
-    candidate_passed_pawn_scores_eg[RANK_4] = CANDIDATE_PASSED_PAWN_RANK4_EG;
-    candidate_passed_pawn_scores_eg[RANK_5] = CANDIDATE_PASSED_PAWN_RANK5_EG;
-    candidate_passed_pawn_scores_eg[RANK_6] = CANDIDATE_PASSED_PAWN_RANK6_EG;
-    candidate_passed_pawn_scores_eg[RANK_7] = 0;
-    candidate_passed_pawn_scores_eg[RANK_8] = 0;
-
-    /* Initialize the material table */
-    material_values_mg[WHITE_PAWN] = PAWN_BASE_VALUE;
-    material_values_mg[BLACK_PAWN] = PAWN_BASE_VALUE;
-    material_values_mg[WHITE_KNIGHT] = KNIGHT_MATERIAL_VALUE_MG;
-    material_values_mg[BLACK_KNIGHT] = KNIGHT_MATERIAL_VALUE_MG;
-    material_values_mg[WHITE_BISHOP] = BISHOP_MATERIAL_VALUE_MG;
-    material_values_mg[BLACK_BISHOP] = BISHOP_MATERIAL_VALUE_MG;
-    material_values_mg[WHITE_ROOK] = ROOK_MATERIAL_VALUE_MG;
-    material_values_mg[BLACK_ROOK] = ROOK_MATERIAL_VALUE_MG;
-    material_values_mg[WHITE_QUEEN] = QUEEN_MATERIAL_VALUE_MG;
-    material_values_mg[BLACK_QUEEN] = QUEEN_MATERIAL_VALUE_MG;
-    material_values_mg[WHITE_KING] = 20000;
-    material_values_mg[BLACK_KING] = 20000;
-    material_values_eg[WHITE_PAWN] = PAWN_BASE_VALUE;
-    material_values_eg[BLACK_PAWN] = PAWN_BASE_VALUE;
-    material_values_eg[WHITE_KNIGHT] = KNIGHT_MATERIAL_VALUE_EG;
-    material_values_eg[BLACK_KNIGHT] = KNIGHT_MATERIAL_VALUE_EG;
-    material_values_eg[WHITE_BISHOP] = BISHOP_MATERIAL_VALUE_EG;
-    material_values_eg[BLACK_BISHOP] = BISHOP_MATERIAL_VALUE_EG;
-    material_values_eg[WHITE_ROOK] = ROOK_MATERIAL_VALUE_EG;
-    material_values_eg[BLACK_ROOK] = ROOK_MATERIAL_VALUE_EG;
-    material_values_eg[WHITE_QUEEN] = QUEEN_MATERIAL_VALUE_EG;
-    material_values_eg[BLACK_QUEEN] = QUEEN_MATERIAL_VALUE_EG;
-    material_values_eg[WHITE_KING] = 20000;
-    material_values_eg[BLACK_KING] = 20000;
 }
 
 int eval_evaluate(struct position *pos)

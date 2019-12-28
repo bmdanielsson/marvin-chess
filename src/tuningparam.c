@@ -22,7 +22,6 @@
 
 #include "tuningparam.h"
 #include "evalparams.h"
-#include "eval.h"
 #include "chess.h"
 
 /* Define a tuning parameter and the connection evaluation parameter */
@@ -87,69 +86,51 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"pawn_shield_rank1", 16, 16, 0, 100},
     {"pawn_shield_rank2", 17, 17, 0, 100},
     {"pawn_shield_hole", 18, 18, -100, 0},
-    {"passed_pawn_rank2_mg", 19, 19, 0, 200},
-    {"passed_pawn_rank3_mg", 20, 20, 0, 200},
-    {"passed_pawn_rank4_mg", 21, 21, 0, 200},
-    {"passed_pawn_rank5_mg", 22, 22, 0, 200},
-    {"passed_pawn_rank6_mg", 23, 23, 0, 200},
-    {"passed_pawn_rank7_mg", 24, 24, 0, 200},
-    {"passed_pawn_rank2_eg", 25, 25, 0, 200},
-    {"passed_pawn_rank3_eg", 26, 26, 0, 200},
-    {"passed_pawn_rank4_eg", 27, 27, 0, 200},
-    {"passed_pawn_rank5_eg", 28, 28, 0, 200},
-    {"passed_pawn_rank6_eg", 29, 29, 0, 200},
-    {"passed_pawn_rank7_eg", 30, 30, 0, 200},
-    {"knight_mobility_mg", 31, 31, 0, 15},
-    {"bishop_mobility_mg", 32, 32, 0, 15},
-    {"rook_mobility_mg", 33, 33, 0, 15},
-    {"queen_mobility_mg", 34, 34, 0, 15},
-    {"knight_mobility_eg", 35, 35, 0, 15},
-    {"bishop_mobility_eg", 36, 36, 0, 15},
-    {"rook_mobility_eg", 37, 37, 0, 15},
-    {"queen_mobility_eg", 38, 38, 0, 15},
-    {"psq_table_pawn_mg", 39, 102, -200, 200},
-    {"psq_table_knight_mg", 103, 166, -200, 200},
-    {"psq_table_bishop_mg", 167, 230, -200, 200},
-    {"psq_table_rook_mg", 231, 294, -200, 200},
-    {"psq_table_queen_mg", 295, 358, -200, 200},
-    {"psq_table_king_mg", 359, 422, -200, 200},
-    {"psq_table_pawn_eg", 423, 486, -200, 200},
-    {"psq_table_knight_eg", 487, 550, -200, 200},
-    {"psq_table_bishop_eg", 551, 614, -200, 200},
-    {"psq_table_rook_eg", 615, 678, -200, 200},
-    {"psq_table_queen_eg", 679, 742, -200, 200},
-    {"psq_table_king_eg", 743, 806, -200, 200},
-    {"knight_material_value_mg", 807, 807, 200, 600},
-    {"bishop_material_value_mg", 808, 808, 200, 600},
-    {"rook_material_value_mg", 809, 809, 400, 800},
-    {"queen_material_value_mg", 810, 810, 700, 1600},
-    {"knight_material_value_eg", 811, 811, 200, 600},
-    {"bishop_material_value_eg", 812, 812, 200, 600},
-    {"rook_material_value_eg", 813, 813, 400, 800},
-    {"queen_material_value_eg", 814, 814, 700, 1600},
-    {"king_attack_scale_mg", 815, 815, 0, 100},
-    {"king_attack_scale_eg", 816, 816, 0, 100},
-    {"knight_outpost", 817, 817, 0, 100},
-    {"protected_knight_outpost", 818, 818, 0, 100},
-    {"candidate_passed_pawn_rank2_mg", 819, 819, 0, 200},
-    {"candidate_passed_pawn_rank3_mg", 820, 820, 0, 200},
-    {"candidate_passed_pawn_rank4_mg", 821, 821, 0, 200},
-    {"candidate_passed_pawn_rank5_mg", 822, 822, 0, 200},
-    {"candidate_passed_pawn_rank6_mg", 823, 823, 0, 200},
-    {"candidate_passed_pawn_rank2_eg", 824, 824, 0, 200},
-    {"candidate_passed_pawn_rank3_eg", 825, 825, 0, 200},
-    {"candidate_passed_pawn_rank4_eg", 826, 826, 0, 200},
-    {"candidate_passed_pawn_rank5_eg", 827, 827, 0, 200},
-    {"candidate_passed_pawn_rank6_eg", 828, 828, 0, 200},
-    {"friendly_king_passer_dist", 829, 829, -30, 0},
-    {"opponent_king_passer_dist", 830, 830, 0, 30},
-    {"backward_pawn_mg", 831, 831, -30, 0},
-    {"backward_pawn_eg", 832, 832, -30, 0},
-    {"free_passed_pawn_mg", 833, 833, 0, 200},
-    {"free_passed_pawn_eg", 834, 834, 0, 200},
-    {"space_square", 835, 835, 0, 50},
-    {"connected_pawns_mg", 836, 842, 0, 200},
-    {"connected_pawns_eg", 843, 849, 0, 200}
+    {"passed_pawn_mg", 19, 25, 0, 200},
+    {"passed_pawn_eg", 26, 32, 0, 200},
+    {"knight_mobility_mg", 33, 33, 0, 15},
+    {"bishop_mobility_mg", 34, 34, 0, 15},
+    {"rook_mobility_mg", 35, 35, 0, 15},
+    {"queen_mobility_mg", 36, 36, 0, 15},
+    {"knight_mobility_eg", 37, 37, 0, 15},
+    {"bishop_mobility_eg", 38, 38, 0, 15},
+    {"rook_mobility_eg", 39, 39, 0, 15},
+    {"queen_mobility_eg", 40, 40, 0, 15},
+    {"psq_table_pawn_mg", 41, 104, -200, 200},
+    {"psq_table_knight_mg", 105, 168, -200, 200},
+    {"psq_table_bishop_mg", 169, 232, -200, 200},
+    {"psq_table_rook_mg", 233, 296, -200, 200},
+    {"psq_table_queen_mg", 297, 360, -200, 200},
+    {"psq_table_king_mg", 361, 424, -200, 200},
+    {"psq_table_pawn_eg", 425, 488, -200, 200},
+    {"psq_table_knight_eg", 489, 552, -200, 200},
+    {"psq_table_bishop_eg", 553, 616, -200, 200},
+    {"psq_table_rook_eg", 617, 680, -200, 200},
+    {"psq_table_queen_eg", 681, 744, -200, 200},
+    {"psq_table_king_eg", 745, 808, -200, 200},
+    {"knight_material_value_mg", 809, 809, 200, 600},
+    {"bishop_material_value_mg", 810, 810, 200, 600},
+    {"rook_material_value_mg", 811, 811, 400, 800},
+    {"queen_material_value_mg", 812, 812, 700, 1600},
+    {"knight_material_value_eg", 813, 813, 200, 600},
+    {"bishop_material_value_eg", 814, 814, 200, 600},
+    {"rook_material_value_eg", 815, 815, 400, 800},
+    {"queen_material_value_eg", 816, 816, 700, 1600},
+    {"king_attack_scale_mg", 817, 817, 0, 100},
+    {"king_attack_scale_eg", 818, 818, 0, 100},
+    {"knight_outpost", 819, 819, 0, 100},
+    {"protected_knight_outpost", 820, 820, 0, 100},
+    {"candidate_passed_pawn_mg", 821, 826, 0, 200},
+    {"candidate_passed_pawn_eg", 827, 832, 0, 200},
+    {"friendly_king_passer_dist", 833, 833, -30, 0},
+    {"opponent_king_passer_dist", 834, 834, 0, 30},
+    {"backward_pawn_mg", 835, 835, -30, 0},
+    {"backward_pawn_eg", 836, 836, -30, 0},
+    {"free_passed_pawn_mg", 837, 837, 0, 200},
+    {"free_passed_pawn_eg", 838, 838, 0, 200},
+    {"space_square", 839, 839, 0, 50},
+    {"connected_pawns_mg", 840, 846, 0, 200},
+    {"connected_pawns_eg", 847, 853, 0, 200}
 };
 
 static void validate_value(FILE *fp, char *name, struct tuning_param *param)
@@ -188,18 +169,8 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN(PAWN_SHIELD_RANK1)
     ASSIGN(PAWN_SHIELD_RANK2)
     ASSIGN(PAWN_SHIELD_HOLE)
-    ASSIGN(PASSED_PAWN_RANK2_MG)
-    ASSIGN(PASSED_PAWN_RANK3_MG)
-    ASSIGN(PASSED_PAWN_RANK4_MG)
-    ASSIGN(PASSED_PAWN_RANK5_MG)
-    ASSIGN(PASSED_PAWN_RANK6_MG)
-    ASSIGN(PASSED_PAWN_RANK7_MG)
-    ASSIGN(PASSED_PAWN_RANK2_EG)
-    ASSIGN(PASSED_PAWN_RANK3_EG)
-    ASSIGN(PASSED_PAWN_RANK4_EG)
-    ASSIGN(PASSED_PAWN_RANK5_EG)
-    ASSIGN(PASSED_PAWN_RANK6_EG)
-    ASSIGN(PASSED_PAWN_RANK7_EG)
+    ASSIGN_MULTIPLE(PASSED_PAWN_MG)
+    ASSIGN_MULTIPLE(PASSED_PAWN_EG)
     ASSIGN(KNIGHT_MOBILITY_MG)
     ASSIGN(BISHOP_MOBILITY_MG)
     ASSIGN(ROOK_MOBILITY_MG)
@@ -232,16 +203,8 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN(KING_ATTACK_SCALE_EG)
     ASSIGN(KNIGHT_OUTPOST)
     ASSIGN(PROTECTED_KNIGHT_OUTPOST)
-    ASSIGN(CANDIDATE_PASSED_PAWN_RANK2_MG)
-    ASSIGN(CANDIDATE_PASSED_PAWN_RANK3_MG)
-    ASSIGN(CANDIDATE_PASSED_PAWN_RANK4_MG)
-    ASSIGN(CANDIDATE_PASSED_PAWN_RANK5_MG)
-    ASSIGN(CANDIDATE_PASSED_PAWN_RANK6_MG)
-    ASSIGN(CANDIDATE_PASSED_PAWN_RANK2_EG)
-    ASSIGN(CANDIDATE_PASSED_PAWN_RANK3_EG)
-    ASSIGN(CANDIDATE_PASSED_PAWN_RANK4_EG)
-    ASSIGN(CANDIDATE_PASSED_PAWN_RANK5_EG)
-    ASSIGN(CANDIDATE_PASSED_PAWN_RANK6_EG)
+    ASSIGN_MULTIPLE(CANDIDATE_PASSED_PAWN_MG)
+    ASSIGN_MULTIPLE(CANDIDATE_PASSED_PAWN_EG)
     ASSIGN(FRIENDLY_KING_PASSER_DIST)
     ASSIGN(OPPONENT_KING_PASSER_DIST)
     ASSIGN(BACKWARD_PAWN_MG)
@@ -251,8 +214,6 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN(SPACE_SQUARE)
     ASSIGN_MULTIPLE(CONNECTED_PAWNS_MG)
     ASSIGN_MULTIPLE(CONNECTED_PAWNS_EG)
-
-    eval_reset();
 }
 
 struct tuning_param* tuning_param_create_list(void)
@@ -283,18 +244,8 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE(PAWN_SHIELD_RANK1)
     DEFINE(PAWN_SHIELD_RANK2)
     DEFINE(PAWN_SHIELD_HOLE)
-    DEFINE(PASSED_PAWN_RANK2_MG)
-    DEFINE(PASSED_PAWN_RANK3_MG)
-    DEFINE(PASSED_PAWN_RANK4_MG)
-    DEFINE(PASSED_PAWN_RANK5_MG)
-    DEFINE(PASSED_PAWN_RANK6_MG)
-    DEFINE(PASSED_PAWN_RANK7_MG)
-    DEFINE(PASSED_PAWN_RANK2_EG)
-    DEFINE(PASSED_PAWN_RANK3_EG)
-    DEFINE(PASSED_PAWN_RANK4_EG)
-    DEFINE(PASSED_PAWN_RANK5_EG)
-    DEFINE(PASSED_PAWN_RANK6_EG)
-    DEFINE(PASSED_PAWN_RANK7_EG)
+    DEFINE_MULTIPLE(PASSED_PAWN_MG)
+    DEFINE_MULTIPLE(PASSED_PAWN_EG)
     DEFINE(KNIGHT_MOBILITY_MG)
     DEFINE(BISHOP_MOBILITY_MG)
     DEFINE(ROOK_MOBILITY_MG)
@@ -327,16 +278,8 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE(KING_ATTACK_SCALE_EG)
     DEFINE(KNIGHT_OUTPOST)
     DEFINE(PROTECTED_KNIGHT_OUTPOST)
-    DEFINE(CANDIDATE_PASSED_PAWN_RANK2_MG)
-    DEFINE(CANDIDATE_PASSED_PAWN_RANK3_MG)
-    DEFINE(CANDIDATE_PASSED_PAWN_RANK4_MG)
-    DEFINE(CANDIDATE_PASSED_PAWN_RANK5_MG)
-    DEFINE(CANDIDATE_PASSED_PAWN_RANK6_MG)
-    DEFINE(CANDIDATE_PASSED_PAWN_RANK2_EG)
-    DEFINE(CANDIDATE_PASSED_PAWN_RANK3_EG)
-    DEFINE(CANDIDATE_PASSED_PAWN_RANK4_EG)
-    DEFINE(CANDIDATE_PASSED_PAWN_RANK5_EG)
-    DEFINE(CANDIDATE_PASSED_PAWN_RANK6_EG)
+    DEFINE_MULTIPLE(CANDIDATE_PASSED_PAWN_MG)
+    DEFINE_MULTIPLE(CANDIDATE_PASSED_PAWN_EG)
     DEFINE(FRIENDLY_KING_PASSER_DIST)
     DEFINE(OPPONENT_KING_PASSER_DIST)
     DEFINE(BACKWARD_PAWN_MG)

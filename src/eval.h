@@ -22,16 +22,6 @@
 #include "trace.h"
 
 /*
- * Material values for all pieces. The table is
- * initialized by the eval_reset function.
- */
-int material_values_mg[NPIECES];
-int material_values_eg[NPIECES];
-
-/* Reset the evaluation module */
-void eval_reset(void);
-
-/*
  * Evaluate the position and assign a static score to it.
  *
  * @param worker The position.

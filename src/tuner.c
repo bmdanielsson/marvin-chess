@@ -1168,7 +1168,6 @@ int main(int argc, char *argv[])
     /* Initialize components */
     chess_data_init();
     bb_init();
-    eval_reset();
     see_init();
 
     /* Initialize options */
