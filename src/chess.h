@@ -367,8 +367,8 @@ struct pawntt_item {
     uint64_t passers;
     /* Bitboard of all candidate passed pawns (for both sides) */
     uint64_t candidates;
-    /* Bitboard of all squares covered by pawns */
-    uint64_t coverage[NSIDES];
+    /* Bitboard of all squares attacked by pawns */
+    uint64_t attacked[NSIDES];
     /* Combined rear span of all pawns */
     uint64_t rear_span[NSIDES];
     /* Description of all potential pawn shields */
