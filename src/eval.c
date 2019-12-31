@@ -112,7 +112,7 @@ static int king_distance(int from, int to)
 static void evaluate_space(struct position *pos, struct eval *eval)
 {
     uint64_t squares;
-    int side;
+    int      side;
 
     for (side=0;side<NSIDES;side++) {
         squares = space_eval_squares[side] & eval->pawntt.rear_span[side] &
@@ -121,6 +121,25 @@ static void evaluate_space(struct position *pos, struct eval *eval)
         eval->score[MIDDLEGAME][side] += BITCOUNT(squares)*SPACE_SQUARE;
         TRACE_M_M(SPACE_SQUARE, BITCOUNT(squares));
     }
+}
+
+/* Evaluate different kinds of threats towards other pieces than the king */
+static void evaluate_threats(struct position *pos, struct eval *eval, int side)
+{
+    uint64_t minors;
+    uint64_t bb;
+    int      oside;
+    int      count;
+
+    oside = FLIP_COLOR(side);
+    minors = pos->bb_pieces[oside+KNIGHT]|pos->bb_pieces[oside+BISHOP];
+
+    /* Give a bonus for pawns attacking opponents minor pieces */
+    bb = minors&eval->attacked_by[side+PAWN];
+    count = BITCOUNT(bb);
+    eval->score[MIDDLEGAME][side] += count*THREAT_MINOR_BY_PAWN_MG;
+    eval->score[ENDGAME][side] += count*THREAT_MINOR_BY_PAWN_EG;
+    TRACE_M(THREAT_MINOR_BY_PAWN_MG, THREAT_MINOR_BY_PAWN_EG, count);
 }
 
 static void evaluate_pawn_shield(struct position *pos, struct eval *eval,
@@ -847,6 +866,8 @@ static void do_eval(struct position *pos, struct eval *eval)
     evaluate_kings(pos, eval);
     evaluate_passers(pos, eval);
     evaluate_space(pos, eval);
+    evaluate_threats(pos, eval, WHITE);
+    evaluate_threats(pos, eval, BLACK);
 
     /*
      * Update the evaluation scores with information from
@@ -1022,5 +1043,9 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
 
     /* Trace space evaluation */
     evaluate_space(pos, &eval);
+
+    /* Trace threat evaluation */
+    evaluate_threats(pos, &eval, WHITE);
+    evaluate_threats(pos, &eval, BLACK);
 }
 #endif
