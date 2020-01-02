@@ -48,6 +48,7 @@ struct eval {
     bool endgame[NSIDES];
     uint64_t attacked_by[NPIECES];
     uint64_t attacked[NSIDES];
+    uint64_t attacked2[NSIDES];
     int nbr_king_attackers[NPIECES];
     int score[NPHASES][NSIDES];
 
@@ -287,6 +288,7 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
     uint64_t            helpers;
     uint64_t            sentries;
     uint64_t            neighbours;
+    uint64_t            attacks;
     struct pawntt_item  *item;
 
     item = &eval->pawntt;
@@ -361,7 +363,9 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
         }
 
         /* Update pawn attacks */
-        item->attacked[side] |= bb_pawn_attacks_from(sq, side);
+        attacks = bb_pawn_attacks_from(sq, side);
+        item->attacked2[side] |= (attacks&item->attacked[side]);
+        item->attacked[side] |= attacks;
 
         /* Update rear span information */
         item->rear_span[side] |= rear_span[side][sq];
@@ -517,6 +521,7 @@ static void evaluate_knights(struct position *pos, struct eval *eval)
 
         /* Update attacks */
         eval->attacked_by[KNIGHT+side] |= attacks;
+        eval->attacked2[side] |= (attacks&eval->attacked[side]);
         eval->attacked[side] |= attacks;
     }
 }
@@ -585,6 +590,7 @@ static void evaluate_bishops(struct position *pos, struct eval *eval)
 
         /* Update attacks */
         eval->attacked_by[BISHOP+side] |= attacks;
+        eval->attacked2[side] |= (attacks&eval->attacked[side]);
         eval->attacked[side] |= attacks;
     }
 }
@@ -667,6 +673,7 @@ static void evaluate_rooks(struct position *pos, struct eval *eval)
 
         /* Update attacks */
         eval->attacked_by[ROOK+side] |= attacks;
+        eval->attacked2[side] |= (attacks&eval->attacked[side]);
         eval->attacked[side] |= attacks;
     }
 }
@@ -738,6 +745,7 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
 
         /* Update attacks */
         eval->attacked_by[QUEEN+side] |= attacks;
+        eval->attacked2[side] |= (attacks&eval->attacked[side]);
         eval->attacked[side] |= attacks;
     }
 }
@@ -764,6 +772,7 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
     int                 index;
     int                 side;
     uint64_t            pieces;
+    uint64_t            attacks;
 
     pieces = pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING];
     while (pieces != 0ULL) {
@@ -835,7 +844,9 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
         TRACE_MD(KING_ATTACK_SCALE_MG, KING_ATTACK_SCALE_EG, score, 100);
 
         /* Update attacks */
-        eval->attacked_by[KING+side] |= bb_king_moves(sq);
+        attacks = bb_king_moves(sq);
+        eval->attacked_by[KING+side] |= attacks;
+        eval->attacked2[side] |= (attacks&eval->attacked[side]);
         eval->attacked[side] |= eval->attacked_by[KING+side];
     }
 }
@@ -859,6 +870,8 @@ static void do_eval(struct position *pos, struct eval *eval)
     eval->attacked_by[BLACK_PAWN] |= eval->pawntt.attacked[BLACK];
     eval->attacked[WHITE] |= eval->pawntt.attacked[WHITE];
     eval->attacked[BLACK] |= eval->pawntt.attacked[BLACK];
+    eval->attacked2[WHITE] |= eval->pawntt.attacked2[WHITE];
+    eval->attacked2[BLACK] |= eval->pawntt.attacked2[BLACK];
     evaluate_knights(pos, eval);
     evaluate_bishops(pos, eval);
     evaluate_rooks(pos, eval);
@@ -1030,6 +1043,8 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
     eval.attacked_by[BLACK_PAWN] |= eval.pawntt.attacked[BLACK];
     eval.attacked[WHITE] |= eval.pawntt.attacked[WHITE];
     eval.attacked[BLACK] |= eval.pawntt.attacked[BLACK];
+    eval.attacked2[WHITE] |= eval.pawntt.attacked2[WHITE];
+    eval.attacked2[BLACK] |= eval.pawntt.attacked2[BLACK];
 
     /* Trace piece evaluation */
     evaluate_knights(pos, &eval);

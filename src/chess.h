@@ -369,6 +369,8 @@ struct pawntt_item {
     uint64_t candidates;
     /* Bitboard of all squares attacked by pawns */
     uint64_t attacked[NSIDES];
+    /* Bitboard of all squares attacked by two pawns */
+    uint64_t attacked2[NSIDES];
     /* Combined rear span of all pawns */
     uint64_t rear_span[NSIDES];
     /* Description of all potential pawn shields */
@@ -381,7 +383,7 @@ struct pawntt_item {
      * Padding added to make sure that the
      * size of the struct is a power-of-2.
      */
-    uint8_t padding[40];
+    uint8_t padding[24];
 };
 
 /* Internal representation of a chess position */
