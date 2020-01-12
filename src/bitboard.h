@@ -189,4 +189,21 @@ uint64_t bb_slider_moves(uint64_t occ, int from, int fdelta, int rdelta);
  */
 uint64_t bb_moves_for_piece(uint64_t occ, int from, int piece);
 
+/*
+ * Generate a bitboard of all possible pawn pushes.
+ *
+ * @param pawns Bitboard of all pawns.
+ * @param occ Bitboard of all occupied squares.
+ * @param side The side to generate pawn pushes for.
+ */
+uint64_t bb_pawn_pushes(uint64_t pawns, uint64_t occ, int side);
+
+/*
+ * Generate a bitboard of all possible pawn attacks.
+ *
+ * @param pawns Bitboard of all pawns.
+ * @param side The side to generate pawn attacks for.
+ */
+uint64_t bb_pawn_attacks(uint64_t pawns, int side);
+
 #endif

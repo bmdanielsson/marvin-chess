@@ -743,3 +743,33 @@ uint64_t bb_moves_for_piece(uint64_t occ, int from, int piece)
 
     return moves;
 }
+
+uint64_t bb_pawn_pushes(uint64_t pawns, uint64_t occ, int side)
+{
+    uint64_t push = 0ULL;
+
+    if (side == WHITE) {
+        push = (pawns<<8)&(~occ);
+        push |= (((push&rank_mask[RANK_3])<<8)&(~occ));
+    } else {
+        push = (pawns>>8)&(~occ);
+        push |= (((push&rank_mask[RANK_6])>>8)&(~occ));
+    }
+
+    return push;
+}
+
+uint64_t bb_pawn_attacks(uint64_t pawns, int side)
+{
+    uint64_t attack = 0ULL;
+
+    if (side == WHITE) {
+        attack = (pawns&(~file_mask[FILE_A]))<<7;
+        attack |= ((pawns&(~file_mask[FILE_H]))<<9);
+    } else {
+        attack = (pawns&(~file_mask[FILE_A]))>>9;
+        attack |= ((pawns&(~file_mask[FILE_H]))>>7);
+    }
+
+    return attack;
+}
