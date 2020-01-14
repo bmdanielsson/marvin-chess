@@ -129,6 +129,7 @@ static void evaluate_threats(struct position *pos, struct eval *eval, int side)
 {
     uint64_t minors;
     uint64_t bb;
+    uint64_t pawn_push;
     int      oside;
     int      count;
 
@@ -141,6 +142,17 @@ static void evaluate_threats(struct position *pos, struct eval *eval, int side)
     eval->score[MIDDLEGAME][side] += count*THREAT_MINOR_BY_PAWN_MG;
     eval->score[ENDGAME][side] += count*THREAT_MINOR_BY_PAWN_EG;
     TRACE_M(THREAT_MINOR_BY_PAWN_MG, THREAT_MINOR_BY_PAWN_EG, count);
+
+    /* Give a bonus for attacks on opponent pieces following a safe pawn push */
+    pawn_push = bb_pawn_pushes(pos->bb_pieces[PAWN+side], pos->bb_all, side);
+    pawn_push &= ((side==WHITE)?(~rank_mask[RANK_8]):(~rank_mask[RANK_1]));
+    pawn_push &= (~eval->attacked_by[PAWN+oside]);
+    pawn_push &= ((~eval->attacked[oside])|eval->attacked[side]);
+    count = BITCOUNT(bb_pawn_attacks(pawn_push, side)&pos->bb_sides[oside]);
+    eval->score[MIDDLEGAME][side] += count*THREAT_PAWN_PUSH_MG;
+    eval->score[ENDGAME][side] += count*THREAT_PAWN_PUSH_EG;
+    TRACE_M(THREAT_PAWN_PUSH_MG, THREAT_PAWN_PUSH_EG, count);
+
 }
 
 static void evaluate_pawn_shield(struct position *pos, struct eval *eval,

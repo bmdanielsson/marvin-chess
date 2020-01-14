@@ -23,7 +23,7 @@
 #include "chess.h"
 
 /* The total number of tunable parameters */
-#define NUM_TUNING_PARAMS 856
+#define NUM_TUNING_PARAMS 858
 
 /* Identifiers for all tunable parameters */
 enum {
@@ -93,6 +93,8 @@ enum {
     TP_CONNECTED_PAWNS_EG,
     TP_THREAT_MINOR_BY_PAWN_MG,
     TP_THREAT_MINOR_BY_PAWN_EG,
+    TP_THREAT_PAWN_PUSH_MG,
+    TP_THREAT_PAWN_PUSH_EG,
     NUM_PARAM_DECLARATIONS
 };
 

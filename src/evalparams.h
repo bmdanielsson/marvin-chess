@@ -98,5 +98,7 @@ extern int CONNECTED_PAWNS_MG[7];
 extern int CONNECTED_PAWNS_EG[7];
 extern int THREAT_MINOR_BY_PAWN_MG;
 extern int THREAT_MINOR_BY_PAWN_EG;
+extern int THREAT_PAWN_PUSH_MG;
+extern int THREAT_PAWN_PUSH_EG;
 
 #endif
