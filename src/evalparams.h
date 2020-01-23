@@ -100,5 +100,13 @@ extern int THREAT_MINOR_BY_PAWN_MG;
 extern int THREAT_MINOR_BY_PAWN_EG;
 extern int THREAT_PAWN_PUSH_MG;
 extern int THREAT_PAWN_PUSH_EG;
+extern int THREAT_BY_KNIGHT_MG[5];
+extern int THREAT_BY_KNIGHT_EG[5];
+extern int THREAT_BY_BISHOP_MG[5];
+extern int THREAT_BY_BISHOP_EG[5];
+extern int THREAT_BY_ROOK_MG[5];
+extern int THREAT_BY_ROOK_EG[5];
+extern int THREAT_BY_QUEEN_MG[5];
+extern int THREAT_BY_QUEEN_EG[5];
 
 #endif

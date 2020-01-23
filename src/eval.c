@@ -27,6 +27,7 @@
 #include "hash.h"
 #include "fen.h"
 #include "utils.h"
+#include "debug.h"
 
 /* Phase valuse for different piece types */
 #define PAWN_PHASE      0
@@ -132,9 +133,19 @@ static void evaluate_threats(struct position *pos, struct eval *eval, int side)
     uint64_t pawn_push;
     int      oside;
     int      count;
+    uint64_t weak;
+    uint64_t weak_pawns;
+    uint64_t weak_minors;
+    uint64_t targets;
+    int      sq;
+    int      index;
 
     oside = FLIP_COLOR(side);
     minors = pos->bb_pieces[oside+KNIGHT]|pos->bb_pieces[oside+BISHOP];
+    weak = ~eval->attacked_by[oside+PAWN]&
+                (eval->attacked2[side]|~eval->attacked2[oside]);
+    weak_pawns = weak&pos->bb_pieces[oside+PAWN];
+    weak_minors = weak&minors;
 
     /* Give a bonus for pawns attacking opponents minor pieces */
     bb = minors&eval->attacked_by[side+PAWN];
@@ -153,6 +164,65 @@ static void evaluate_threats(struct position *pos, struct eval *eval, int side)
     eval->score[ENDGAME][side] += count*THREAT_PAWN_PUSH_EG;
     TRACE_M(THREAT_PAWN_PUSH_MG, THREAT_PAWN_PUSH_EG, count);
 
+    /*
+     * Give a bonus for knights attacking higher value
+     * pieces or weak pieces of the same or lower value.
+     */
+    targets = weak_pawns|weak_minors|pos->bb_pieces[oside+ROOK]|
+                                            pos->bb_pieces[oside+QUEEN];
+    bb = targets&eval->attacked_by[side+KNIGHT];
+    while (bb != 0ULL) {
+        sq = POPBIT(&bb);
+        index = VALUE(pos->pieces[sq])/2;
+        eval->score[MIDDLEGAME][side] += THREAT_BY_KNIGHT_MG[index];
+        eval->score[ENDGAME][side] += THREAT_BY_KNIGHT_EG[index];
+        TRACE_OM(THREAT_BY_KNIGHT_MG, THREAT_BY_KNIGHT_EG, index, 1);
+    }
+
+    /*
+     * Give a bonus for bishops attacking higher value
+     * pieces or weak pieces of the same or lower value.
+     */
+    targets = weak_pawns|weak_minors|pos->bb_pieces[oside+ROOK]|
+                                            pos->bb_pieces[oside+QUEEN];
+    bb = targets&eval->attacked_by[side+BISHOP];
+    while (bb != 0ULL) {
+        sq = POPBIT(&bb);
+        index = VALUE(pos->pieces[sq])/2;
+        eval->score[MIDDLEGAME][side] += THREAT_BY_BISHOP_MG[index];
+        eval->score[ENDGAME][side] += THREAT_BY_BISHOP_EG[index];
+        TRACE_OM(THREAT_BY_BISHOP_MG, THREAT_BY_BISHOP_EG, index, 1);
+    }
+
+    /*
+     * Give a bonus for rooks attacking higher value
+     * pieces or weak pieces of the same or lower value.
+     */
+    targets = weak_pawns|weak_minors|(pos->bb_pieces[oside+ROOK]&weak)|
+                                            pos->bb_pieces[oside+QUEEN];
+    bb = targets&eval->attacked_by[side+ROOK];
+    while (bb != 0ULL) {
+        sq = POPBIT(&bb);
+        index = VALUE(pos->pieces[sq])/2;
+        eval->score[MIDDLEGAME][side] += THREAT_BY_ROOK_MG[index];
+        eval->score[ENDGAME][side] += THREAT_BY_ROOK_EG[index];
+        TRACE_OM(THREAT_BY_ROOK_MG, THREAT_BY_ROOK_EG, index, 1);
+    }
+
+    /*
+     * Give a bonus for queens attacking weak pieces of
+     * the same or lower value.
+     */
+    targets = weak_pawns|weak_minors|(pos->bb_pieces[oside+ROOK]&weak)|
+                                            (pos->bb_pieces[oside+QUEEN]&weak);
+    bb = targets&eval->attacked_by[side+QUEEN];
+    while (bb != 0ULL) {
+        sq = POPBIT(&bb);
+        index = VALUE(pos->pieces[sq])/2;
+        eval->score[MIDDLEGAME][side] += THREAT_BY_QUEEN_MG[index];
+        eval->score[ENDGAME][side] += THREAT_BY_QUEEN_EG[index];
+        TRACE_OM(THREAT_BY_QUEEN_MG, THREAT_BY_QUEEN_EG, index, 1);
+    }
 }
 
 static void evaluate_pawn_shield(struct position *pos, struct eval *eval,

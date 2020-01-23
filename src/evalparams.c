@@ -36,8 +36,12 @@ int BISHOP_PAIR_EG = 72;
 int PAWN_SHIELD_RANK1 = 36;
 int PAWN_SHIELD_RANK2 = 27;
 int PAWN_SHIELD_HOLE = -9;
-int PASSED_PAWN_MG[7] = {0, 2, 0, 0, 30, 48, 153};
-int PASSED_PAWN_EG[7] = {0, 0, 0, 43, 84, 97, 132};
+int PASSED_PAWN_MG[7] = {
+    0, 2, 0, 0, 30, 48, 153
+};
+int PASSED_PAWN_EG[7] = {
+    0, 0, 0, 43, 84, 97, 132
+};
 int KNIGHT_MOBILITY_MG = 12;
 int BISHOP_MOBILITY_MG = 10;
 int ROOK_MOBILITY_MG = 3;
@@ -178,8 +182,12 @@ int KING_ATTACK_SCALE_MG = 27;
 int KING_ATTACK_SCALE_EG = 1;
 int KNIGHT_OUTPOST = 17;
 int PROTECTED_KNIGHT_OUTPOST = 50;
-int CANDIDATE_PASSED_PAWN_MG[6] = {0, 0, 6, 10, 21, 87};
-int CANDIDATE_PASSED_PAWN_EG[6] = {0, 0, 6, 10, 19, 72};
+int CANDIDATE_PASSED_PAWN_MG[6] = {
+    0, 0, 6, 10, 21, 87
+};
+int CANDIDATE_PASSED_PAWN_EG[6] = {
+    0, 0, 6, 10, 19, 72
+};
 int FRIENDLY_KING_PASSER_DIST = -11;
 int OPPONENT_KING_PASSER_DIST = 14;
 int BACKWARD_PAWN_MG = -15;
@@ -197,3 +205,28 @@ int THREAT_MINOR_BY_PAWN_MG = 56;
 int THREAT_MINOR_BY_PAWN_EG = 4;
 int THREAT_PAWN_PUSH_MG = 17;
 int THREAT_PAWN_PUSH_EG = 14;
+int THREAT_BY_KNIGHT_MG[5] = {
+    1, 11, 49, 46, 29
+};
+int THREAT_BY_KNIGHT_EG[5] = {
+    17, 9, 26, 5, 0
+};
+int THREAT_BY_BISHOP_MG[5] = {
+    1, 34, 15, 22, 59
+};
+int THREAT_BY_BISHOP_EG[5] = {
+    25, 32, 17, 10, 100
+};
+int THREAT_BY_ROOK_MG[5] = {
+    1, 27, 40, 15, 82
+};
+int THREAT_BY_ROOK_EG[5] = {
+    15, 25, 27, 18, 30
+};
+int THREAT_BY_QUEEN_MG[5] = {
+    0, 7, 7, 0, 0
+};
+int THREAT_BY_QUEEN_EG[5] = {
+    0, 27, 40, 11, 0
+};
+

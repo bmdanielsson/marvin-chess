@@ -134,7 +134,15 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"threat_minor_by_pawn_mg", 854, 854, 0, 100},
     {"threat_minor_by_pawn_eg", 855, 855, 0, 100},
     {"threat_pawn_push_mg", 856, 856, 0, 100},
-    {"threat_pawn_push_eg", 857, 857, 0, 100}
+    {"threat_pawn_push_eg", 857, 857, 0, 100},
+    {"threat_by_knight_mg", 858, 862, 0, 100},
+    {"threat_by_knight_eg", 863, 867, 0, 100},
+    {"threat_by_bishop_mg", 868, 872, 0, 100},
+    {"threat_by_bishop_eg", 873, 877, 0, 100},
+    {"threat_by_rook_mg", 878, 882, 0, 100},
+    {"threat_by_rook_eg", 883, 887, 0, 100},
+    {"threat_by_queen_mg", 888, 892, 0, 100},
+    {"threat_by_queen_eg", 893, 897, 0, 100}
 };
 
 static void validate_value(FILE *fp, char *name, struct tuning_param *param)
@@ -222,6 +230,14 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN(THREAT_MINOR_BY_PAWN_EG)
     ASSIGN(THREAT_PAWN_PUSH_MG)
     ASSIGN(THREAT_PAWN_PUSH_EG)
+    ASSIGN_MULTIPLE(THREAT_BY_KNIGHT_MG)
+    ASSIGN_MULTIPLE(THREAT_BY_KNIGHT_EG)
+    ASSIGN_MULTIPLE(THREAT_BY_BISHOP_MG)
+    ASSIGN_MULTIPLE(THREAT_BY_BISHOP_EG)
+    ASSIGN_MULTIPLE(THREAT_BY_ROOK_MG)
+    ASSIGN_MULTIPLE(THREAT_BY_ROOK_EG)
+    ASSIGN_MULTIPLE(THREAT_BY_QUEEN_MG)
+    ASSIGN_MULTIPLE(THREAT_BY_QUEEN_EG)
 }
 
 struct tuning_param* tuning_param_create_list(void)
@@ -301,6 +317,14 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE(THREAT_MINOR_BY_PAWN_EG)
     DEFINE(THREAT_PAWN_PUSH_MG)
     DEFINE(THREAT_PAWN_PUSH_EG)
+    DEFINE_MULTIPLE(THREAT_BY_KNIGHT_MG)
+    DEFINE_MULTIPLE(THREAT_BY_KNIGHT_EG)
+    DEFINE_MULTIPLE(THREAT_BY_BISHOP_MG)
+    DEFINE_MULTIPLE(THREAT_BY_BISHOP_EG)
+    DEFINE_MULTIPLE(THREAT_BY_ROOK_MG)
+    DEFINE_MULTIPLE(THREAT_BY_ROOK_EG)
+    DEFINE_MULTIPLE(THREAT_BY_QUEEN_MG)
+    DEFINE_MULTIPLE(THREAT_BY_QUEEN_EG)
 
     return params;
 }
