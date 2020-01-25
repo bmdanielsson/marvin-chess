@@ -45,7 +45,7 @@ static thread_retval_t memset_func(void *data)
     struct memset_task *task = data;
 
     memset(task->start, task->value, task->size);
-    return NULL;
+    return (thread_retval_t)0;
 }
 
 #if HAS_POPCNT && __GNUC__
