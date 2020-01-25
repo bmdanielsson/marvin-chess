@@ -25,8 +25,8 @@ void thread_create(thread_t *thread, thread_func_t func, void *data)
 
 void thread_join(thread_t *thread)
 {
-    WaitForSingleObject(thread, INFINITE);
-	CloseHandle(thread);
+    WaitForSingleObject(*thread, INFINITE);
+	CloseHandle(*thread);
 }
 
 void mutex_init(mutex_t *mutex)
