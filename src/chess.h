@@ -599,15 +599,14 @@ extern uint64_t front_span[NSIDES][NSQUARES];
 extern uint64_t rear_span[NSIDES][NSQUARES];
 
 /*
- * Masks for the king attack zone for all sides/squares. The attack zone
+ * Masks for the king zone for all sides/squares. The king zone
  * is defined as illustrated below:
  *
- *  xxx
  *  xxx
  *  xKx
  *  xxx
  */
-extern uint64_t king_attack_zone[NSIDES][NSQUARES];
+extern uint64_t king_zone[NSIDES][NSQUARES];
 
 /* Character representation for each piece */
 extern char piece2char[NPIECES+1];

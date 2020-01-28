@@ -52,7 +52,7 @@ uint64_t front_span[NSIDES][NSQUARES];
 
 uint64_t rear_span[NSIDES][NSQUARES];
 
-uint64_t king_attack_zone[NSIDES][NSQUARES];
+uint64_t king_zone[NSIDES][NSQUARES];
 
 char piece2char[NPIECES+1] = {
     'P', 'p', 'N', 'n', 'B', 'b', 'R', 'r', 'Q', 'q', 'K', 'k', '.'
@@ -97,7 +97,7 @@ uint64_t outpost_squares[NSIDES];
 
 uint64_t space_eval_squares[NSIDES];
 
-static void init_king_attack_zones(void)
+static void init_king_zones(void)
 {
     int sq;
     int rank;
@@ -107,58 +107,58 @@ static void init_king_attack_zones(void)
         rank = RANKNR(sq);
         file = FILENR(sq);
 
-        king_attack_zone[WHITE][sq] = 0ULL;
-        king_attack_zone[BLACK][sq] = 0ULL;
+        king_zone[WHITE][sq] = 0ULL;
+        king_zone[BLACK][sq] = 0ULL;
 
         /* White king zone */
         if (rank < RANK_8) {
             if (file > FILE_A) {
-                SETBIT(king_attack_zone[WHITE][sq], sq+7);
+                SETBIT(king_zone[WHITE][sq], sq+7);
             }
-            SETBIT(king_attack_zone[WHITE][sq], sq+8);
+            SETBIT(king_zone[WHITE][sq], sq+8);
             if (file < FILE_H) {
-                SETBIT(king_attack_zone[WHITE][sq], sq+9);
+                SETBIT(king_zone[WHITE][sq], sq+9);
             }
         }
         if (file > FILE_A) {
-            SETBIT(king_attack_zone[WHITE][sq], sq-1);
+            SETBIT(king_zone[WHITE][sq], sq-1);
         }
         if (file < FILE_H) {
-            SETBIT(king_attack_zone[WHITE][sq], sq+1);
+            SETBIT(king_zone[WHITE][sq], sq+1);
         }
         if (rank > RANK_1) {
             if (file > FILE_A) {
-                SETBIT(king_attack_zone[WHITE][sq], sq-9);
+                SETBIT(king_zone[WHITE][sq], sq-9);
             }
-            SETBIT(king_attack_zone[WHITE][sq], sq-8);
+            SETBIT(king_zone[WHITE][sq], sq-8);
             if (file < FILE_H) {
-                SETBIT(king_attack_zone[WHITE][sq], sq-7);
+                SETBIT(king_zone[WHITE][sq], sq-7);
             }
         }
 
         /* Black king zone */
         if (rank > RANK_1) {
             if (file > FILE_A) {
-                SETBIT(king_attack_zone[BLACK][sq], sq-9);
+                SETBIT(king_zone[BLACK][sq], sq-9);
             }
-            SETBIT(king_attack_zone[BLACK][sq], sq-8);
+            SETBIT(king_zone[BLACK][sq], sq-8);
             if (file < FILE_H) {
-                SETBIT(king_attack_zone[BLACK][sq], sq-7);
+                SETBIT(king_zone[BLACK][sq], sq-7);
             }
         }
         if (file > FILE_A) {
-            SETBIT(king_attack_zone[BLACK][sq], sq-1);
+            SETBIT(king_zone[BLACK][sq], sq-1);
         }
         if (file < FILE_H) {
-            SETBIT(king_attack_zone[BLACK][sq], sq+1);
+            SETBIT(king_zone[BLACK][sq], sq+1);
         }
         if (rank < RANK_8) {
             if (file > FILE_A) {
-                SETBIT(king_attack_zone[BLACK][sq], sq+7);
+                SETBIT(king_zone[BLACK][sq], sq+7);
             }
-            SETBIT(king_attack_zone[BLACK][sq], sq+8);
+            SETBIT(king_zone[BLACK][sq], sq+8);
             if (file < FILE_H) {
-                SETBIT(king_attack_zone[BLACK][sq], sq+9);
+                SETBIT(king_zone[BLACK][sq], sq+9);
             }
         }
     }
@@ -344,7 +344,7 @@ void chess_data_init(void)
                                   file_mask[FILE_F]|file_mask[FILE_G]);
 
     /* Initialize king attack zone masks */
-    init_king_attack_zones();
+    init_king_zones();
 }
 
 struct gamestate* create_game_state(void)

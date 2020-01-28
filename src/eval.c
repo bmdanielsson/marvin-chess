@@ -585,7 +585,7 @@ static void evaluate_knights(struct position *pos, struct eval *eval)
         TRACE_M(KNIGHT_MOBILITY_MG, KNIGHT_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
-        if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
+        if (!ISEMPTY(moves&king_zone[opp_side][king_sq])) {
             eval->nbr_king_attackers[KNIGHT+side]++;
         }
 
@@ -666,7 +666,7 @@ static void evaluate_bishops(struct position *pos, struct eval *eval)
         TRACE_M(BISHOP_MOBILITY_MG, BISHOP_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
-        if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
+        if (!ISEMPTY(moves&king_zone[opp_side][king_sq])) {
             eval->nbr_king_attackers[BISHOP+side]++;
         }
 
@@ -749,7 +749,7 @@ static void evaluate_rooks(struct position *pos, struct eval *eval)
         TRACE_M(ROOK_MOBILITY_MG, ROOK_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
-        if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
+        if (!ISEMPTY(moves&king_zone[opp_side][king_sq])) {
             eval->nbr_king_attackers[ROOK+side]++;
         }
 
@@ -821,7 +821,7 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
         TRACE_M(QUEEN_MOBILITY_MG, QUEEN_MOBILITY_EG, BITCOUNT(safe_moves));
 
         /* Preassure on enemy king */
-        if (!ISEMPTY(moves&king_attack_zone[opp_side][king_sq])) {
+        if (!ISEMPTY(moves&king_zone[opp_side][king_sq])) {
             eval->nbr_king_attackers[QUEEN+side]++;
         }
 
