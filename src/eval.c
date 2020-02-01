@@ -854,7 +854,6 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
     int                 index;
     int                 side;
     uint64_t            pieces;
-    uint64_t            attacks;
 
     pieces = pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING];
     while (pieces != 0ULL) {
@@ -924,13 +923,32 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
         eval->score[MIDDLEGAME][side] += (score*KING_ATTACK_SCALE_MG)/100;
         eval->score[ENDGAME][side] += (score*KING_ATTACK_SCALE_EG)/100;
         TRACE_MD(KING_ATTACK_SCALE_MG, KING_ATTACK_SCALE_EG, score, 100);
-
-        /* Update attacks */
-        attacks = bb_king_moves(sq);
-        eval->attacked_by[KING+side] |= attacks;
-        eval->attacked2[side] |= (attacks&eval->attacked[side]);
-        eval->attacked[side] |= eval->attacked_by[KING+side];
     }
+}
+
+/*
+ * Initialize attack tables with king attack information. This is
+ * done here since the information is needed during king evaluation
+ * later.
+ */
+static void init_attack_tables(struct position *pos, struct eval *eval)
+{
+    uint64_t attacks;
+    int      sq;
+
+    /* White king attacks */
+    sq = LSB(pos->bb_pieces[WHITE_KING]);
+    attacks = bb_king_moves(sq);
+    eval->attacked_by[WHITE_KING] |= attacks;
+    eval->attacked2[WHITE] |= (attacks&eval->attacked[WHITE]);
+    eval->attacked[WHITE] |= eval->attacked_by[WHITE_KING];
+
+    /* Black king attacks */
+    sq = LSB(pos->bb_pieces[BLACK_KING]);
+    attacks = bb_king_moves(sq);
+    eval->attacked_by[BLACK_KING] |= attacks;
+    eval->attacked2[BLACK] |= (attacks&eval->attacked[BLACK]);
+    eval->attacked[BLACK] |= eval->attacked_by[BLACK_KING];
 }
 
 static void do_eval(struct position *pos, struct eval *eval)
@@ -938,6 +956,9 @@ static void do_eval(struct position *pos, struct eval *eval)
     int k;
 
     memset(eval, 0, sizeof(struct eval));
+
+    /* Init attack table */
+    init_attack_tables(pos, eval);
 
     /* Check if the position is present in the pawn transposition table */
     eval->in_pawntt = (pos->worker != NULL)?
@@ -1117,6 +1138,9 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
     if (eval_is_material_draw(pos)) {
         return;
     }
+
+    /* Init attack table */
+    init_attack_tables(pos, &eval);
 
     /* Trace pawn structure evaluation */
     hash_pawntt_init_item(&eval.pawntt);
