@@ -226,35 +226,66 @@ static void evaluate_threats(struct position *pos, struct eval *eval, int side)
 }
 
 static void evaluate_pawn_shield(struct position *pos, struct eval *eval,
-                                 int side)
+                                 int king_sq, int side)
 {
-    uint64_t           pawns;
-    struct pawntt_item *item;
-    int                delta;
-    int                k;
+    uint64_t queenside[NSIDES] = {sq_mask[A1]|sq_mask[B1]|sq_mask[C1],
+                                  sq_mask[A8]|sq_mask[B8]|sq_mask[C8]};
+    uint64_t kingside[NSIDES] = {sq_mask[F1]|sq_mask[G1]|sq_mask[H1],
+                                 sq_mask[F8]|sq_mask[G8]|sq_mask[H8]};
+    int      king_file;
+    int      king_rank;
+    int      first;
+    int      last;
+    int      file;
+    uint64_t bb;
+    int      dist;
+    int      sq;
 
-    item = &eval->pawntt;
+    king_file = FILENR(king_sq);
+    king_rank = RANKNR(king_sq);
 
-    /* Queenside pawn shield */
-    for (k=0;k<3;k++) {
-        pawns = pos->bb_pieces[PAWN+side]&file_mask[FILE_A+k];
-        if (pawns != 0ULL) {
-            delta = (side==WHITE)?RANKNR(LSB(pawns)):7-RANKNR(MSB(pawns));
-        } else {
-            delta = 0;
-        }
-        item->pawn_shield[side][QUEENSIDE][k] = delta;
+    /* Only apply pawn shield bonus if the king is on the back rank */
+    if (((side == WHITE) && (king_rank != RANK_1)) ||
+        ((side == BLACK) && (king_rank != RANK_8))) {
+        return;
     }
 
-    /* Kingside pawn shield */
-    for (k=0;k<3;k++) {
-        pawns = pos->bb_pieces[PAWN+side]&file_mask[FILE_F+k];
-        if (pawns != 0ULL) {
-            delta = (side==WHITE)?RANKNR(LSB(pawns)):7-RANKNR(MSB(pawns));
-        } else {
-            delta = 0;
+    /*
+     * Don't apply pawn shield bonus if the king is on either
+     * side trapping a rook in the corner.
+     */
+    if ((queenside[side]&sq_mask[king_sq]) &&
+        (pos->bb_pieces[ROOK+side]&queenside[side]) &&
+         (LSB(pos->bb_pieces[ROOK+side]&queenside[side]) <
+          LSB(pos->bb_pieces[KING+side]))) {
+        return;
+    } else if ((kingside[side]&pos->bb_pieces[KING+side]) &&
+               (pos->bb_pieces[ROOK+side]&kingside[side]) &&
+               (MSB(pos->bb_pieces[ROOK+side]&kingside[side]) >
+                MSB(pos->bb_pieces[KING+side]))) {
+        return;
+    }
+
+    /* Don't apply pawn shield bonus if the king is in the center */
+    if (king_file < FILE_D) {
+        first = FILE_A;
+        last = FILE_C;
+    } else if (king_file > FILE_E) {
+        first = FILE_F;
+        last = FILE_H;
+    } else {
+        return;
+    }
+
+    for (file=first;file<=last;file++) {
+        sq = SQUARE(file, king_rank);
+        bb = front_span[side][sq]&pos->bb_pieces[PAWN+side];
+        dist = (bb == 0ULL)?0:(side == WHITE)?RANKNR(LSB(bb))-RANKNR(sq):
+                                              RANKNR(sq)-RANKNR(MSB(bb));
+        if (dist <= 2) {
+            eval->score[MIDDLEGAME][side] += PAWN_SHIELD[dist];
+            TRACE_OM_M(PAWN_SHIELD, dist, 1);
         }
-        item->pawn_shield[side][KINGSIDE][k] = delta;
     }
 }
 
@@ -453,8 +484,8 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
         item->rear_span[side] |= rear_span[side][sq];
     }
 
+    /* Look for double pawns */
     for (side=0;side<NSIDES;side++) {
-        /* Look for double pawns */
         for (file=0;file<NFILES;file++) {
             if (BITCOUNT(pos->bb_pieces[side+PAWN]&file_mask[file]) >= 2) {
                 item->score[MIDDLEGAME][side] += DOUBLE_PAWNS_MG;
@@ -462,12 +493,6 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
                 TRACE_M(DOUBLE_PAWNS_MG, DOUBLE_PAWNS_EG, 1);
             }
         }
-
-        /*
-         * Calculate a pawnshield score. This score will be used
-         * later when evaluating king safety.
-         */
-        evaluate_pawn_shield(pos, eval, side);
     }
 }
 
@@ -834,22 +859,22 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
 
 static void evaluate_kings(struct position *pos, struct eval *eval)
 {
-    uint64_t            queenside[NSIDES] = {
+/*    uint64_t            queenside[NSIDES] = {
                                         sq_mask[A1]|sq_mask[B1]|sq_mask[C1],
                                         sq_mask[A8]|sq_mask[B8]|sq_mask[C8]};
     uint64_t            kingside[NSIDES] = {
                                         sq_mask[F1]|sq_mask[G1]|sq_mask[H1],
-                                        sq_mask[F8]|sq_mask[G8]|sq_mask[H8]};
-    int                 scores[] = {PAWN_SHIELD_HOLE, PAWN_SHIELD_RANK1,
-                                    PAWN_SHIELD_RANK2};
-    struct pawntt_item  *item;
+                                        sq_mask[F8]|sq_mask[G8]|sq_mask[H8]};*/
+//    int                 scores[] = {PAWN_SHIELD_HOLE, PAWN_SHIELD_RANK1,
+//                                    PAWN_SHIELD_RANK2};
+//    struct pawntt_item  *item;
     int                 piece;
     int                 nattackers;
     int                 score;
-    bool                shield;
-    int                 castling_side;
-    int                 type;
-    int                 k;
+    //bool                shield;
+    //int                 castling_side;
+    //int                 type;
+    //int                 k;
     int                 sq;
     int                 index;
     int                 side;
@@ -872,7 +897,7 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
          * there is a rook between the king and the corner. In this case
          * keeping a pawn shield will get the rook trapped.
          */
-        shield = false;
+/*        shield = false;
         item = &eval->pawntt;
         if (queenside[side]&pos->bb_pieces[KING+side]) {
             if (!((pos->bb_pieces[ROOK+side]&queenside[side]) &&
@@ -906,7 +931,8 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
                     break;
                 }
             }
-        }
+        }*/
+
 
         /* Calculate preassure on the enemy king */
         nattackers = 0;
@@ -923,6 +949,9 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
         eval->score[MIDDLEGAME][side] += (score*KING_ATTACK_SCALE_MG)/100;
         eval->score[ENDGAME][side] += (score*KING_ATTACK_SCALE_EG)/100;
         TRACE_MD(KING_ATTACK_SCALE_MG, KING_ATTACK_SCALE_EG, score, 100);
+
+        /* Evaluate pawn shield */
+        evaluate_pawn_shield(pos, eval, sq, side);
     }
 }
 

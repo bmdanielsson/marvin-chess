@@ -83,9 +83,7 @@ struct param_decl parameter_declarations[NUM_PARAM_DECLARATIONS] = {
     {"rook_on_7th_eg", 13, 13, 0, 150},
     {"bishop_pair_mg", 14, 14, 0, 200},
     {"bishop_pair_eg", 15, 15, 0, 200},
-    {"pawn_shield_rank1", 16, 16, 0, 100},
-    {"pawn_shield_rank2", 17, 17, 0, 100},
-    {"pawn_shield_hole", 18, 18, -100, 0},
+    {"pawn_shield", 16, 18, -100, 100},
     {"passed_pawn_mg", 19, 25, 0, 200},
     {"passed_pawn_eg", 26, 32, 0, 200},
     {"knight_mobility_mg", 33, 33, 0, 15},
@@ -178,9 +176,7 @@ void tuning_param_assign_current(struct tuning_param *params)
     ASSIGN(ROOK_ON_7TH_EG)
     ASSIGN(BISHOP_PAIR_MG)
     ASSIGN(BISHOP_PAIR_EG)
-    ASSIGN(PAWN_SHIELD_RANK1)
-    ASSIGN(PAWN_SHIELD_RANK2)
-    ASSIGN(PAWN_SHIELD_HOLE)
+    ASSIGN_MULTIPLE(PAWN_SHIELD)
     ASSIGN_MULTIPLE(PASSED_PAWN_MG)
     ASSIGN_MULTIPLE(PASSED_PAWN_EG)
     ASSIGN(KNIGHT_MOBILITY_MG)
@@ -265,9 +261,7 @@ struct tuning_param* tuning_param_create_list(void)
     DEFINE(ROOK_ON_7TH_EG)
     DEFINE(BISHOP_PAIR_MG)
     DEFINE(BISHOP_PAIR_EG)
-    DEFINE(PAWN_SHIELD_RANK1)
-    DEFINE(PAWN_SHIELD_RANK2)
-    DEFINE(PAWN_SHIELD_HOLE)
+    DEFINE_MULTIPLE(PAWN_SHIELD)
     DEFINE_MULTIPLE(PASSED_PAWN_MG)
     DEFINE_MULTIPLE(PASSED_PAWN_EG)
     DEFINE(KNIGHT_MOBILITY_MG)

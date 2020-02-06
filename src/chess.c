@@ -296,10 +296,6 @@ void chess_data_init(void)
         front_span[WHITE][sq] = 0ULL;
         front_span[BLACK][sq] = 0ULL;
 
-        if ((sq >= 56) || (sq <= 7)) {
-            continue;
-        }
-
         for (k=sq+8;k<=63;k+=8) {
             front_span[WHITE][sq] |= sq_mask[k];
         }
@@ -312,10 +308,6 @@ void chess_data_init(void)
     for (sq=0;sq<NSQUARES;sq++) {
         rear_span[WHITE][sq] = 0ULL;
         rear_span[BLACK][sq] = 0ULL;
-
-        if ((sq >= 56) || (sq <= 7)) {
-            continue;
-        }
 
         for (k=sq-8;k>=0;k-=8) {
             rear_span[WHITE][sq] |= sq_mask[k];

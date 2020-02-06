@@ -33,9 +33,7 @@ int ROOK_ON_7TH_MG = 1;
 int ROOK_ON_7TH_EG = 29;
 int BISHOP_PAIR_MG = 47;
 int BISHOP_PAIR_EG = 72;
-int PAWN_SHIELD_RANK1 = 36;
-int PAWN_SHIELD_RANK2 = 27;
-int PAWN_SHIELD_HOLE = -9;
+int PAWN_SHIELD[3] = {-9, 36, 27};
 int PASSED_PAWN_MG[7] = {
     0, 2, 0, 0, 30, 48, 153
 };
@@ -229,4 +227,3 @@ int THREAT_BY_QUEEN_MG[5] = {
 int THREAT_BY_QUEEN_EG[5] = {
     0, 27, 40, 11, 0
 };
-
