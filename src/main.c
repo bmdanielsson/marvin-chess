@@ -122,7 +122,6 @@ int main(int argc, char *argv[])
     /* Initialize components */
     chess_data_init();
     bb_init();
-    see_init();
     polybook_open(BOOKFILE_NAME);
 
     /* Setup SMP */

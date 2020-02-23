@@ -23,9 +23,6 @@
 /* Material values for see calculations */
 extern int see_material[NPIECES];
 
-/* Initialize the SEE component */
-void see_init(void);
-
 /*
  * Evaluate a capture, including potential recaptures, using
  * Static Exchange Evaluation (SEE). Note that en passant captures

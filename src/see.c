@@ -26,7 +26,12 @@
 #include "validation.h"
 #include "fen.h"
 
-int see_material[NPIECES];
+int see_material[NPIECES] = {100, 100,      /* pawn */
+                             392, 392,      /* knight */
+                             406, 406,      /* bishop */
+                             654, 654,      /* rook */
+                             1381, 1381,    /* queen */
+                             20000, 20000}; /* king */
 
 static uint64_t find_xray_attackers(struct position *pos, uint64_t occ,
                                     int target, uint64_t last_attacker)
@@ -70,26 +75,6 @@ static uint64_t find_next_attacker(struct position *pos, uint64_t attackers,
         }
     }
     return 0ULL;
-}
-
-void see_init(void)
-{
-    see_material[WHITE_PAWN] = PAWN_BASE_VALUE;
-    see_material[BLACK_PAWN] = see_material[WHITE_PAWN];
-    see_material[WHITE_KNIGHT] =
-                        (KNIGHT_MATERIAL_VALUE_MG+KNIGHT_MATERIAL_VALUE_EG)/2;
-    see_material[BLACK_KNIGHT] = see_material[WHITE_KNIGHT];
-    see_material[WHITE_BISHOP] =
-                        (BISHOP_MATERIAL_VALUE_MG+BISHOP_MATERIAL_VALUE_EG)/2;
-    see_material[BLACK_BISHOP] = see_material[WHITE_BISHOP];
-    see_material[WHITE_ROOK] =
-                            (ROOK_MATERIAL_VALUE_MG+ROOK_MATERIAL_VALUE_EG)/2;
-    see_material[BLACK_ROOK] = see_material[WHITE_ROOK];
-    see_material[WHITE_QUEEN] =
-                            (QUEEN_MATERIAL_VALUE_MG+QUEEN_MATERIAL_VALUE_EG)/2;
-    see_material[BLACK_QUEEN] = see_material[WHITE_QUEEN];
-    see_material[WHITE_KING] = 20000;
-    see_material[BLACK_KING] = 20000;
 }
 
 /*
