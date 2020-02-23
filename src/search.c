@@ -139,25 +139,27 @@ static bool is_pawn_push(struct position *pos, uint32_t move)
     return false;
 }
 
-static bool is_recapture(struct position *pos)
+static bool is_recapture(struct position *pos, uint32_t move)
 {
-    struct unmake *prev = &pos->history[pos->ply-2];
-    struct unmake *curr = &pos->history[pos->ply-1];
+    struct unmake *prev = &pos->history[pos->ply-1];
+    int           capture;
 
-    if (!ISCAPTURE(prev->move) || (TO(prev->move) != TO(curr->move))) {
+    if (!ISCAPTURE(prev->move) || !ISCAPTURE(move) ||
+        (TO(prev->move) != TO(move))) {
         return false;
     }
 
+    capture = VALUE(pos->pieces[TO(move)]);
     switch (VALUE(prev->capture)) {
     case PAWN:
-        return VALUE(curr->capture) == PAWN;
+        return capture == PAWN;
     case KNIGHT:
     case BISHOP:
-        return VALUE(curr->capture) == KNIGHT || VALUE(curr->capture) == BISHOP;
+        return capture == KNIGHT || capture == BISHOP;
     case ROOK:
-        return VALUE(curr->capture) == ROOK;
+        return capture == ROOK;
     case QUEEN:
-        return VALUE(curr->capture) == QUEEN;
+        return capture == QUEEN;
     default:
         break;
     }
@@ -684,12 +686,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             continue;
         }
 
-        /* Make the move */
-        if (!board_make_move(pos, move)) {
-            continue;
-        }
-        movenumber++;
-        found_move = true;
         new_depth = depth;
         extended = false;
 
@@ -703,17 +699,24 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
          * Extend checking moves unless SEE indicates
          * that the move is losing material.
          */
-        if (!extended && gives_check && see_post_ge(pos, move, 0)) {
+        if (!extended && gives_check && see_ge(pos, move, 0)) {
             new_depth++;
             extended = true;
         }
 
         /* Extend recaptures */
-        if (!extended && pos->sply >= 2 && pv_node && !gives_check &&
-            is_recapture(pos) && (see_post_ge(pos, move, 0))) {
+        if (!extended && pos->sply >= 1 && pv_node && !gives_check &&
+            is_recapture(pos, move) && see_ge(pos, move, 0)) {
             new_depth++;
             extended = true;
         }
+
+        /* Make the move */
+        if (!board_make_move(pos, move)) {
+            continue;
+        }
+        movenumber++;
+        found_move = true;
 
         /*
          * LMR (Late Move Reduction). With good move ordering later moves

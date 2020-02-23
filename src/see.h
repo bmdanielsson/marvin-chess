@@ -24,17 +24,6 @@
 extern int see_material[NPIECES];
 
 /*
- * Evaluate a capture, including potential recaptures, using
- * Static Exchange Evaluation (SEE). Note that en passant captures
- * are not handled.
- *
- * @param pos The chess position.
- * @param move The move to evaluate.
- * @return The calculated score.
- */
-int see_calculate_score(struct position *pos, uint32_t move);
-
-/*
  * Check if the Static Exchange Evaluation (SEE) score of a capturer
  * is equal to or above a certain threshold.
  *
@@ -44,16 +33,6 @@ int see_calculate_score(struct position *pos, uint32_t move);
  * @return Returns true if the score is greater than the threahold.
  */
 bool see_ge(struct position *pos, uint32_t move, int threshold);
-
-/*
- * Version of see_ge that should be called after the move has been made.
- *
- * @param pos The chess position.
- * @param move The move to evaluate.
- * @param threshold The threshold.
- * @return Returns true if the score is greater than the threahold.
- */
-bool see_post_ge(struct position *pos, uint32_t move, int threshold);
 
 #endif
 
