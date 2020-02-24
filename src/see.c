@@ -49,17 +49,16 @@ static uint64_t find_xray_attackers(struct position *pos, uint64_t occ,
     }
 
     sq = LSB(last_attacker);
-    occ |= sq_mask[target];
     if ((RANKNR(target) == RANKNR(sq)) || (FILENR(target) == FILENR(sq)))  {
         mask = pos->bb_pieces[WHITE_ROOK] | pos->bb_pieces[WHITE_QUEEN] |
                pos->bb_pieces[BLACK_ROOK] | pos->bb_pieces[BLACK_QUEEN];
         mask &= occ;
-        return (bb_rook_moves(occ, target)&bb_rook_moves(occ, sq))&mask;
+        return (bb_rook_moves(occ, target))&mask;
     } else {
         mask = pos->bb_pieces[WHITE_BISHOP] | pos->bb_pieces[WHITE_QUEEN] |
                pos->bb_pieces[BLACK_BISHOP] | pos->bb_pieces[BLACK_QUEEN];
         mask &= occ;
-        return (bb_bishop_moves(occ, target)&bb_bishop_moves(occ, sq))&mask;
+        return (bb_bishop_moves(occ, target))&mask;
     }
 }
 
@@ -114,6 +113,11 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
         see_score = 0;
     }
 
+    /* Check if it's possible to exit early */
+    if ((see_score-see_material[piece]) > threshold) {
+        return true;
+    }
+
     /* Apply the move */
     occ = pos->bb_all&(~sq_mask[FROM(move)]);
     if (ISENPASSANT(move)) {
@@ -136,9 +140,8 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
          * no need to continue, same thing if it is the oppenents turn
          * to move and the score is below the threshold.
          */
-        if ((stm == maximizer) && (see_score >= threshold)) {
-            break;
-        } else if ((stm != maximizer) && (see_score < threshold)) {
+        if (((stm == maximizer) && (see_score >= threshold)) ||
+            ((stm != maximizer) && (see_score < threshold))) {
             break;
         }
 
@@ -149,17 +152,10 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
         }
 
         /* Update the score based on the move */
-        if (stm == maximizer) {
-            see_score += see_material[victim];
-        } else {
-            see_score -= see_material[victim];
-        }
+        see_score +=
+                (stm == maximizer)?see_material[victim]:-see_material[victim];
 
-        /*
-         * Apply the move. The current piece becomes the next victim
-         * unless it's a promotion in which case the next victim is
-         * a queen.
-         */
+        /* Apply the move. The current piece becomes the next victim. */
         attackers &= ~attacker;
         occ &= ~attacker;
         victim = piece;
