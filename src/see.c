@@ -26,67 +26,28 @@
 #include "validation.h"
 #include "fen.h"
 
-int see_material[NPIECES] = {100, 100,      /* pawn */
-                             392, 392,      /* knight */
-                             406, 406,      /* bishop */
-                             654, 654,      /* rook */
-                             1381, 1381,    /* queen */
-                             20000, 20000}; /* king */
-
-static uint64_t find_xray_attackers(struct position *pos, uint64_t occ,
-                                    int target, uint64_t last_attacker)
-{
-    int      sq;
-    uint64_t mask;
-
-    /*
-     * Check if there can actually be an xray attacker
-     * hidden behind the last attacker.
-     */
-    if (last_attacker&
-                (pos->bb_pieces[WHITE_KNIGHT]|pos->bb_pieces[BLACK_KNIGHT])) {
-        return 0ULL;
-    }
-
-    sq = LSB(last_attacker);
-    if ((RANKNR(target) == RANKNR(sq)) || (FILENR(target) == FILENR(sq)))  {
-        mask = pos->bb_pieces[WHITE_ROOK] | pos->bb_pieces[WHITE_QUEEN] |
-               pos->bb_pieces[BLACK_ROOK] | pos->bb_pieces[BLACK_QUEEN];
-        mask &= occ;
-        return (bb_rook_moves(occ, target))&mask;
-    } else {
-        mask = pos->bb_pieces[WHITE_BISHOP] | pos->bb_pieces[WHITE_QUEEN] |
-               pos->bb_pieces[BLACK_BISHOP] | pos->bb_pieces[BLACK_QUEEN];
-        mask &= occ;
-        return (bb_bishop_moves(occ, target))&mask;
-    }
-}
-
-static uint64_t find_next_attacker(struct position *pos, uint64_t attackers,
-                                   int side, int *piece)
-{
-    uint64_t bb;
-
-    for (*piece=PAWN+side;*piece<NPIECES;*piece+=2) {
-        bb = attackers & pos->bb_pieces[*piece];
-        if (bb != 0ULL) {
-            return ISOLATE(bb);
-        }
-    }
-    return 0ULL;
-}
+int see_material[NPIECES] = {100,  100,      /* pawn */
+                             392,  392,      /* knight */
+                             406,  406,      /* bishop */
+                             654,  654,      /* rook */
+                             1381, 1381,     /* queen */
+                             0,    0};       /* king */
 
 bool see_ge(struct position *pos, uint32_t move, int threshold)
 {
     int      see_score;
+    int      old_score;
     int      sq;
     int      maximizer;
     int      stm;
     int      piece;
     int      victim;
+    int      val;
     uint64_t attackers;
     uint64_t attacker;
     uint64_t occ;
+    uint64_t bq;
+    uint64_t rq;
 
     assert(valid_position(pos));
     assert(valid_move(move));
@@ -114,8 +75,13 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
     }
 
     /* Check if it's possible to exit early */
-    if ((see_score-see_material[piece]) > threshold) {
-        return true;
+    if (VALUE(piece) != KING) {
+        if (see_score < threshold) {
+            return false;
+        }
+        if ((see_score-see_material[piece]) >= threshold) {
+            return true;
+        }
     }
 
     /* Apply the move */
@@ -131,7 +97,20 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
                                             bb_attacks_to(pos, occ, sq, BLACK);
     attackers &= ~sq_mask[FROM(move)];
 
+    /*
+     * If the moving piece is a king and there are opponent
+     *  attackers then the move is illegal.
+     */
+    if ((VALUE(victim) == KING) &&
+        ((attackers&pos->bb_sides[stm]) != 0ULL)) {
+        return false;
+    }
+
     /* Iterate until there are no more attackers */
+    bq = pos->bb_pieces[WHITE_BISHOP] | pos->bb_pieces[WHITE_QUEEN] |
+         pos->bb_pieces[BLACK_BISHOP] | pos->bb_pieces[BLACK_QUEEN];
+    rq = pos->bb_pieces[WHITE_ROOK] | pos->bb_pieces[WHITE_QUEEN] |
+         pos->bb_pieces[BLACK_ROOK] | pos->bb_pieces[BLACK_QUEEN];
     while (!ISEMPTY(attackers)) {
         /*
          * Before recapturing compare the current score against the
@@ -146,12 +125,19 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
         }
 
         /* Find the next attacker to consider */
-        attacker = find_next_attacker(pos, attackers, stm, &piece);
+        attacker = 0ULL;
+        for (piece=PAWN+stm;piece<NPIECES;piece+=2) {
+            if ((attackers&pos->bb_pieces[piece]) != 0ULL) {
+                attacker = ISOLATE(attackers&pos->bb_pieces[piece]);
+                break;
+            }
+        }
         if (attacker == 0ULL) {
             break;
         }
 
         /* Update the score based on the move */
+        old_score = see_score;
         see_score +=
                 (stm == maximizer)?see_material[victim]:-see_material[victim];
 
@@ -161,8 +147,25 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
         victim = piece;
         stm = FLIP_COLOR(stm);
 
-        /* Find xray attackers and add them to the set of attackers */
-        attackers |= find_xray_attackers(pos, occ, sq, attacker);
+        /* Look for potential xray attackers */
+        val = VALUE(piece);
+        if ((val == PAWN) || (val == BISHOP) || (val == QUEEN)) {
+            attackers |= (bb_bishop_moves(occ, sq)&bq);
+        }
+        if ((val == ROOK) || (val == QUEEN)) {
+            attackers |= (bb_rook_moves(occ, sq)&rq);
+        }
+        attackers &= occ;
+
+        /*
+         * Check the last capturing piece was a king. If it was and there
+         * are still attackers the the move was illegal.
+        */
+        if ((VALUE(victim) == KING) &&
+            ((attackers&pos->bb_sides[stm]) != 0ULL)) {
+            see_score = old_score;
+            break;
+        }
     }
 
     return see_score >= threshold;
