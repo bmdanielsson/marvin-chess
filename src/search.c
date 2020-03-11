@@ -78,8 +78,9 @@ static int lmp_counts[] = {0, 4, 6, 8, 12, 17, 24, 33, 44, 57, 72};
 #define PROBCUT_MARGIN 210
 
 /* Margins for SEE pruning in the main search */
-#define SEE_PRUNE_DEPTH 5
-static int see_prune_margin[] = {0, -100, -200, -300, -400};
+#define SEE_PRUNE_DEPTH 8
+#define SEE_QUIET_MARGIN(d) (-100)*(d)
+#define SEE_TACTICAL_MARGIN(d) (-29)*(d)*(d)
 
 /* Margin used for delta pruning */
 #define DELTA_MARGIN 200
@@ -430,11 +431,16 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     struct position *pos;
     bool            is_singular;
     struct movelist quiets;
+    int             see_prune_margin[2];
 
     pos = &worker->pos;
 
     /* Set node type */
     pv_node = (beta-alpha) > 1;
+
+    /* Setup margins for SEE pruning */
+    see_prune_margin[0] = SEE_QUIET_MARGIN(depth);
+    see_prune_margin[1] = SEE_TACTICAL_MARGIN(depth);
 
     /* Update search statistics */
     worker->nodes++;
@@ -675,14 +681,10 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         }
 
         /* Prune moves that lose material according to SEE */
-        if (!pv_node &&
-            move != tt_move &&
-            !in_check &&
-            !gives_check &&
-            depth < SEE_PRUNE_DEPTH &&
+        if (depth < SEE_PRUNE_DEPTH &&
             (movenumber > 1) &&
             (best_score > KNOWN_LOSS) &&
-            !see_ge(pos, move, see_prune_margin[depth])) {
+            !see_ge(pos, move, see_prune_margin[tactical])) {
             continue;
         }
 
