@@ -17,23 +17,17 @@
  */
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "history.h"
 
-void history_clear_table(struct search_worker *worker)
+void history_clear_tables(struct search_worker *worker)
 {
-    int k;
-    int l;
-
-    for (k=0;k<NPIECES;k++) {
-        for (l=0;l<NSQUARES;l++) {
-            worker->history_table[k][l] = 0;
-        }
-    }
+    memset(worker->history_table, 0, sizeof(int)*NPIECES*NSQUARES);
 }
 
-void history_update_table(struct search_worker *worker, struct movelist *list,
-                          int depth)
+void history_update_tables(struct search_worker *worker, struct movelist *list,
+                           int depth)
 {
     uint32_t        best_move;
     uint32_t        move;
@@ -72,6 +66,11 @@ void history_update_table(struct search_worker *worker, struct movelist *list,
             }
         }
     }
+}
+
+int history_get_score(struct search_worker *worker, uint32_t move)
+{
+    return worker->history_table[worker->pos.pieces[FROM(move)]][TO(move)];
 }
 
 void killer_clear_table(struct search_worker *worker)

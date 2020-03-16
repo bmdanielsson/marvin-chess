@@ -26,22 +26,31 @@
 #define MAX_HISTORY_SCORE 10000000
 
 /*
- * Clear history table.
+ * Clear history tables.
  *
- * @param worker The worker to clear the history table for.
+ * @param worker The worker to clear the history tables for.
  */
-void history_clear_table(struct search_worker *worker);
+void history_clear_tables(struct search_worker *worker);
 
 /*
- * Update the history table with a move.
+ * Update the history tables with a new move.
  *
  * @param worker The worker.
  * @param list List of quiet moves tried for this position. The last move
  *             in the list is the move tha caused the beta cutoff.
  * @param depth The depth to which the move was searched.
  */
-void history_update_table(struct search_worker *worker, struct movelist *list,
-                          int depth);
+void history_update_tables(struct search_worker *worker, struct movelist *list,
+                           int depth);
+
+/*
+ * Get a combined history score for a move.
+ *
+ * @param worker The worker.
+ * @param move The move.
+ * @return The combined history score.
+ */
+int history_get_score(struct search_worker *worker, uint32_t move);
 
 /*
  * Clear the killer move table.

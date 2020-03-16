@@ -76,8 +76,6 @@ static int mvvlva(struct position *pos, uint32_t move)
 static void add_move(struct search_worker *worker, struct moveselector *ms,
                      struct movelist *list, int iter)
 {
-    int             from;
-    int             to;
     uint32_t        move;
     struct moveinfo *info;
     struct position *pos;
@@ -113,12 +111,10 @@ static void add_move(struct search_worker *worker, struct moveselector *ms,
     info->move = move;
 
     /* Assign a score to the move */
-    from = FROM(move);
-    to = TO(move);
     if ((ISCAPTURE(move) || ISENPASSANT(move)) && gez) {
         info->score = mvvlva(pos, move);
     } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
-        info->score = worker->history_table[pos->pieces[from]][to];
+        info->score = history_get_score(worker, move);
     } else {
         info->score = mvvlva(pos, move);
     }

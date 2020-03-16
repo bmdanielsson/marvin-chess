@@ -144,7 +144,7 @@ static void prepare_worker(struct search_worker *worker,
     worker->pos = state->pos;
 
     /* Clear tables */
-    history_clear_table(worker);
+    history_clear_tables(worker);
     killer_clear_table(worker);
     counter_clear_table(worker);
 
