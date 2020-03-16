@@ -18,6 +18,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdatomic.h>
+#include <stdlib.h>
 
 #include "smp.h"
 #include "hash.h"
@@ -46,8 +47,8 @@ static mutex_t stop_lock;
 static atomic_bool should_stop = false;
 
 /* Data for worker threads */
-static int number_of_workers = 1;
-static struct search_worker workers[MAX_WORKERS];
+static int number_of_workers = 0;
+static struct search_worker *workers = NULL;
 
 static bool probe_dtz_tables(struct gamestate *state, int *score)
 {
@@ -192,6 +193,7 @@ void smp_create_workers(int nthreads)
     int k;
 
     number_of_workers = nthreads;
+    workers = malloc(number_of_workers*sizeof(struct search_worker));
     for (k=0;k<number_of_workers;k++) {
         memset(&workers[k], 0, sizeof(struct search_worker));
         hash_pawntt_create_table(&workers[k], PAWN_HASH_SIZE);
@@ -207,8 +209,9 @@ void smp_destroy_workers(void)
     for (k=0;k<number_of_workers;k++) {
         hash_pawntt_destroy_table(&workers[k]);
     }
-
-    number_of_workers = 1;
+    free(workers);
+    workers = NULL;
+    number_of_workers = 0;
 }
 
 int smp_number_of_workers(void)
@@ -226,6 +229,8 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     struct movelist      legal;
 
     assert(valid_position(&state->pos));
+    assert(number_of_workers > 0);
+    assert(workers != NULL);
 
     /* Reset the best move information */
     state->best_move = NOMOVE;
