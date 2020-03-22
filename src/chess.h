@@ -450,6 +450,8 @@ struct search_worker {
     uint32_t countermove_table[NPIECES][NSQUARES];
     /* Tables used for history heuristics */
     int history_table[NPIECES][NSQUARES];
+    int counter_history[NPIECES][NSQUARES][NPIECES][NSQUARES];
+    int follow_history[NPIECES][NSQUARES][NPIECES][NSQUARES];
     /* Pawn transposition table */
     struct pawntt_item *pawntt;
     /* The number of entries in the pawn transposition table */

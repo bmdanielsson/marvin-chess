@@ -18,12 +18,30 @@
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+#include <limits.h>
 
 #include "history.h"
+#include "utils.h"
+#include "validation.h"
+
+/* The maximum allowed history score */
+#define MAX_HISTORY_SCORE (INT_MAX/3)
+
+/* The maximum depth used for history scores */
+#define MAX_HISTORY_DEPTH 20
+
+/* Constants for scaling history scores */
+#define UP   32
+#define DOWN 512
 
 void history_clear_tables(struct search_worker *worker)
 {
     memset(worker->history_table, 0, sizeof(int)*NPIECES*NSQUARES);
+    memset(worker->counter_history, 0,
+           sizeof(int)*NPIECES*NSQUARES*NPIECES*NSQUARES);
+    memset(worker->follow_history, 0,
+           sizeof(int)*NPIECES*NSQUARES*NPIECES*NSQUARES);
 }
 
 void history_update_tables(struct search_worker *worker, struct movelist *list,
@@ -34,43 +52,112 @@ void history_update_tables(struct search_worker *worker, struct movelist *list,
     int             to;
     int             piece;
     int             k;
-    bool            rescale;
     int             delta;
+    int             score;
+    uint32_t        move_c;
+    uint32_t        move_f;
+    int             prev_to;
+    int             prev_piece;
     struct position *pos;
 
     assert(list != NULL);
     assert(list->size > 0);
     assert(depth > 0);
 
+    pos = &worker->pos;
+
+    /* Limit the depth used for bonus/penalty calculations */
+    depth = MIN(depth, MAX_HISTORY_DEPTH);
+
+    /* Get the opponents previous move */
+    move_c = ((pos->ply >= 1) &&
+             !ISNULLMOVE(pos->history[pos->ply-1].move))?
+             pos->history[pos->ply-1].move:NOMOVE;
+
+    /* Get our previous move */
+    move_f = ((pos->ply >= 2) &&
+             !ISNULLMOVE(pos->history[pos->ply-1].move) &&
+             !ISNULLMOVE(pos->history[pos->ply-2].move))?
+             pos->history[pos->ply-2].move:NOMOVE;
+
     /* Update history table */
     best_move = list->moves[list->size-1];
-    rescale = false;
-    pos = &worker->pos;
     for (k=0;k<list->size;k++) {
         move = list->moves[k];
         piece = pos->pieces[FROM(move)];
         to = TO(move);
 
+        /* Calculate the bonus to apply */
         delta = (move != best_move)?-(depth*depth):depth*depth;
-        worker->history_table[piece][to] += delta;
-        if (abs(worker->history_table[piece][to]) > MAX_HISTORY_SCORE) {
-            rescale = true;
-        }
-    }
 
-    /* Rescale entries if necessary */
-    if (rescale) {
-        for (piece=0;piece<NPIECES;piece++) {
-            for (to=0;to<NSQUARES;to++) {
-                worker->history_table[piece][to] /= 2;
-            }
+        /* Update history table */
+        score = worker->history_table[piece][to];
+        score = UP*delta - score*abs(delta)/DOWN;
+        worker->history_table[piece][to] = MIN(score, MAX_HISTORY_SCORE);
+
+        /* Update counter history table */
+        if (move_c != NOMOVE) {
+            prev_to = TO(move_c);
+            prev_piece = pos->history[pos->ply-1].piece;
+            score = worker->counter_history[prev_piece][prev_to][piece][to];
+            score += UP*delta - score*abs(delta)/DOWN;
+            worker->counter_history[prev_piece][prev_to][piece][to] =
+                                                MIN(score, MAX_HISTORY_SCORE);
+        }
+
+        /* Update follow up history table */
+        if (move_f != NOMOVE) {
+            prev_to = TO(move_f);
+            prev_piece = pos->history[pos->ply-2].piece;
+            score = worker->follow_history[prev_piece][prev_to][piece][to];
+            score += UP*delta - score*abs(delta)/DOWN;
+            worker->follow_history[prev_piece][prev_to][piece][to] =
+                                                MIN(score, MAX_HISTORY_SCORE);
         }
     }
 }
 
 int history_get_score(struct search_worker *worker, uint32_t move)
 {
-    return worker->history_table[worker->pos.pieces[FROM(move)]][TO(move)];
+    struct position *pos;
+    int             score;
+    int             to;
+    int             piece;
+    int             prev_move;
+    int             prev_to;
+    int             prev_piece;
+
+    assert(valid_move(move));
+
+    pos = &worker->pos;
+    piece = pos->pieces[FROM(move)];
+    to = TO(move);
+
+    /* Add score from history table */
+    score = worker->history_table[piece][to];
+
+    /* Add score from counter history table */
+    prev_move = ((pos->ply >= 1) &&
+                !ISNULLMOVE(pos->history[pos->ply-1].move))?
+                pos->history[pos->ply-1].move:NOMOVE;
+    if (prev_move != NOMOVE) {
+        prev_to = TO(prev_move);
+        prev_piece = pos->history[pos->ply-1].piece;
+        score += worker->counter_history[prev_piece][prev_to][piece][to];
+    }
+
+    /* Add score from follow up history table */
+    prev_move = ((pos->ply >= 2) &&
+                !ISNULLMOVE(pos->history[pos->ply-1].move) &&
+                !ISNULLMOVE(pos->history[pos->ply-2].move))?
+                pos->history[pos->ply-2].move:NOMOVE;
+    if (prev_move != NOMOVE) {
+        prev_to = TO(prev_move);
+        prev_piece = pos->history[pos->ply-2].piece;
+        score += worker->follow_history[prev_piece][prev_to][piece][to];
+    }
+
+    return score;
 }
 
 void killer_clear_table(struct search_worker *worker)

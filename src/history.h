@@ -22,9 +22,6 @@
 
 #include "chess.h"
 
-/* The maximum allowed history score */
-#define MAX_HISTORY_SCORE 10000000
-
 /*
  * Clear history tables.
  *
