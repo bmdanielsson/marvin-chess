@@ -32,20 +32,17 @@
 /* Safety margin to avoid loosing on time (in ms) */
 #define SAFETY_MARGIN 50
 
-/* The time control type to use for the search */
-static enum timectl_type time_control_type = TC_INFINITE;
+/* Flags indicating special time control modes */
+static int tc_flags = 0;
 
 /* The time increment (in milliseconds) */
-static int time_control_increment = 0;
+static int tc_increment = 0;
 
 /* The number of moves to the next time control */
-static int time_control_movestogo = 0;
-
-/* The time when the current search was started */
-static time_t search_start = 0;
+static int tc_movestogo = 0;
 
 /* The number of milliseconds left on the clock */
-static int search_time_left = 0;
+static int tc_time_left = 0;
 
 /*
  * Limit on how long the engine is allowed to search. In
@@ -57,35 +54,25 @@ static time_t soft_time_limit = 0;
 /* A hard time limit that may not be exceeded */
 static time_t hard_time_limit = 0;
 
+/* The time when the current search was started */
+static time_t search_start = 0;
+
 /* Keeps track if the clock is running or not */
 static bool clock_is_running = false;
 
-void tc_configure_time_control(enum timectl_type type, int time, int inc,
-                               int movestogo)
+void tc_configure_time_control(int time, int inc, int movestogo, int flags)
 {
-    time_control_type = type;
-    search_time_left = time;
-    time_control_increment = inc;
-    time_control_movestogo = movestogo;
+    tc_time_left = time;
+    tc_increment = inc;
+    tc_movestogo = movestogo > 0?movestogo:MOVES_TO_TIME_CONTROL;
+    tc_flags = flags;
     soft_time_limit = 0;
     hard_time_limit = 0;
 }
 
-bool tc_is_flexible(void)
-{
-    switch (time_control_type) {
-    case TC_SUDDEN_DEATH:
-    case TC_FISCHER:
-    case TC_TOURNAMENT:
-        return true;
-    default:
-        return false;
-    }
-}
-
 bool tc_is_infinite(void)
 {
-    return time_control_type == TC_INFINITE;
+    return tc_flags&TC_INFINITE_TIME;
 }
 
 void tc_start_clock(void)
@@ -107,71 +94,32 @@ bool tc_is_clock_running(void)
 void tc_allocate_time(void)
 {
     time_t allocated = 0;
-    time_t time_with_safety;
-    time_t time_left;
 
-    if (search_time_left > SAFETY_MARGIN) {
-        time_with_safety = search_time_left - SAFETY_MARGIN;
-    } else {
-        time_with_safety = 0;
-    }
-
-    switch (time_control_type) {
-    case TC_SUDDEN_DEATH:
-        /*
-         * An assumption is made that there are always a constant
-         * number of moves left to time control. This makes the
-         * engine spend more time in the beginning and play faster
-         * and faster as the game progresses.
-         */
-        allocated = MIN(search_time_left/MOVES_TO_TIME_CONTROL,
-                        time_with_safety);
-        break;
-    case TC_FISCHER:
-        /*
-         * Based on the same principle as for sudden death time
-         * control, except that the full increment is always added
-         * to the allocated time. Since the increment is gained after
-         * making a move the increment for the previous move have already
-         * been added to the clock it has to be subtracted first.
-         */
-        assert(search_time_left >= time_control_increment);
-        time_left = search_time_left - time_control_increment;
-        allocated =
-                CLAMP(time_left/MOVES_TO_TIME_CONTROL+time_control_increment, 0,
-                      time_with_safety);
-        break;
-    case TC_TOURNAMENT:
-        allocated = MIN(search_time_left/time_control_movestogo,
-                        time_with_safety);
-        break;
-    case TC_FIXED_TIME:
-        /* No reason not to use all the time */
-        allocated = time_with_safety;
-        break;
-    case TC_INFINITE:
-        allocated = 0;
-        break;
-    default:
-        assert(false);
-        break;
-    }
-    assert(allocated >= 0);
-
-    soft_time_limit = search_start + allocated;
-    if (tc_is_flexible()) {
-        /*
-         * For flexible time controls we also set a hard time limit
-         * that can be used to allocate extra time when needed. Specifically
-         * we allow five times the normally allocated time up to at
-         * most 80% of the remaining time to be used.
-         */
-        allocated = MIN(5*allocated, search_time_left*0.8);
-        allocated = CLAMP(allocated, 0, time_with_safety);
-        hard_time_limit = MAX(search_start+allocated, soft_time_limit);
-    } else {
+    /* Handle special cases first */
+    if (tc_flags&TC_INFINITE_TIME) {
+        soft_time_limit = 0;
+        hard_time_limit = 0;
+        return;
+    } else if (tc_flags&TC_FIXED_TIME) {
+        allocated = MAX(tc_time_left-SAFETY_MARGIN, 0);
+        soft_time_limit = search_start + allocated;
         hard_time_limit = soft_time_limit;
+        return;
     }
+
+    /* Calculate how much time to allocate */
+    allocated = tc_time_left/tc_movestogo + tc_increment;
+    allocated = MIN(allocated, tc_time_left-SAFETY_MARGIN);
+
+    /*
+     * Setup time limits. The soft time limit is time the engine is
+     * expected to spend and the hard limit is the amount of time it
+     * is allowed to spend in case of panic.
+     */
+    soft_time_limit = search_start + allocated;
+    allocated = MIN(5*allocated, tc_time_left*0.8);
+    allocated = MIN(allocated, tc_time_left-SAFETY_MARGIN);
+    hard_time_limit = search_start + allocated;
 }
 
 time_t tc_elapsed_time(void)
@@ -181,14 +129,22 @@ time_t tc_elapsed_time(void)
 
 void tc_update_time(int time)
 {
-    search_time_left = time;
+    tc_time_left = time;
 }
 
 bool tc_check_time(struct search_worker *worker)
 {
     assert(worker != NULL);
 
-    if (worker->state->pondering || (time_control_type == TC_INFINITE)) {
+    if (worker->state->pondering || (tc_flags&TC_INFINITE_TIME)) {
+        return true;
+    }
+
+    /*
+     * Always search at least one ply in order to make sure
+     * a sensible (not random) move is always played
+     */
+    if (worker->depth <= 1) {
         return true;
     }
 
@@ -206,6 +162,6 @@ bool tc_check_time(struct search_worker *worker)
 
 bool tc_new_iteration(struct search_worker *worker)
 {
-    return worker->state->pondering || (time_control_type == TC_INFINITE) ||
-           (get_current_time() < soft_time_limit);
+    return worker->state->pondering || (tc_flags&TC_INFINITE_TIME) ||
+           worker->depth <= 1 || (get_current_time() < soft_time_limit);
 }

@@ -162,7 +162,7 @@ void test_run_benchmark(void)
     npos = sizeof(positions)/sizeof(char*);
     for (k=0;k<npos;k++) {
         board_setup_from_fen(&state->pos, positions[k]);
-        tc_configure_time_control(TC_INFINITE, 0, 0, 0);
+        tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
         state->sd = BENCH_DEPTH;
         state->silent = true;
         state->move_filter.size = 0;

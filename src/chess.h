@@ -297,15 +297,6 @@ struct unmake {
     uint64_t pawnkey;
 };
 
-/* The different supported time controls */
-enum timectl_type {
-    TC_SUDDEN_DEATH,
-    TC_FISCHER,
-    TC_INFINITE,
-    TC_TOURNAMENT,
-    TC_FIXED_TIME
-};
-
 /* An opening book entry */
 struct book_entry {
     uint32_t move;

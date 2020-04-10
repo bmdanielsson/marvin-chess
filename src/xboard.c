@@ -66,7 +66,8 @@ static int moves_to_time_control = 0;
 static int engine_time_left = 0;
 static int engine_time_increment = 0;
 static int search_depth_limit = MAX_SEARCH_DEPTH;
-static enum timectl_type time_control_type = TC_INFINITE;
+static bool infinite_time = true;
+static bool fixed_time = false;
 
 /* Pondering variables */
 static uint32_t pondering_on = NOMOVE;
@@ -83,7 +84,7 @@ static void update_moves_to_time_control(struct gamestate *state)
 {
     int moves_in_tc;
 
-    if (time_control_type != TC_TOURNAMENT) {
+    if (infinite_time || fixed_time || (moves_per_time_control == 0)) {
         return;
     }
 
@@ -189,6 +190,7 @@ static void make_engine_move(struct gamestate *state)
     uint32_t         ponder_move;
     enum game_result result;
     bool             ponder;
+    int              flags;
 
     /* Start the clock */
     if (!tc_is_clock_running()) {
@@ -200,13 +202,15 @@ static void make_engine_move(struct gamestate *state)
     state->silent = false;
     ponder = false;
     pondering_on = NOMOVE;
+    flags = infinite_time?TC_INFINITE_TIME:0;
+    flags = fixed_time?TC_FIXED_TIME:flags;
 
     while (true) {
         /* Set time control */
         state->sd = search_depth_limit;
         update_moves_to_time_control(state);
-        tc_configure_time_control(time_control_type, engine_time_left,
-                                  engine_time_increment, moves_to_time_control);
+        tc_configure_time_control(engine_time_left, engine_time_increment,
+                                  moves_to_time_control, flags);
 
         /* Search the position for a move */
         smp_search(state, ponder_mode && ponder, true, tablebase_mode);
@@ -273,7 +277,7 @@ static void xboard_cmd_analyze(struct gamestate *state)
         state->silent = false;
         state->exit_on_mate = false;
         engine_clear_pending_command();
-        tc_configure_time_control(TC_INFINITE, 0, 0, 0);
+        tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
 
         /* Search until told otherwise */
         smp_search(state, false, false, tablebase_mode);
@@ -422,7 +426,7 @@ static void xboard_cmd_hint(struct gamestate *state)
              * If all else fails do a shallow search to
              * find a resonably good move.
              */
-            tc_configure_time_control(TC_INFINITE, 0, 0, 0);
+            tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
             state->exit_on_mate = true;
             state->sd = 6;
             state->silent = true;
@@ -439,15 +443,14 @@ static void xboard_cmd_hint(struct gamestate *state)
 
 static void xboard_cmd_level(char *cmd)
 {
-	int               min;
-	int               sec;
-	float             sec_f;
-	char              *endptr;
-	char              *iter;
-    enum timectl_type tc_type;
-    int               movestogo;
-    int               increment;
-    int               time_left;
+	int   min;
+	int   sec;
+	float sec_f;
+	char  *endptr;
+	char  *iter;
+    int   movestogo;
+    int   increment;
+    int   time_left;
 
 	/* Extract MPS */
 	min = 0;
@@ -501,23 +504,13 @@ static void xboard_cmd_level(char *cmd)
 	    increment = (int)(sec_f*1000.0f);
     }
 
-	/* Figure out the clock style */
-	if (movestogo != 0) {
-		tc_type = TC_TOURNAMENT;
-	} else if (increment != 0) {
-		tc_type = TC_FISCHER;
-		movestogo = 0;
-	} else {
-		tc_type = TC_SUDDEN_DEATH;
-		movestogo = 0;
-	}
-
     /* Set time control variables */
+    infinite_time = false;
+    fixed_time = false;
     moves_per_time_control = movestogo;
     moves_to_time_control = movestogo;
     engine_time_left = time_left;
     engine_time_increment = increment;
-    time_control_type = tc_type;
 }
 
 static void xboard_cmd_memory(char *cmd)
@@ -645,11 +638,12 @@ static void xboard_cmd_st(char *cmd)
     }
 
     /* Set time control variables */
+    infinite_time = false;
+    fixed_time = true;
     moves_per_time_control = 0;
     moves_to_time_control = 0;
     engine_time_left = time*1000;
     engine_time_increment = 0;
-    time_control_type = TC_FIXED_TIME;
 }
 
 static void xboard_cmd_time(char *cmd)

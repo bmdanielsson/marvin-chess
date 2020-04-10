@@ -46,6 +46,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
 {
     char     *iter;
     int      movetime = 0;
+    int      moveinc = 0;
     int      wtime = 0;
     int      btime = 0;
     int      winc = 0;
@@ -53,7 +54,9 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     int      movestogo = 0;
     char     best_movestr[MAX_MOVESTR_LENGTH];
     char     ponder_movestr[MAX_MOVESTR_LENGTH];
-    bool     infinite = false;
+    int      flags;
+    bool     infinite_time = false;
+    bool     fixed_time = false;
     int      depth = 0;
     bool     in_movelist = false;
     char     *temp;
@@ -125,6 +128,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = skip_whitespace(iter);
             iter = strchr(iter, ' ');
             in_movelist = false;
+            fixed_time = true;
         } else if (!strncmp(iter, "depth", 5)) {
             if (sscanf(iter, "depth %d", &depth) != 1) {
                 return;
@@ -139,7 +143,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = strchr(iter, ' ');
             in_movelist = false;
         } else if (!strncmp(iter, "infinite", 8)) {
-            infinite = true;
+            infinite_time = true;
             iter = strchr(iter, ' ');
             in_movelist = false;
         } else if (!strncmp(iter, "ponder", 6)) {
@@ -170,29 +174,22 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     }
 
     /* Set the correct time control */
-    if (infinite) {
-        tc_configure_time_control(TC_INFINITE, 0, 0, 0);
+    if (infinite_time) {
+        movetime = 0;
+        moveinc = 0;
+        movestogo = 0;
+        flags |= TC_INFINITE_TIME;
         state->exit_on_mate = false;
         skip_book = true;
-    } else if (movetime > 0) {
-        tc_configure_time_control(TC_FIXED_TIME, movetime, 0, 0);
-    } else if ((winc > 0) && (state->pos.stm == WHITE)) {
-        tc_configure_time_control(TC_FISCHER, wtime, winc, 0);
-    } else if ((binc > 0) && (state->pos.stm == BLACK)) {
-        tc_configure_time_control(TC_FISCHER, btime, binc, 0);
-    } else if ((movestogo > 0) && (state->pos.stm == WHITE)) {
-        tc_configure_time_control(TC_TOURNAMENT, wtime, 0, movestogo);
-    } else if ((movestogo > 0) && (state->pos.stm == BLACK)) {
-        tc_configure_time_control(TC_TOURNAMENT, btime, 0, movestogo);
-    } else if ((state->pos.stm == WHITE) && (wtime > 0)) {
-        tc_configure_time_control(TC_SUDDEN_DEATH, wtime, 0, 0);
-    } else if ((state->pos.stm == BLACK) && (btime > 0)) {
-        tc_configure_time_control(TC_SUDDEN_DEATH, btime, 0, 0);
+    } else if (fixed_time) {
+        moveinc = 0;
+        movestogo = 0;
+        flags |= TC_FIXED_TIME;
     } else {
-        tc_configure_time_control(TC_INFINITE, 0, 0, 0);
-        state->exit_on_mate = false;
-        skip_book = true;
+        movetime = state->pos.stm == WHITE?wtime:btime;
+        moveinc = state->pos.stm == WHITE?winc:binc;
     }
+    tc_configure_time_control(movetime, moveinc, movestogo, flags);
 
     /* Search the position for a move */
     smp_search(state, ponder && ponder_mode, own_book_mode && !skip_book,

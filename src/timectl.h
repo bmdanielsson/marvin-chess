@@ -22,26 +22,22 @@
 
 #include "chess.h"
 
+/* Different time control flags */
+#define TC_INFINITE_TIME 0x00000001
+#define TC_FIXED_TIME    0x00000002
+
 /*
  * Configure the time control to use for the next search.
  *
- * @param type Time control type.
  * @param time The number of milliseconds left on the clock for the engine.
  * @param inc The time increment.
  * @param movestogo The number of moves left to the next time control.
+ * @param flags Time control flags.
  */
-void tc_configure_time_control(enum timectl_type type, int time, int inc,
-                               int movestogo);
+void tc_configure_time_control(int time, int inc, int movestogo, int flags);
 
 /*
- * Check if the the time control is flexible or if any part of it is fixed.
- *
- * @return Return true if the time control is flexible.
- */
-bool tc_is_flexible(void);
-
-/*
- * Check if the an infinite time control has been configured.
+ * Check if the infinite time control has been configured.
  *
  * @return Return true if the time control is infinite.
  */
