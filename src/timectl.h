@@ -25,6 +25,7 @@
 /* Different time control flags */
 #define TC_INFINITE_TIME 0x00000001
 #define TC_FIXED_TIME    0x00000002
+#define TC_REGULAR       0x00000004
 
 /*
  * Configure the time control to use for the next search.

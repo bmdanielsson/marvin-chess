@@ -883,6 +883,10 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
         score = -search(worker, new_depth-1, -beta, -alpha, true, NOMOVE);
         board_unmake_move(pos);
 
+        if ((worker->currmovenumber == 1) && (score <= alpha)) {
+            worker->resolving_tt_fail = true;
+        }
+
         /* Check if a new best move have been found */
         if (score > best_score) {
             /* Update the best score and best move for this iteration */
@@ -926,6 +930,13 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 copy_pv(&worker->pv_table[0], &worker->best_pv);
                 if (worker->id == 0) {
                     engine_send_pv_info(worker, score);
+                }
+                if (worker->resolving_tt_fail) {
+                    worker->resolving_tt_fail = false;
+                    if (!tc_check_time(worker)) {
+                        smp_stop_all();
+                        break;
+                    }
                 }
             }
         }

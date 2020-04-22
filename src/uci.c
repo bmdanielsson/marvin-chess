@@ -54,7 +54,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     int      movestogo = 0;
     char     best_movestr[MAX_MOVESTR_LENGTH];
     char     ponder_movestr[MAX_MOVESTR_LENGTH];
-    int      flags;
+    int      flags = 0;
     bool     infinite_time = false;
     bool     fixed_time = false;
     int      depth = 0;
@@ -120,6 +120,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = skip_whitespace(iter);
             iter = strchr(iter, ' ');
             in_movelist = false;
+            flags |= TC_REGULAR;
         } else if (!strncmp(iter, "movetime", 8)) {
             if (sscanf(iter, "movetime %d", &movetime) != 1) {
                 return;

@@ -204,6 +204,9 @@ static void make_engine_move(struct gamestate *state)
     pondering_on = NOMOVE;
     flags = infinite_time?TC_INFINITE_TIME:0;
     flags = fixed_time?TC_FIXED_TIME:flags;
+    if (moves_to_time_control > 0) {
+        flags |= TC_REGULAR;
+    }
 
     while (true) {
         /* Set time control */
