@@ -505,7 +505,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * Evaluate the position in order to get a score
      * to use for pruning decisions.
      */
-    static_score = eval_evaluate(pos);
+    static_score = tt_found?tt_item.eval_score:eval_evaluate(pos);
 
     /* Reverse futility pruning */
     if ((depth <= FUTILITY_DEPTH) &&
@@ -817,7 +817,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Store the result for this node in the transposition table */
-    hash_tt_store(pos, best_move, depth, best_score, tt_flag);
+    hash_tt_store(pos, best_move, depth, best_score, tt_flag, static_score);
 
     return best_score;
 }
@@ -948,7 +948,8 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     }
 
     /* Store the result for this node in the transposition table */
-    hash_tt_store(pos, best_move, depth, best_score, tt_flag);
+    hash_tt_store(pos, best_move, depth, best_score, tt_flag,
+                  eval_evaluate(pos));
 
     return best_score;
 }

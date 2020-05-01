@@ -120,7 +120,6 @@ void tc_allocate_time(void)
      * */
     allocated = tc_time_left/tc_movestogo + tc_increment;
     if (tc_flags&TC_REGULAR) {
-        LOG_INFO1("reduce\n");
         allocated = allocated*0.75;
     }
     allocated = MIN(allocated, tc_time_left-SAFETY_MARGIN);
