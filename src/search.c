@@ -445,9 +445,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     /* Update search statistics */
     worker->nodes++;
 
-    /* Is the side to move in check */
-    in_check = board_in_check(pos, pos->stm);
-
     /* Check if we have reached the full depth of the search */
     if ((depth <= 0) || (pos->sply >= MAX_SEARCH_DEPTH)) {
         return quiescence(worker, 0, alpha, beta);
@@ -508,6 +505,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     static_score = tt_found?tt_item.eval_score:eval_evaluate(pos);
 
     /* Reverse futility pruning */
+    in_check = board_in_check(pos, pos->stm);
     if ((depth <= FUTILITY_DEPTH) &&
         !in_check &&
         !pv_node &&
