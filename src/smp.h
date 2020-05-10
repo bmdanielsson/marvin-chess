@@ -43,6 +43,9 @@ void smp_destroy_workers(void);
  */
 int smp_number_of_workers(void);
 
+/* Indicate the start of a new game */
+void smp_newgame(void);
+
 /*
  * Start a new search.
  *

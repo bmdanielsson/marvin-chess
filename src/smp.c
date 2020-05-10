@@ -144,7 +144,6 @@ static void prepare_worker(struct search_worker *worker,
     worker->pos = state->pos;
 
     /* Clear tables */
-    history_clear_tables(worker);
     killer_clear_table(worker);
     counter_clear_table(worker);
 
@@ -218,6 +217,15 @@ void smp_destroy_workers(void)
 int smp_number_of_workers(void)
 {
     return number_of_workers;
+}
+
+void smp_newgame(void)
+{
+    int k;
+
+    for (k=0;k<number_of_workers;k++) {
+        history_clear_tables(&workers[k]);
+    }
 }
 
 void smp_search(struct gamestate *state, bool pondering, bool use_book,

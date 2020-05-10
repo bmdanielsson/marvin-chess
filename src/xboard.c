@@ -536,6 +536,7 @@ static void xboard_cmd_new(struct gamestate *state)
 {
     board_start_position(&state->pos);
     hash_tt_clear_table();
+    smp_newgame();
 
     search_depth_limit = MAX_SEARCH_DEPTH;
     engine_side = BLACK;

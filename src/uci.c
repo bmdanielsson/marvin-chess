@@ -397,6 +397,7 @@ static void uci_cmd_uci(struct gamestate *state)
 static void uci_cmd_ucinewgame(void)
 {
     hash_tt_clear_table();
+    smp_newgame();
 }
 
 bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop)
