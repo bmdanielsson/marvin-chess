@@ -50,6 +50,18 @@ void history_update_tables(struct search_worker *worker, struct movelist *list,
 int history_get_score(struct search_worker *worker, uint32_t move);
 
 /*
+ * Get the individual history table scores.
+ *
+ * @param worker The worker.
+ * @param move The move.
+ * @param hist Location to store the history table score at.
+ * @param chist Location to store the countermove history table score at.
+ * @param fhist Location to store the follow-up history table score at.
+ */
+void history_get_scores(struct search_worker *worker, uint32_t move,
+                        int *hist, int *chist, int *fhist);
+
+/*
  * Clear the killer move table.
  *
  * @param worker The worker to clear the killer table for.

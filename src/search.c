@@ -88,6 +88,11 @@ static int lmp_counts[] = {0, 4, 6, 8, 12, 17, 24, 33, 44, 57, 72};
 /* Configuration constants for singular extensions */
 #define SE_DEPTH 8
 
+/* Configuration for continuation history pruning */
+#define HISTORY_PRUNING_DEPTH 3
+static int COUNTER_HISTORY_PRUNING_MARGIN[] = {0, 0, -500, -1000};
+static int FOLLOWUP_HISTORY_PRUNING_MARGIN[] = {0, -500, -1000, -2000};
+
 static bool check_tt_cutoff(struct tt_item *item, int depth, int alpha,
                             int beta, int score)
 {
@@ -432,6 +437,9 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     bool            is_singular;
     struct movelist quiets;
     int             see_prune_margin[2];
+    int             hist;
+    int             chist;
+    int             fhist;
 
     pos = &worker->pos;
 
@@ -684,6 +692,17 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             (best_score > KNOWN_LOSS) &&
             !see_ge(pos, move, see_prune_margin[tactical])) {
             continue;
+        }
+
+        /* Prune moves based on continuation history */
+        if (!tactical && (movenumber > 1) && depth <= HISTORY_PRUNING_DEPTH) {
+            history_get_scores(worker, move, &hist, &chist, &fhist);
+            if (chist < COUNTER_HISTORY_PRUNING_MARGIN[depth]) {
+                continue;
+            }
+            if (fhist < FOLLOWUP_HISTORY_PRUNING_MARGIN[depth]) {
+                continue;
+            }
         }
 
         new_depth = depth;

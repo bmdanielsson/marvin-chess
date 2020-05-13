@@ -160,6 +160,52 @@ int history_get_score(struct search_worker *worker, uint32_t move)
     return score;
 }
 
+void history_get_scores(struct search_worker *worker, uint32_t move,
+                        int *hist, int *chist, int *fhist)
+{
+    struct position *pos;
+    int             to;
+    int             piece;
+    int             prev_move;
+    int             prev_to;
+    int             prev_piece;
+
+    assert(valid_move(move));
+
+    pos = &worker->pos;
+    piece = pos->pieces[FROM(move)];
+    to = TO(move);
+
+    /* Initialize history values */
+    *hist = 0;
+    *chist = 0;
+    *fhist = 0;
+
+    /* Add score from history table */
+    *hist = worker->history_table[piece][to];
+
+    /* Add score from counter history table */
+    prev_move = ((pos->ply >= 1) &&
+                !ISNULLMOVE(pos->history[pos->ply-1].move))?
+                pos->history[pos->ply-1].move:NOMOVE;
+    if (prev_move != NOMOVE) {
+        prev_to = TO(prev_move);
+        prev_piece = pos->history[pos->ply-1].piece;
+        *chist = worker->counter_history[prev_piece][prev_to][piece][to];
+    }
+
+    /* Add score from follow up history table */
+    prev_move = ((pos->ply >= 2) &&
+                !ISNULLMOVE(pos->history[pos->ply-1].move) &&
+                !ISNULLMOVE(pos->history[pos->ply-2].move))?
+                pos->history[pos->ply-2].move:NOMOVE;
+    if (prev_move != NOMOVE) {
+        prev_to = TO(prev_move);
+        prev_piece = pos->history[pos->ply-2].piece;
+        *fhist = worker->follow_history[prev_piece][prev_to][piece][to];
+    }
+}
+
 void killer_clear_table(struct search_worker *worker)
 {
     int k;
