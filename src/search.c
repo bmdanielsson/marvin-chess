@@ -90,8 +90,8 @@ static int lmp_counts[] = {0, 4, 6, 8, 12, 17, 24, 33, 44, 57, 72};
 
 /* Configuration for continuation history pruning */
 #define HISTORY_PRUNING_DEPTH 3
-static int COUNTER_HISTORY_PRUNING_MARGIN[] = {0, 0, -500, -1000};
-static int FOLLOWUP_HISTORY_PRUNING_MARGIN[] = {0, -500, -1000, -2000};
+static int counter_history_pruning_margin[] = {0, 0, -500, -1000};
+static int followup_history_pruning_margin[] = {0, -500, -1000, -2000};
 
 static bool check_tt_cutoff(struct tt_item *item, int depth, int alpha,
                             int beta, int score)
@@ -697,10 +697,10 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         /* Prune moves based on continuation history */
         if (!tactical && (movenumber > 1) && depth <= HISTORY_PRUNING_DEPTH) {
             history_get_scores(worker, move, &hist, &chist, &fhist);
-            if (chist < COUNTER_HISTORY_PRUNING_MARGIN[depth]) {
+            if (chist < counter_history_pruning_margin[depth]) {
                 continue;
             }
-            if (fhist < FOLLOWUP_HISTORY_PRUNING_MARGIN[depth]) {
+            if (fhist < followup_history_pruning_margin[depth]) {
                 continue;
             }
         }
