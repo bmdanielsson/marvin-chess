@@ -20,7 +20,7 @@
 
 /* Version information */
 #define APP_NAME "Marvin"
-#define APP_VERSION "3.6.0-a6"
+#define APP_VERSION "3.6.0"
 #define APP_AUTHOR "Martin Danielsson"
 
 /* The name of the log file */
