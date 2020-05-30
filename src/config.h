@@ -41,6 +41,9 @@
 /* The maximum number of supported worker threads */
 #define MAX_WORKERS 512
 
+/* The maximum number of MultiPV lines that can be reported */
+#define MAX_MULTIPV_LINES 32
+
 /* The name of the opening book file */
 #define BOOKFILE_NAME "book.bin"
 

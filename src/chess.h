@@ -24,6 +24,7 @@
 #include <setjmp.h>
 
 #include "thread.h"
+#include "config.h"
 
 /* The maximum length of the string representation of a move */
 #define MAX_MOVESTR_LENGTH 7
@@ -236,11 +237,23 @@ struct movelist {
     int size;
 };
 
-/* Move with extended information */
+/* Move with additional information */
 struct moveinfo {
     /* The move */
     uint32_t move;
     /* Move ordering score */
+    int score;
+};
+
+/* Principle variation with additional information */
+struct pvinfo {
+    /* The depth of the pv */
+    int depth;
+    /* The selective depth of the pv */
+    int seldepth;
+    /* The principle variation */
+    struct movelist pv;
+    /* The score */
     int score;
 };
 
@@ -467,11 +480,11 @@ struct search_worker {
     /* The number of tablebase hits */
     uint64_t tbhits;
 
-    /* The best move found so far */
-    int best_score;
-    int best_depth;
-    uint32_t best_move;
-    struct movelist best_pv;
+    /* PV information */
+    int multipv;
+    int mpvidx;
+    uint32_t mpv_moves[MAX_MULTIPV_LINES];
+    struct pvinfo mpv_lines[MAX_MULTIPV_LINES];
 
     /* Data for the worker thread */
     thread_t thread;
@@ -513,6 +526,8 @@ struct gamestate {
     uint32_t ponder_move;
     /* Information about the highest completed depth */
     int completed_depth;
+    /* The number of lines to search */
+    int multipv;
 };
 
 /* Bitboard mask for each square */

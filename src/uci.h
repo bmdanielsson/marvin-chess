@@ -64,4 +64,11 @@ void uci_send_bound_info(struct search_worker *worker, int score, bool lower);
  */
 void uci_send_move_info(struct search_worker *worker);
 
+/*
+ * Send information the currently best lines.
+ *
+ * @param worker The worker.
+ */
+void uci_send_multipv_info(struct search_worker *worker);
+
 #endif

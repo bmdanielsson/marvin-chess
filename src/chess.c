@@ -350,6 +350,7 @@ struct gamestate* create_game_state(void)
     memset(state, 0, sizeof(struct gamestate));
     board_reset(&state->pos);
     board_start_position(&state->pos);
+    state->multipv = 1;
 
     return state;
 }

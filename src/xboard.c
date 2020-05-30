@@ -847,7 +847,7 @@ bool xboard_check_input(struct search_worker *worker)
          * This only makes sense if the engine is in analyze mode
          * so send the current best move as a hint.
          */
-        move2str(worker->best_move, movestr);
+        move2str(worker->mpv_moves[0], movestr);
         engine_write_command("Hint: %s", movestr);
     } else if (!strncmp(cmd, "easy", 4)) {
         xboard_cmd_easy();
@@ -926,8 +926,8 @@ void xboard_send_pv_info(struct search_worker *worker,  int score)
 
 	/* Display thinking according to the current output mode */
 	msec = tc_elapsed_time();
-	sprintf(buffer, "%3d %6d %7d %9"PRIu64"", worker->depth, score, msec/10,
-            smp_nodes());
+	sprintf(buffer, "%3d %6d %7d %9"PRIu64"", worker->mpv_lines[0].depth,
+            score, msec/10, smp_nodes());
     pv = &worker->pv_table[0];
 	for (k=0;k<pv->size;k++) {
 		strcat(buffer, " ");

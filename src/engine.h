@@ -117,4 +117,11 @@ void engine_send_bound_info(struct search_worker *worker, int score,
  */
 void engine_send_move_info(struct search_worker *worker);
 
+/*
+ * Send information the currently best lines.
+ *
+ * @param worker The worker.
+ */
+void engine_send_multipv_info(struct search_worker *worker);
+
 #endif

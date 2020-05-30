@@ -42,6 +42,9 @@ static bool ponder_mode = false;
 static bool own_book_mode = true;
 static bool tablebase_mode = false;
 
+/* Helper variable used for sorting pv lines */
+static struct pvinfo sorted_mpv_lines[MAX_MULTIPV_LINES];
+
 static void uci_cmd_go(char *cmd, struct gamestate *state)
 {
     char     *iter;
@@ -285,7 +288,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
     }
 }
 
-static void uci_cmd_setoption(char *cmd)
+static void uci_cmd_setoption(char *cmd, struct gamestate *state)
 {
     char *iter;
     int  value;
@@ -361,6 +364,17 @@ static void uci_cmd_setoption(char *cmd)
                 }
                 dbg_set_log_level(value);
             }
+        } else if (!strncmp(iter, "MultiPV", 7)) {
+            iter += 7;
+            iter = skip_whitespace(iter);
+            if (sscanf(iter, "value %d", &value) == 1) {
+                if (value > MAX_MULTIPV_LINES) {
+                    value = MAX_MULTIPV_LINES;
+                } else if (value < 1) {
+                    value = 1;
+                }
+                state->multipv = value;
+            }
         }
         iter = strstr(iter, "name");
     }
@@ -388,6 +402,9 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command(
                         "option name Threads type spin default %d min 1 max %d",
                         engine_default_num_threads, MAX_WORKERS);
+    engine_write_command(
+                        "option name MultiPV type spin default 1 min 1 max %d",
+                        MAX_MULTIPV_LINES);
     engine_write_command(
                        "option name LogLevel type spin default %d min 0 max %d",
                         dbg_get_log_level(), LOG_HIGHEST_LEVEL);
@@ -421,7 +438,7 @@ bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop)
     } else if (!strncmp(cmd, "position", 8)) {
         uci_cmd_position(cmd, state);
     } else if (!strncmp(cmd, "setoption", 9)) {
-        uci_cmd_setoption(cmd);
+        uci_cmd_setoption(cmd, state);
 	} else if (!strncmp(cmd, "stop", 4)) {
 		/* Ignore */
     } else if (!strncmp(cmd, "uci", 3) && (strlen(cmd) == 3)) {
@@ -492,11 +509,12 @@ void uci_send_pv_info(struct search_worker *worker, int score)
 
     /* Build command */
     sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
-            "tbhits %"PRIu64" hashfull %d score cp %d pv", worker->depth,
-            worker->seldepth, nodes, msec, nps, tbhits, hash_tt_usage(), score);
-    for (k=0;k<worker->best_pv.size;k++) {
+            "tbhits %"PRIu64" hashfull %d score cp %d pv",
+            worker->mpv_lines[0].depth, worker->mpv_lines[0].seldepth,
+            nodes, msec, nps, tbhits, hash_tt_usage(), score);
+    for (k=0;k<worker->mpv_lines[0].pv.size;k++) {
         strcat(buffer, " ");
-        move2str(worker->best_pv.moves[k], movestr);
+        move2str(worker->mpv_lines[0].pv.moves[k], movestr);
         strcat(buffer, movestr);
     }
 
@@ -526,9 +544,10 @@ void uci_send_bound_info(struct search_worker *worker, int score, bool lower)
 
     /* Build command */
     sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
-            "tbhits %"PRIu64" hashfull %d score cp %d %s", worker->depth,
-            worker->seldepth, nodes, msec, nps, tbhits, hash_tt_usage(), score,
-            lower?"lowerbound":"upperbound");
+            "tbhits %"PRIu64" hashfull %d score cp %d %s",
+            worker->mpv_lines[0].depth, worker->mpv_lines[0].seldepth,
+            nodes, msec, nps, tbhits, hash_tt_usage(),
+            score, lower?"lowerbound":"upperbound");
 
     /* Write command */
     engine_write_command(buffer);
@@ -550,4 +569,60 @@ void uci_send_move_info(struct search_worker *worker)
     move2str(worker->currmove, movestr);
     engine_write_command("info depth %d currmove %s currmovenumber %d",
                          worker->depth, movestr, worker->currmovenumber);
+}
+
+void uci_send_multipv_info(struct search_worker *worker)
+{
+    char          movestr[MAX_MOVESTR_LENGTH];
+    char          buffer[1024];
+    int           msec;
+    int           nps;
+    uint64_t      tbhits;
+    uint64_t      nodes;
+    int           ttusage;
+    int           k;
+    int           l;
+    int           idx;
+    int           score;
+    struct pvinfo pv;
+
+    /* Get information common for all lines */
+    msec = (int)tc_elapsed_time();
+    nodes = smp_nodes();
+    nps = (msec > 0)?(nodes/msec)*1000:0;
+    tbhits = worker->state->root_in_tb?1:smp_tbhits();
+    ttusage = hash_tt_usage();
+
+    /* Sort pv lines based on score */
+    memcpy(sorted_mpv_lines, worker->mpv_lines, sizeof(sorted_mpv_lines));
+    for (k=0;k<worker->multipv-1;k++) {
+        score = sorted_mpv_lines[k].score;
+        idx = k;
+        for (l=k+1;l<worker->multipv;l++) {
+            if (sorted_mpv_lines[k].score > score) {
+                idx = l;
+                score = sorted_mpv_lines[k].score;
+            }
+        }
+        if (idx != k) {
+            pv = sorted_mpv_lines[k];
+            sorted_mpv_lines[k] = sorted_mpv_lines[idx];
+            sorted_mpv_lines[k] = pv;
+        }
+    }
+
+    /* Write one info command for each pv line */
+    for (k=0;k<worker->multipv;k++) {
+        sprintf(buffer, "info multipv %d depth %d seldepth %d nodes %"PRIu64" "
+                "time %d nps %d tbhits %"PRIu64" hashfull %d score cp %d pv",
+                k+1, sorted_mpv_lines[k].depth, sorted_mpv_lines[k].seldepth,
+                nodes, msec, nps, tbhits, ttusage, sorted_mpv_lines[k].score);
+        for (l=0;l<sorted_mpv_lines[k].pv.size;l++) {
+            strcat(buffer, " ");
+            move2str(sorted_mpv_lines[k].pv.moves[l], movestr);
+            strcat(buffer, movestr);
+        }
+
+        engine_write_command(buffer);
+    }
 }

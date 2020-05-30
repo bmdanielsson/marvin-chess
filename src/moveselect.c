@@ -313,27 +313,9 @@ void select_init_node(struct search_worker *worker, bool tactical_only,
 
 bool select_get_move(struct search_worker *worker, uint32_t *move)
 {
-    int  k;
-    bool found;
-
     assert(move != NULL);
 
-    found = false;
-    while (!found && get_move(worker, move)) {
-        if ((worker->pos.sply > 0) ||
-            (worker->state->move_filter.size == 0)) {
-            found = true;
-            break;
-        }
-        for (k=0;k<worker->state->move_filter.size;k++) {
-            if (*move == worker->state->move_filter.moves[k]) {
-                found = true;
-                break;
-            }
-        }
-    }
-
-    return found;
+    return get_move(worker, move);
 }
 
 bool select_is_bad_capture_phase(struct search_worker *worker)

@@ -121,6 +121,30 @@ static int adjust_mate_score(struct position *pos, int score)
     return score;
 }
 
+static bool is_multipv_move(struct search_worker *worker, uint32_t move)
+{
+    int k;
+
+    for (k=0;k<worker->mpvidx;k++) {
+        if (move == worker->mpv_moves[k]) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool is_filtered_move(struct search_worker *worker, uint32_t move)
+{
+    int k;
+
+    for (k=0;k<worker->state->move_filter.size;k++) {
+        if (move == worker->state->move_filter.moves[k]) {
+            return true;
+        }
+    }
+    return false;
+}
+
 static bool is_pawn_push(struct position *pos, uint32_t move)
 {
     int from;
@@ -873,6 +897,14 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     worker->currmovenumber = 0;
     select_init_node(worker, false, in_check, best_move);
     while (select_get_move(worker, &move)) {
+        if ((worker->multipv > 1) && is_multipv_move(worker, move)) {
+            continue;
+        }
+        if ((worker->state->move_filter.size > 0) &&
+            !is_filtered_move(worker, move)) {
+            continue;
+        }
+
         /* Send stats for the first worker */
         worker->currmovenumber++;
         worker->currmove = move;
@@ -941,11 +973,13 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                  * are only updated when the score is inside the aspiration
                  * window since it's only then that the score can be trusted.
                  */
-                worker->best_score = score;
-                worker->best_depth = worker->depth;
-                worker->best_move = move;
-                copy_pv(&worker->pv_table[0], &worker->best_pv);
-                if (worker->id == 0) {
+                worker->mpv_moves[worker->mpvidx] = move;
+                copy_pv(&worker->pv_table[0],
+                        &worker->mpv_lines[worker->mpvidx].pv);
+                worker->mpv_lines[worker->mpvidx].score = score;
+                worker->mpv_lines[worker->mpvidx].depth = worker->depth;
+                worker->mpv_lines[worker->mpvidx].seldepth = worker->seldepth;
+                if ((worker->id == 0) && (worker->multipv == 1)) {
                     engine_send_pv_info(worker, score);
                 }
                 if (worker->resolving_tt_fail) {
@@ -971,37 +1005,38 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     return best_score;
 }
 
-void search_find_best_move(struct search_worker *worker)
+static void search_aspiration_window(struct search_worker *worker, int depth,
+                                     int prev_score)
 {
-    volatile int alpha;
-    volatile int beta;
-    volatile int awindex;
-    volatile int bwindex;
-    int          score;
-    int          depth;
-    int          exception;
+    int alpha;
+    int beta;
+    int awindex;
+    int bwindex;
+    int score;
 
-    assert(valid_position(&worker->pos));
-
-    /* Setup the first iteration */
-    depth = 1 + worker->id%2;
-    alpha = -INFINITE_SCORE;
-    beta = INFINITE_SCORE;
+    /*
+     * Setup the next iteration. There is not much to gain
+     * from having an aspiration window for the first few
+     * iterations so an infinite window is used to start with.
+     */
     awindex = 0;
     bwindex = 0;
+    if (depth > 5) {
+        alpha = prev_score - aspiration_window[awindex];
+        beta = prev_score + aspiration_window[bwindex];
+    } else {
+        alpha = -INFINITE_SCORE;
+        beta = INFINITE_SCORE;
+    }
 
     /* Main iterative deepening loop */
     while (true) {
 		/* Search */
-        exception = setjmp(worker->env);
-        if (exception == 0) {
-            worker->depth = depth;
-            alpha = MAX(alpha, -INFINITE_SCORE);
-            beta = MIN(beta, INFINITE_SCORE);
-            score = search_root(worker, depth, alpha, beta);
-        } else {
-            break;
-        }
+        worker->depth = depth;
+        worker->seldepth = 0;
+        alpha = MAX(alpha, -INFINITE_SCORE);
+        beta = MIN(beta, INFINITE_SCORE);
+        score = search_root(worker, depth, alpha, beta);
 
         /*
          * If the score is outside of the alpha/beta bounds then
@@ -1011,7 +1046,7 @@ void search_find_best_move(struct search_worker *worker)
             awindex++;
             alpha = score - aspiration_window[awindex];
             worker->resolving_root_fail = true;
-            if (worker->id == 0) {
+            if ((worker->id == 0) && (worker->multipv == 1)) {
                 engine_send_bound_info(worker, score, false);
             }
             continue;
@@ -1025,6 +1060,39 @@ void search_find_best_move(struct search_worker *worker)
             continue;
         }
         worker->resolving_root_fail = false;
+        break;
+    }
+}
+
+void search_find_best_move(struct search_worker *worker)
+{
+    int score;
+    int depth;
+    int mpvidx;
+
+    assert(valid_position(&worker->pos));
+
+    /* Setup the first iteration */
+    depth = 1 + worker->id%2;
+
+    /* Main search loop */
+    score = 0;
+    while (true) {
+		/* Handle aborted searches */
+        if (setjmp(worker->env) != 0) {
+            break;
+        }
+
+        /* Multipv loop */
+        for (mpvidx=0;mpvidx<worker->multipv;mpvidx++) {
+            worker->mpvidx = mpvidx;
+            search_aspiration_window(worker, depth, score);
+
+            if ((worker->id == 0) && (worker->multipv > 1)) {
+                engine_send_multipv_info(worker);
+            }
+        }
+        score = worker->mpv_lines[0].score;
 
         /* Report iteration as completed */
         depth = smp_complete_iteration(worker);
@@ -1045,21 +1113,6 @@ void search_find_best_move(struct search_worker *worker)
         if (depth > worker->state->sd) {
             smp_stop_all();
             break;
-        }
-
-        /*
-         * Setup the next iteration. There is not much to gain
-         * from having an aspiration window for the first few
-         * iterations so an infinite window is used to start with.
-         */
-        awindex = 0;
-        bwindex = 0;
-        if (depth > 5) {
-            alpha = score - aspiration_window[awindex];
-            beta = score + aspiration_window[bwindex];
-        } else {
-            alpha = -INFINITE_SCORE;
-            beta = INFINITE_SCORE;
         }
 
         /*
