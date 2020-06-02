@@ -73,9 +73,9 @@ void tc_configure_time_control(int time, int inc, int movestogo, int flags)
     medium_time_limit = 0;
 }
 
-bool tc_is_infinite(void)
+int tc_get_flags(void)
 {
-    return tc_flags&TC_INFINITE_TIME;
+    return tc_flags;
 }
 
 void tc_start_clock(void)

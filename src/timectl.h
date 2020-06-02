@@ -38,6 +38,13 @@
 void tc_configure_time_control(int time, int inc, int movestogo, int flags);
 
 /*
+ * Get the currently configured time control flags.
+ *
+ * @return Returns the time control flags.
+ */
+int tc_get_flags(void);
+
+/*
  * Check if the infinite time control has been configured.
  *
  * @return Return true if the time control is infinite.

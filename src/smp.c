@@ -238,7 +238,6 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
                 bool use_tablebases)
 {
     int                  k;
-    bool                 analysis;
     struct search_worker *worker;
     struct search_worker *best;
     struct movelist      legal;
@@ -250,12 +249,6 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     /* Reset the best move information */
     state->best_move = NOMOVE;
     state->ponder_move = NOMOVE;
-
-	/*
-	 * Try to guess if the search is part of a
-	 * game or if it is for analysis.
-	 */
-	analysis = tc_is_infinite() || (state->move_filter.size > 0);
 
     /* Try to find a move in the opening book */
     if (use_book) {
@@ -317,7 +310,10 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
      * If there is only one legal move then there is no
      * need to do a search. Instead save the time for later.
      */
-    if ((legal.size == 1) && !state->pondering && !analysis) {
+    if ((legal.size == 1) &&
+        !state->pondering &&
+        (state->move_filter.size > 0) &&
+        ((tc_get_flags()&(TC_INFINITE_TIME|TC_FIXED_TIME)) != 0)) {
         return;
     }
 
