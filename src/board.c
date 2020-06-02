@@ -222,7 +222,7 @@ bool board_setup_from_fen(struct position *pos, char *fenstr)
     assert(fenstr != NULL);
 
     board_reset(pos);
-    return fen_setup_board(pos, fenstr, false) && valid_position(pos);
+    return fen_setup_board(pos, fenstr) && valid_position(pos);
 }
 
 

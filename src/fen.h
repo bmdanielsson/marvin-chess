@@ -34,10 +34,9 @@
  * @param pos The chess position.
  * @param fenstr The FEN string to parse. The string is assumed to be
  *               zero terminated.
- * @param epd Indicates that the parsing should stop after the en-passant field.
  * @return Returns true if the position was sucessfully setup, false otherwise.
  */
-bool fen_setup_board(struct position *pos, char *fenstr, bool epd);
+bool fen_setup_board(struct position *pos, char *fenstr);
 
 /*
  * Builds a FEN string for the current position.

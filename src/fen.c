@@ -76,7 +76,7 @@ static int char2piece(char piece)
     }
 }
 
-bool fen_setup_board(struct position *pos, char *fenstr, bool epd)
+bool fen_setup_board(struct position *pos, char *fenstr)
 {
     int  rank;
     int  file;
@@ -179,10 +179,11 @@ bool fen_setup_board(struct position *pos, char *fenstr, bool epd)
     }
 
     /*
-     * Parse remaining fields if required,
-     * otherwise assign default valus.
+     * Parse remaing FEN fields if they are present
+     * otherwise assign default values.
      */
-    if (!epd) {
+    iter = skip_whitespace(iter);
+    if (*iter != '\0') {
         /* Halfmove counter field */
         iter++;
         if (sscanf(iter, "%d", &pos->fifty) != 1) {
