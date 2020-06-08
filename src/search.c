@@ -685,47 +685,44 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             quiets.moves[quiets.size++] = move;
         }
 
-        /*
-         * If the futility pruning flag is set then prune all moves except
-         * tactical ones.
-         */
-        if (futility_pruning &&
-            (movenumber > 1) &&
-            !tactical &&
-            (best_score > KNOWN_LOSS)) {
-            continue;
-        }
-
-        /*
-         * LMP (Late Move Pruning). If a move is sorted late in the list and
-         * it has not been good in the past then prune it unless there are
-         * obvious tactics.
-         */
-        if (!pv_node &&
-            (depth <= LMP_DEPTH) &&
-            (movenumber > lmp_counts[depth]) &&
-            !tactical &&
-            (abs(alpha) < KNOWN_WIN) &&
-            (best_score > KNOWN_LOSS)) {
-            continue;
-        }
-
-        /* Prune moves that lose material according to SEE */
-        if (depth < SEE_PRUNE_DEPTH &&
-            (movenumber > 1) &&
-            (best_score > KNOWN_LOSS) &&
-            !see_ge(pos, move, see_prune_margin[tactical])) {
-            continue;
-        }
-
-        /* Prune moves based on continuation history */
-        if (!tactical && (movenumber > 1) && depth <= HISTORY_PRUNING_DEPTH) {
-            history_get_scores(worker, move, &hist, &chist, &fhist);
-            if (chist < counter_history_pruning_margin[depth]) {
+        /* Pruning of moves at low depths */
+        if (best_score > KNOWN_LOSS) {
+            /*
+             * If the futility pruning flag is set then prune all moves except
+             * tactical ones.
+             */
+            if (futility_pruning && !tactical) {
                 continue;
             }
-            if (fhist < followup_history_pruning_margin[depth]) {
+
+            /*
+             * LMP (Late Move Pruning). If a move is sorted late in the list and
+             * it has not been good in the past then prune it unless there are
+             * obvious tactics.
+             */
+            if (!pv_node &&
+                (depth <= LMP_DEPTH) &&
+                (movenumber > lmp_counts[depth]) &&
+                (abs(alpha) < KNOWN_WIN) &&
+                !tactical) {
                 continue;
+            }
+
+            /* Prune moves that lose material according to SEE */
+            if (depth < SEE_PRUNE_DEPTH &&
+                !see_ge(pos, move, see_prune_margin[tactical])) {
+                continue;
+            }
+
+            /* Prune moves based on continuation history */
+            if (!tactical && (depth <= HISTORY_PRUNING_DEPTH)) {
+                history_get_scores(worker, move, &hist, &chist, &fhist);
+                if (chist < counter_history_pruning_margin[depth]) {
+                    continue;
+                }
+                if (fhist < followup_history_pruning_margin[depth]) {
+                    continue;
+                }
             }
         }
 
