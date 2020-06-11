@@ -45,6 +45,9 @@
 #define KNOWN_WIN   (TABLEBASE_WIN - MAX_SEARCH_DEPTH)
 #define KNOWN_LOSS  (-KNOWN_WIN)
 
+/* Initialize the search component */
+void search_init(void);
+
 /*
  * Called to starta search for a specific worker.
  *

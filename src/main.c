@@ -35,6 +35,7 @@
 #include "smp.h"
 #include "hash.h"
 #include "see.h"
+#include "search.h"
 
 /* The maximum length of a line in the configuration file */
 #define CFG_MAX_LINE_LENGTH 1024
@@ -122,6 +123,7 @@ int main(int argc, char *argv[])
     /* Initialize components */
     chess_data_init();
     bb_init();
+    search_init();
     polybook_open(BOOKFILE_NAME);
 
     /* Setup SMP */

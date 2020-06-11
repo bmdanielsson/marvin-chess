@@ -21,6 +21,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <limits.h>
+#include <math.h>
 
 #include "search.h"
 #include "engine.h"
@@ -92,6 +93,9 @@ static int lmp_counts[] = {0, 4, 6, 8, 12, 17, 24, 33, 44, 57, 72};
 #define HISTORY_PRUNING_DEPTH 3
 static int counter_history_pruning_margin[] = {0, 0, -500, -1000};
 static int followup_history_pruning_margin[] = {0, -500, -1000, -2000};
+
+/* Table of base reductions for LMR indexed by depth and move number */
+static int lmr_reductions[64][64];
 
 static bool check_tt_cutoff(struct tt_item *item, int depth, int alpha,
                             int beta, int score)
@@ -535,6 +539,9 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * to use for pruning decisions.
      */
     static_score = tt_found?tt_item.eval_score:eval_evaluate(pos);
+    pos->eval_stack[pos->sply] = static_score;
+    bool improving = (pos->sply >= 2 &&
+                    static_score > pos->eval_stack[pos->sply-2]);
 
     /* Reverse futility pruning */
     in_check = board_in_check(pos, pos->stm);
@@ -679,6 +686,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         /* Various move properties */
         gives_check = board_move_gives_check(pos, move);
         tactical = ISTACTICAL(move) || in_check || gives_check;
+        history_get_scores(worker, move, &hist, &chist, &fhist);
 
         /* Remeber all quiet moves */
         if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
@@ -716,7 +724,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
 
             /* Prune moves based on continuation history */
             if (!tactical && (depth <= HISTORY_PRUNING_DEPTH)) {
-                history_get_scores(worker, move, &hist, &chist, &fhist);
                 if (chist < counter_history_pruning_margin[depth]) {
                     continue;
                 }
@@ -764,13 +771,18 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
          * depth. Exceptions are made for tactical moves, like captures and
          * promotions.
          */
-        reduction =
-                (!extended && (movenumber > 3) && (depth > 3) && !tactical)?1:0;
-        if ((reduction > 0) && (movenumber > 6)) {
-            reduction++;
+        reduction = 0;
+        if (!tactical && !extended && (new_depth > 2) && (movenumber > 1)) {
+            reduction = lmr_reductions[MIN(new_depth, 63)][MIN(movenumber, 63)];
+            reduction -= (CLAMP(((fhist+chist+hist)/5000), -2, 2));
+
+            if (!pv_node && !improving) {
+                reduction++;
+            }
         }
 
         /* Recursivly search the move */
+        reduction = CLAMP(reduction, 0, new_depth-1);
         if (best_score == -INFINITE_SCORE) {
             /*
              * Perform a full search until a pv move is found. Usually
@@ -886,6 +898,8 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     tt_found = hash_tt_lookup(pos, &tt_item);
     best_move = tt_found?tt_item.move:NOMOVE;
     in_check = board_in_check(pos, pos->stm);
+
+    pos->eval_stack[pos->sply] = eval_evaluate(pos);
 
     /* Search all moves */
     quiets.size = 0;
@@ -1058,6 +1072,18 @@ static void search_aspiration_window(struct search_worker *worker, int depth,
         }
         worker->resolving_root_fail = false;
         break;
+    }
+}
+
+void search_init(void)
+{
+    int k;
+    int l;
+
+    for (k=1;k<64;k++) {
+        for (l=1;l<64;l++) {
+            lmr_reductions[k][l] = 0.5 + log(k)*log(l)/2.0;
+        }
     }
 }
 

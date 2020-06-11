@@ -430,6 +430,7 @@ struct position {
     int fullmove;
     /* Game history used for undoing moves */
     struct unmake history[MAX_HISTORY_SIZE];
+    int eval_stack[MAX_HISTORY_SIZE];
 
     /* Pointers to the owning worker and the active game state */
     struct search_worker *worker;
