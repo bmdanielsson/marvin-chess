@@ -775,10 +775,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         if (!tactical && !extended && (new_depth > 2) && (movenumber > 1)) {
             reduction = lmr_reductions[MIN(new_depth, 63)][MIN(movenumber, 63)];
             reduction -= (CLAMP(((fhist+chist+hist)/5000), -2, 2));
-
-            if (!pv_node && !improving) {
-                reduction++;
-            }
+            reduction += ((!pv_node && !improving)?1:0);
         }
 
         /* Recursivly search the move */
