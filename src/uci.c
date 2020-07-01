@@ -91,6 +91,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = skip_whitespace(iter);
             iter = strchr(iter, ' ');
             in_movelist = false;
+            flags |= TC_TIME_LIMIT;
         } else if (!strncmp(iter, "btime", 5)) {
             if (sscanf(iter, "btime %d", &btime) != 1) {
                 return;
@@ -99,6 +100,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = skip_whitespace(iter);
             iter = strchr(iter, ' ');
             in_movelist = false;
+            flags |= TC_TIME_LIMIT;
         } else if (!strncmp(iter, "winc", 4)) {
             if (sscanf(iter, "winc %d", &winc) != 1) {
                 return;
@@ -107,6 +109,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = skip_whitespace(iter);
             iter = strchr(iter, ' ');
             in_movelist = false;
+            flags |= TC_TIME_LIMIT;
         } else if (!strncmp(iter, "binc", 4)) {
             if (sscanf(iter, "binc %d", &binc) != 1) {
                 return;
@@ -115,6 +118,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = skip_whitespace(iter);
             iter = strchr(iter, ' ');
             in_movelist = false;
+            flags |= TC_TIME_LIMIT;
         } else if (!strncmp(iter, "movestogo", 9)) {
             if (sscanf(iter, "movestogo %d", &movestogo) != 1) {
                 return;
@@ -123,7 +127,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = skip_whitespace(iter);
             iter = strchr(iter, ' ');
             in_movelist = false;
-            flags |= TC_REGULAR;
+            flags |= (TC_REGULAR|TC_TIME_LIMIT);
         } else if (!strncmp(iter, "movetime", 8)) {
             if (sscanf(iter, "movetime %d", &movetime) != 1) {
                 return;
@@ -133,6 +137,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = strchr(iter, ' ');
             in_movelist = false;
             fixed_time = true;
+            flags |= (TC_FIXED_TIME|TC_TIME_LIMIT);
         } else if (!strncmp(iter, "depth", 5)) {
             if (sscanf(iter, "depth %d", &depth) != 1) {
                 return;
@@ -146,10 +151,12 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = skip_whitespace(iter);
             iter = strchr(iter, ' ');
             in_movelist = false;
+            flags |= TC_DEPTH_LIMIT;
         } else if (!strncmp(iter, "infinite", 8)) {
             infinite_time = true;
             iter = strchr(iter, ' ');
             in_movelist = false;
+            flags |= TC_INFINITE_TIME;
         } else if (!strncmp(iter, "ponder", 6)) {
             ponder = true;
             iter = strchr(iter, ' ');
@@ -182,13 +189,11 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
         movetime = 0;
         moveinc = 0;
         movestogo = 0;
-        flags |= TC_INFINITE_TIME;
         state->exit_on_mate = false;
         skip_book = true;
     } else if (fixed_time) {
         moveinc = 0;
         movestogo = 0;
-        flags |= TC_FIXED_TIME;
     } else {
         movetime = state->pos.stm == WHITE?wtime:btime;
         moveinc = state->pos.stm == WHITE?winc:binc;

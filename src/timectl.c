@@ -154,7 +154,8 @@ bool tc_check_time(struct search_worker *worker)
 {
     assert(worker != NULL);
 
-    if (worker->state->pondering || (tc_flags&TC_INFINITE_TIME)) {
+    if (worker->state->pondering ||
+        ((tc_flags&TC_TIME_LIMIT) == 0)) {
         return true;
     }
 
@@ -183,6 +184,6 @@ bool tc_check_time(struct search_worker *worker)
 
 bool tc_new_iteration(struct search_worker *worker)
 {
-    return worker->state->pondering || (tc_flags&TC_INFINITE_TIME) ||
+    return worker->state->pondering || ((tc_flags&TC_TIME_LIMIT) == 0) ||
            worker->depth <= 1 || (get_current_time() < soft_time_limit);
 }

@@ -202,10 +202,18 @@ static void make_engine_move(struct gamestate *state)
     state->silent = false;
     ponder = false;
     pondering_on = NOMOVE;
-    flags = infinite_time?TC_INFINITE_TIME:0;
-    flags = fixed_time?TC_FIXED_TIME:flags;
+    if (infinite_time) {
+        flags = TC_INFINITE_TIME;
+    } else if (fixed_time) {
+        flags = TC_FIXED_TIME|TC_TIME_LIMIT;
+    } else if ((engine_time_left > 0) || (engine_time_increment > 0)) {
+        flags = TC_TIME_LIMIT;
+    }
     if (moves_to_time_control > 0) {
         flags |= TC_REGULAR;
+    }
+    if (search_depth_limit < MAX_SEARCH_DEPTH) {
+        flags |= TC_DEPTH_LIMIT;
     }
 
     while (true) {
