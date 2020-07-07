@@ -704,8 +704,8 @@ static void evaluate_bishops(struct position *pos, struct eval *eval)
 
 static void evaluate_rooks(struct position *pos, struct eval *eval)
 {
-    const uint64_t rank7[NSIDES] = {rank_mask[RANK_7], rank_mask[RANK_2]};
-    const uint64_t rank8[NSIDES] = {rank_mask[RANK_8], rank_mask[RANK_1]};
+    uint64_t rank7[NSIDES] = {rank_mask[RANK_7], rank_mask[RANK_2]};
+    uint64_t rank8[NSIDES] = {rank_mask[RANK_8], rank_mask[RANK_1]};
     uint64_t pieces;
     uint64_t all_pawns;
     uint64_t moves;
@@ -859,26 +859,13 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
 
 static void evaluate_kings(struct position *pos, struct eval *eval)
 {
-/*    uint64_t            queenside[NSIDES] = {
-                                        sq_mask[A1]|sq_mask[B1]|sq_mask[C1],
-                                        sq_mask[A8]|sq_mask[B8]|sq_mask[C8]};
-    uint64_t            kingside[NSIDES] = {
-                                        sq_mask[F1]|sq_mask[G1]|sq_mask[H1],
-                                        sq_mask[F8]|sq_mask[G8]|sq_mask[H8]};*/
-//    int                 scores[] = {PAWN_SHIELD_HOLE, PAWN_SHIELD_RANK1,
-//                                    PAWN_SHIELD_RANK2};
-//    struct pawntt_item  *item;
-    int                 piece;
-    int                 nattackers;
-    int                 score;
-    //bool                shield;
-    //int                 castling_side;
-    //int                 type;
-    //int                 k;
-    int                 sq;
-    int                 index;
-    int                 side;
-    uint64_t            pieces;
+    int      piece;
+    int      nattackers;
+    int      score;
+    int      sq;
+    int      index;
+    int      side;
+    uint64_t pieces;
 
     pieces = pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING];
     while (pieces != 0ULL) {
@@ -890,49 +877,6 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
         eval->score[MIDDLEGAME][side] += PSQ_TABLE_KING_MG[index];
         eval->score[ENDGAME][side] += PSQ_TABLE_KING_EG[index];
         TRACE_OM(PSQ_TABLE_KING_MG, PSQ_TABLE_KING_EG, index, 1);
-
-        /*
-         * If the king has moved to the side then it is good to keep a
-         * shield of pawns in front of it. The only exception is if
-         * there is a rook between the king and the corner. In this case
-         * keeping a pawn shield will get the rook trapped.
-         */
-/*        shield = false;
-        item = &eval->pawntt;
-        if (queenside[side]&pos->bb_pieces[KING+side]) {
-            if (!((pos->bb_pieces[ROOK+side]&queenside[side]) &&
-                 (LSB(pos->bb_pieces[ROOK+side]&queenside[side]) <
-                  LSB(pos->bb_pieces[KING+side])))) {
-                shield = true;
-                castling_side = QUEENSIDE;
-            }
-        } else if (kingside[side]&pos->bb_pieces[KING+side]) {
-            if (!((pos->bb_pieces[ROOK+side]&kingside[side]) &&
-                  (MSB(pos->bb_pieces[ROOK+side]&kingside[side]) >
-                   MSB(pos->bb_pieces[KING+side])))) {
-                shield = true;
-                castling_side = KINGSIDE;
-            }
-        }
-        if (shield) {
-            for (k=0;k<3;k++) {
-                type = item->pawn_shield[side][castling_side][k];
-                switch (type) {
-                case 0:
-                    eval->score[MIDDLEGAME][side] += scores[type];
-                    TRACE_M_M(PAWN_SHIELD_HOLE, 1);
-                    break;
-                case 1:
-                case 2:
-                    eval->score[MIDDLEGAME][side] += scores[type];
-                    TRACE_OM_M(PAWN_SHIELD_RANK1, type-1, 1);
-                    break;
-                default:
-                    break;
-                }
-            }
-        }*/
-
 
         /* Calculate preassure on the enemy king */
         nattackers = 0;
