@@ -179,11 +179,11 @@ bool fen_setup_board(struct position *pos, char *fenstr)
     }
 
     /*
-     * Parse remaing FEN fields if they are present
-     * otherwise assign default values.
+     * Allow the 'halfmove' and 'full move' fields to be
+     * omitted in order to handle EPD strings.
      */
     iter = skip_whitespace(iter);
-    if (*iter != '\0') {
+    if (*iter != '\0' && IS_DIGIT_09(*iter)) {
         /* Halfmove counter field */
         iter++;
         if (sscanf(iter, "%d", &pos->fifty) != 1) {
