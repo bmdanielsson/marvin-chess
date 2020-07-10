@@ -274,8 +274,7 @@ static thread_retval_t trace_positions_func(void *data)
     for (iter=worker->first_pos;iter<=worker->last_pos;iter++) {
         /* Setup position */
         board_reset(&state->pos);
-        (void)fen_setup_board(&state->pos, trainingset->positions[iter].epd,
-                              true);
+        (void)fen_setup_board(&state->pos, trainingset->positions[iter].epd);
 
         /*
          * Trace the evaluation function for this position
@@ -703,7 +702,7 @@ static struct trainingset* read_trainingset(struct gamestate *state, char *file)
 
         /* Verify that the position is legal */
         board_reset(&state->pos);
-        if (!fen_setup_board(&state->pos, buffer, true)) {
+        if (!fen_setup_board(&state->pos, buffer)) {
             str = fgets(buffer, sizeof(buffer), fp);
             continue;
         }
@@ -1045,8 +1044,7 @@ static void verify_trace(char *training_file)
     for (k=0;k<trainingset->size;k++) {
         /* Setup position */
         board_reset(&state->pos);
-        (void)fen_setup_board(&state->pos, trainingset->positions[k].epd,
-                              true);
+        (void)fen_setup_board(&state->pos, trainingset->positions[k].epd);
 
         /* Evaluate the position */
         score = eval_evaluate(&state->pos);
@@ -1168,7 +1166,6 @@ int main(int argc, char *argv[])
     /* Initialize components */
     chess_data_init();
     bb_init();
-    see_init();
 
     /* Initialize options */
     training_file = NULL;
