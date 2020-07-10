@@ -42,6 +42,9 @@
 #define ROOK_ATTACK_WEIGHT      2
 #define QUEEN_ATTACK_WEIGHT     4
 
+/* Bonus given to the side to move */
+#define TEMPO_BONUS 10
+
 /* Different evaluation components */
 struct eval {
     bool in_pawntt;
@@ -981,6 +984,7 @@ int eval_evaluate(struct position *pos)
     int         k;
     int         phase;
     int         score[NPHASES];
+    int         tapered_score;
 
     assert(valid_position(pos));
 
@@ -1007,7 +1011,9 @@ int eval_evaluate(struct position *pos)
 
     /* Return score adjusted for game phase */
     phase = eval_game_phase(pos);
-    return calculate_tapered_eval(phase, score[MIDDLEGAME], score[ENDGAME]);
+    tapered_score = calculate_tapered_eval(phase, score[MIDDLEGAME],
+                                           score[ENDGAME]);
+    return tapered_score + TEMPO_BONUS;
 }
 
 /*
