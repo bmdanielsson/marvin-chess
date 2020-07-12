@@ -202,6 +202,7 @@ static void make_engine_move(struct gamestate *state)
     state->silent = false;
     ponder = false;
     pondering_on = NOMOVE;
+    flags = 0;
     if (infinite_time) {
         flags = TC_INFINITE_TIME;
     } else if (fixed_time) {
