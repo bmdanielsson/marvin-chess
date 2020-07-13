@@ -676,9 +676,10 @@ uint64_t bb_attacks_to(struct position *pos, uint64_t occ, int to, int side)
     /* Generate attacks */
     attacks = 0ULL;
     attacks |= king_moves_table[to]&(pos->bb_pieces[side+KING]);
-    attacks |= (bb_queen_moves(occ, to)&(pos->bb_pieces[side+QUEEN]));
-    attacks |= (bb_rook_moves(occ, to)&(pos->bb_pieces[side+ROOK]));
-    attacks |= (bb_bishop_moves(occ, to)&(pos->bb_pieces[side+BISHOP]));
+    attacks |= bb_rook_moves(occ, to)&
+                    (pos->bb_pieces[side+ROOK]|pos->bb_pieces[side+QUEEN]);
+    attacks |= bb_bishop_moves(occ, to)&
+                    (pos->bb_pieces[side+BISHOP]|pos->bb_pieces[side+QUEEN]);
     attacks |= knight_moves_table[to]&(pos->bb_pieces[side+KNIGHT]);
     attacks |= pawn_attacks_to_table[to][side]&(pos->bb_pieces[side+PAWN]);
 
