@@ -137,7 +137,6 @@ static void add_piece(struct position *pos, int piece, int square)
 {
     SETBIT(pos->bb_pieces[piece], square);
     SETBIT(pos->bb_sides[COLOR(piece)], square);
-    SETBIT(pos->bb_all, square);
     pos->pieces[square] = piece;
 }
 
@@ -145,7 +144,6 @@ static void remove_piece(struct position *pos, int piece, int square)
 {
     CLEARBIT(pos->bb_pieces[piece], square);
     CLEARBIT(pos->bb_sides[COLOR(piece)], square);
-    CLEARBIT(pos->bb_all, square);
     pos->pieces[square] = NO_PIECE;
 }
 
@@ -250,7 +248,6 @@ bool board_make_move(struct position *pos, uint32_t move)
     assert(board_is_move_pseudo_legal(pos, move));
     assert(pos->ply < MAX_MOVES);
 
-
     from = FROM(move);
     to = TO(move);
     promotion = PROMOTION(move);
@@ -349,6 +346,9 @@ bool board_make_move(struct position *pos, uint32_t move)
         hash_prefetch(pos->worker);
     }
 
+    /* Update bitboard of all pieces */
+    pos->bb_all = pos->bb_sides[WHITE]|pos->bb_sides[BLACK];
+
     /*
      * If the king was left in check then the move
      * was illegal and should be undone.
@@ -430,6 +430,9 @@ void board_unmake_move(struct position *pos)
 
     /* Update position and game information */
     pos->stm = move_color;
+
+    /* Update bitboard of all pieces */
+    pos->bb_all = pos->bb_sides[WHITE]|pos->bb_sides[BLACK];
 
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
