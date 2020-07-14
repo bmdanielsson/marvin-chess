@@ -40,7 +40,7 @@ endif
 ifeq ($(variant), release)
     CPPFLAGS += -DNDEBUG
     CFLAGS += -O3 -funroll-loops -fomit-frame-pointer -flto
-    LDFLAGS += $(ARCH) -flto
+    LDFLAGS += $(ARCH) -flto $(EXTRALDFLAGS)
 else
 ifeq ($(variant), debug)
     CFLAGS += -g
@@ -157,7 +157,7 @@ TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
 .DEFAULT_GOAL = marvin
 
 %.o : %.c
-	$(COMPILE.c) -MD -o $@ $<
+	$(COMPILE.c) -MD -o $@ $< $(EXTRACFLAGS)
 	@cp $*.d $*.d 2> /dev/null; \
             sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
                 -e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $*.d; \
@@ -186,3 +186,18 @@ marvin : $(OBJECTS)
 
 tuner : $(TUNER_OBJECTS)
 	$(CC) $(TUNER_OBJECTS) $(LDFLAGS) -o tuner
+
+pgo-generate:
+	$(MAKE) EXTRACFLAGS='-fprofile-generate' EXTRALDFLAGS='-fprofile-generate -lgcov'
+
+pgo-use:
+	$(MAKE) EXTRACFLAGS='-fprofile-use' EXTRALDFLAGS='-fprofile-use -lgcov'
+
+pgo:
+	$(MAKE) clean
+	$(MAKE) pgo-generate
+	rm -f src/*.gcda import/fathom/*.gcda
+	./marvin -b
+	$(MAKE) clean
+	$(MAKE) pgo-use
+	rm -f src/*.gcda import/fathom/*.gcda
