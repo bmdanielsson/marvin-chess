@@ -158,7 +158,7 @@ void test_run_benchmark(void)
 
     state = create_game_state();
     nodes = 0ULL;
-    start = get_current_time();
+    total = 0;
     npos = sizeof(positions)/sizeof(char*);
     for (k=0;k<npos;k++) {
         board_setup_from_fen(&state->pos, positions[k]);
@@ -169,14 +169,14 @@ void test_run_benchmark(void)
         state->move_filter.size = 0;
         state->exit_on_mate = true;
 
+        start = get_current_time();
         smp_search(state, false, false, false);
+        total += (get_current_time() - start);
         nodes += smp_nodes();
 
         printf("#");
     }
     printf("\n");
-
-    total = get_current_time() - start;
 
     printf("Total time: %.2fs\n", total/1000.0);
     printf("Total number of nodes: %"PRIu64"\n", nodes);
