@@ -91,10 +91,10 @@ static void print_version(void)
 #ifdef HAS_POPCNT
     strcat(str, ", popcnt");
 #endif
-#ifdef HAS_ALIGNED_MALLOC
+#ifdef __GNUC__
     strcat(str, ", memalign");
 #endif
-#ifdef HAS_PREFETCH
+#ifdef __GNUC__
     strcat(str, ", prefetch");
 #endif
     strcat(str, ")");

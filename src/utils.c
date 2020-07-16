@@ -298,7 +298,7 @@ char* skip_whitespace(char *str)
 
 void* aligned_malloc(int alignment, uint64_t size)
 {
-#ifdef HAS_ALIGNED_MALLOC
+#ifdef __GNUC__
 #ifdef WINDOWS
     return _aligned_malloc(size, alignment);
 #else
@@ -316,7 +316,7 @@ void* aligned_malloc(int alignment, uint64_t size)
 
 void aligned_free(void *ptr)
 {
-#ifdef HAS_ALIGNED_MALLOC
+#ifdef __GNUC__
 #ifdef WINDOWS
     _aligned_free(ptr);
 #else

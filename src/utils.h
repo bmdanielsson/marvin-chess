@@ -31,7 +31,7 @@
 #define CACHE_LINE_SIZE 64
 
 /* Macro for prefetching the data at an address in to the cache */
-#ifdef HAS_PREFETCH
+#ifdef __GNUC__
 #define PREFETCH_ADDRESS(a) __builtin_prefetch((a))
 #else
 #define PREFETCH_ADDRESS(a)

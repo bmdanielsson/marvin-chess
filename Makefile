@@ -1,7 +1,5 @@
 # Default options
 popcnt = yes
-memalign = yes
-prefetch = yes
 trace = no
 variant = release
 
@@ -24,14 +22,6 @@ ifeq ($(popcnt), yes)
 else
     CPPFLAGS += -DTB_NO_HW_POP_COUNT
 endif
-.PHONY : memalign
-ifeq ($(memalign), yes)
-    CPPFLAGS += -DHAS_ALIGNED_MALLOC
-endif
-.PHONY : prefetch
-ifeq ($(prefetch), yes)
-    CPPFLAGS += -DHAS_PREFETCH
-endif
 .PHONY : trace
 ifeq ($(trace), yes)
     CPPFLAGS += -DTRACE
@@ -39,7 +29,7 @@ endif
 .PHONY : variant
 ifeq ($(variant), release)
     CPPFLAGS += -DNDEBUG
-    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer -flto
+    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer -flto $(EXTRACFLAGS)
     LDFLAGS += $(ARCH) -flto $(EXTRALDFLAGS)
 else
 ifeq ($(variant), debug)
@@ -157,10 +147,7 @@ TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
 .DEFAULT_GOAL = marvin
 
 %.o : %.c
-	$(COMPILE.c) -MD -o $@ $< $(EXTRACFLAGS)
-	@cp $*.d $*.d 2> /dev/null; \
-            sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
-                -e '/^$$/ d' -e 's/$$/ :/' < $*.d >> $*.d; \
+	$(COMPILE.c) -MD -o $@ $<
 
 clean :
 	rm -f marvin marvin.exe tuner $(INTERMEDIATES) $(TUNER_INTERMEDIATES)
@@ -171,13 +158,15 @@ help :
 	@echo ""
 	@echo "Supported targets:"
 	@echo "  marvin: Build the engine."
+	@echo "  pgo: Build the engine using profile guided optimization."
 	@echo "  tuner: Build the tuner program."
 	@echo "  help: Display this message."
 	@echo "  clean: Remove all intermediate files."
 	@echo ""
 	@echo "Supported options:"
-	@echo "  popcnt=[yes|no]: Use the popcnt HW instruction."
 	@echo "  arch=[x86|x86-64]: The architecture to build for."
+	@echo "  popcnt=[yes|no]: Use the popcnt HW instruction (default yes)."
+	@echo "  trace=[yes|no]: Include support for tracing the evaluation (default no)."
 	@echo "  variant=[release|debug|profile]: The variant to build."
 .PHONY : help
 
