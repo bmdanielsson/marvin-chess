@@ -437,6 +437,9 @@ struct position {
     struct gamestate *state;
 };
 
+/* The number of killer slots for each ply */
+#define NKILLERS 2
+
 /* Per-thread worker instance */
 struct search_worker {
     /* The id of this thread */
@@ -452,7 +455,7 @@ struct search_worker {
      */
     struct movelist pv_table[MAX_PLY];
     /* Tables used for killer heuristics */
-    uint32_t killer_table[MAX_PLY][2];
+    uint32_t killer_table[MAX_PLY][NKILLERS];
     /* Table used for counter move heuristics */
     uint32_t countermove_table[NPIECES][NSQUARES];
     /* Tables used for history heuristics */

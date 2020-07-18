@@ -77,6 +77,15 @@ void killer_clear_table(struct search_worker *worker);
 void killer_add_move(struct search_worker *worker, uint32_t move);
 
 /*
+ * Get the killer move in a specific slot.
+ *
+ * @param worker The worker.
+ * @param slot The index of the killer slot.
+ * @return Returns the killer move or NOMOVE if there is none.
+ */
+uint32_t killer_get_move(struct search_worker *worker, int slot);
+
+/*
  * Clear the counter move table.
  *
  * @param worker The worker to clear the counter move table for.
@@ -90,5 +99,13 @@ void counter_clear_table(struct search_worker *worker);
  * @param move The move to add.
  */
 void counter_add_move(struct search_worker *worker, uint32_t move);
+
+/*
+ * Get the counter move for the current position.
+ *
+ * @param worker The worker.
+ * @return Returns the counter move or NOMOVE if there is none.
+ */
+uint32_t counter_get_move(struct search_worker *worker);
 
 #endif

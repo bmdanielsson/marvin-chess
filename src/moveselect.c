@@ -279,8 +279,6 @@ void select_init_node(struct search_worker *worker, bool tactical_only,
                       bool in_check, uint32_t ttmove)
 {
     struct moveselector *ms;
-    uint32_t            prev_move;
-    int                 prev_to;
     struct position     *pos;
 
     pos = &worker->pos;
@@ -299,16 +297,9 @@ void select_init_node(struct search_worker *worker, bool tactical_only,
     ms->idx = 0;
     ms->last_idx = 0;
     ms->nbadcaps = 0;
-    ms->killer1 = worker->killer_table[pos->sply][0];
-    ms->killer2 = worker->killer_table[pos->sply][1];
-    prev_move = (pos->ply > 0)?pos->history[pos->ply-1].move:NOMOVE;
-    if (prev_move != NOMOVE && !ISNULLMOVE(prev_move)) {
-        prev_to = TO(prev_move);
-        ms->counter =
-                worker->countermove_table[pos->pieces[prev_to]][prev_to];
-    } else {
-        ms->counter = NOMOVE;
-    }
+    ms->killer1 = killer_get_move(worker, 0);
+    ms->killer2 = killer_get_move(worker, 1);
+    ms->counter = counter_get_move(worker);
 }
 
 bool select_get_move(struct search_worker *worker, uint32_t *move)
