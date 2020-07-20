@@ -264,9 +264,8 @@ struct pvinfo {
 struct moveselector {
     /* Move fetched from the transposition table for this position */
     uint32_t ttmove;
-    /* Killer moves for this position */
-    uint32_t killer1;
-    uint32_t killer2;
+    /* Killer move for this position */
+    uint32_t killer;
     /* Counter move for this position */
     uint32_t counter;
     /* Additional information for the availables moves */
@@ -437,9 +436,6 @@ struct position {
     struct gamestate *state;
 };
 
-/* The number of killer slots for each ply */
-#define NKILLERS 2
-
 /* Per-thread worker instance */
 struct search_worker {
     /* The id of this thread */
@@ -454,8 +450,8 @@ struct search_worker {
      * complete variation can be found in pv_table[0].
      */
     struct movelist pv_table[MAX_PLY];
-    /* Tables used for killer heuristics */
-    uint32_t killer_table[MAX_PLY][NKILLERS];
+    /* Tables used for killer move heuristics */
+    uint32_t killer_table[MAX_PLY];
     /* Table used for counter move heuristics */
     uint32_t countermove_table[NPIECES][NSQUARES];
     /* Tables used for history heuristics */

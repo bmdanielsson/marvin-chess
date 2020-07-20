@@ -33,8 +33,7 @@ enum {
     PHASE_TT,
     PHASE_GEN_TACTICAL,
     PHASE_GOOD_TACTICAL,
-    PHASE_KILLER1,
-    PHASE_KILLER2,
+    PHASE_KILLER,
     PHASE_COUNTER,
     PHASE_GEN_MOVES,
     PHASE_MOVES,
@@ -89,8 +88,7 @@ static void add_move(struct search_worker *worker, struct moveselector *ms,
      */
     move = list->moves[iter];
     if ((move == ms->ttmove) ||
-        (move == ms->killer1) ||
-        (move == ms->killer2) ||
+        (move == ms->killer) ||
         (move == ms->counter)) {
         return;
     }
@@ -203,20 +201,10 @@ static bool get_move(struct search_worker *worker, uint32_t *move)
         }
         ms->phase++;
         /* Fall through */
-    case PHASE_KILLER1:
+    case PHASE_KILLER:
         ms->phase++;
-        killer = ms->killer1;
+        killer = ms->killer;
         if ((killer != NOMOVE) && (killer != ms->ttmove) &&
-            board_is_move_pseudo_legal(pos, killer)) {
-            *move = killer;
-            return true;
-        }
-        /* Fall through */
-    case PHASE_KILLER2:
-        ms->phase++;
-        killer = ms->killer2;
-        if ((killer != NOMOVE) && (killer != ms->ttmove) &&
-            (killer != ms->killer1) &&
             board_is_move_pseudo_legal(pos, killer)) {
             *move = killer;
             return true;
@@ -226,7 +214,7 @@ static bool get_move(struct search_worker *worker, uint32_t *move)
         ms->phase++;
         counter = ms->counter;
         if ((counter != NOMOVE) && (counter != ms->ttmove) &&
-            (counter != ms->killer1) && (counter != ms->killer2) &&
+            (counter != ms->killer) &&
             board_is_move_pseudo_legal(pos, counter)) {
             *move = counter;
             return true;
@@ -297,8 +285,7 @@ void select_init_node(struct search_worker *worker, bool tactical_only,
     ms->idx = 0;
     ms->last_idx = 0;
     ms->nbadcaps = 0;
-    ms->killer1 = killer_get_move(worker, 0);
-    ms->killer2 = killer_get_move(worker, 1);
+    ms->killer = killer_get_move(worker);
     ms->counter = counter_get_move(worker);
 }
 

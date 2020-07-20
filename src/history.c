@@ -211,8 +211,7 @@ void killer_clear_table(struct search_worker *worker)
     int k;
 
     for (k=0;k<MAX_PLY;k++) {
-        worker->killer_table[k][0] = NOMOVE;
-        worker->killer_table[k][1] = NOMOVE;
+        worker->killer_table[k] = NOMOVE;
     }
 }
 
@@ -220,20 +219,14 @@ void killer_add_move(struct search_worker *worker, uint32_t move)
 {
     struct position *pos = &worker->pos;
 
-    if (move == worker->killer_table[pos->sply][0]) {
-        return;
-    }
-
-    worker->killer_table[pos->sply][1] = worker->killer_table[pos->sply][0];
-    worker->killer_table[pos->sply][0] = move;
+    worker->killer_table[pos->sply] = move;
 }
 
-uint32_t killer_get_move(struct search_worker *worker, int slot)
+uint32_t killer_get_move(struct search_worker *worker)
 {
     assert(worker != NULL);
-    assert(slot < NKILLERS);
 
-    return worker->killer_table[worker->pos.sply][slot];
+    return worker->killer_table[worker->pos.sply];
 }
 
 void counter_clear_table(struct search_worker *worker)

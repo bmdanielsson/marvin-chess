@@ -80,10 +80,9 @@ void killer_add_move(struct search_worker *worker, uint32_t move);
  * Get the killer move in a specific slot.
  *
  * @param worker The worker.
- * @param slot The index of the killer slot.
  * @return Returns the killer move or NOMOVE if there is none.
  */
-uint32_t killer_get_move(struct search_worker *worker, int slot);
+uint32_t killer_get_move(struct search_worker *worker);
 
 /*
  * Clear the counter move table.
