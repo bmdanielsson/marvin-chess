@@ -689,7 +689,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         history_get_scores(worker, move, &hist, &chist, &fhist);
 
         /* Remeber all quiet moves */
-        if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
+        if (!ISTACTICAL(move)) {
             quiets.moves[quiets.size++] = move;
         }
 
@@ -921,7 +921,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
         }
 
         /* Remeber all quiet moves */
-        if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
+        if (!ISTACTICAL(move)) {
             quiets.moves[quiets.size++] = move;
         }
 
