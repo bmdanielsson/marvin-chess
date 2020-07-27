@@ -319,25 +319,23 @@ void gen_check_evasions(struct position *pos, struct movelist *list)
 
     list->size = 0;
 
-    gen_check_evasion_moves(pos, list);
-    gen_check_evasion_captures(pos, list);
+    gen_check_evasion_quiet(pos, list);
+    gen_check_evasion_tactical(pos, list);
 }
 
-void gen_check_evasion_moves(struct position *pos, struct movelist *list)
+void gen_check_evasion_quiet(struct position *pos, struct movelist *list)
 {
     int      kingsq;
     int      to;
     uint64_t moves;
     uint64_t attackers;
     uint64_t slide;
-    uint64_t temp;
     uint64_t blockers;
     uint64_t occ;
     int      attacksq;
     int      attacker;
     int      from;
     int      blocksq;
-    bool     promotion;
 
     /* Find the location of our king */
     kingsq = LSB(pos->bb_pieces[KING+pos->stm]);
@@ -391,7 +389,6 @@ void gen_check_evasion_moves(struct position *pos, struct movelist *list)
     slide &= (~sq_mask[kingsq]);
 
     /* Try to put a piece between the attacker and the king */
-    temp = slide;
     while (slide != 0ULL) {
         blocksq = POPBIT(&slide);
 
@@ -404,38 +401,27 @@ void gen_check_evasion_moves(struct position *pos, struct movelist *list)
             ADD_MOVE(list, from, blocksq, NO_PIECE, 0);
         }
 
-        /* Pawn blockers */
-        promotion =
-            ((sq_mask[blocksq]&(rank_mask[RANK_1]|rank_mask[RANK_8])) != 0ULL);
+        /* Pawn blockers (excluding promotions) */
+        if ((RANKNR(blocksq) == RANK_1) || (RANKNR(blocksq) == RANK_8)) {
+            continue;
+        }
         blockers = bb_pawn_moves_to(occ, blocksq, pos->stm);
         blockers &= pos->bb_pieces[PAWN+pos->stm];
         while (blockers != 0ULL) {
             from = POPBIT(&blockers);
-            if (promotion) {
-                add_promotion_moves(pos, list, from, sq_mask[blocksq],
-                                    PROMOTION, true);
-            } else {
-                ADD_MOVE(list, from, blocksq, NO_PIECE, 0);
-            }
+            ADD_MOVE(list, from, blocksq, NO_PIECE, 0);
         }
-    }
-    slide = temp;
-
-    /*
-     * Finally see if the check can be blocked
-     * by doing an en-passant capture.
-     */
-    if ((pos->ep_sq != NO_SQUARE) && ISBITSET(slide, pos->ep_sq)) {
-        gen_en_passant_moves(pos, list);
     }
 }
 
-void gen_check_evasion_captures(struct position *pos, struct movelist *list)
+void gen_check_evasion_tactical(struct position *pos, struct movelist *list)
 {
     int      kingsq;
     int      to;
     uint64_t moves;
     uint64_t attackers;
+    uint64_t slide;
+    uint64_t blockers;
     uint64_t occ;
     int      attacksq;
     int      attacker;
@@ -502,6 +488,39 @@ void gen_check_evasion_captures(struct position *pos, struct movelist *list)
     } else if ((VALUE(attacker) == PAWN) && (pos->stm == BLACK) &&
                (attacksq == (pos->ep_sq+8))) {
         gen_en_passant_moves(pos, list);
+    }
+
+    /*
+     * If the king is not on the first or last rank then
+     * there are no more cases to consider.
+     */
+    if ((RANKNR(attacksq) != RANKNR(kingsq)) ||
+        ((pos->stm == WHITE) && (RANKNR(kingsq) != RANK_8)) ||
+        ((pos->stm == BLACK) && (RANKNR(kingsq) != RANK_1)) ||
+        ((VALUE(attacker) != ROOK) && (VALUE(attacker) != QUEEN))) {
+        return;
+    }
+
+    /*
+     * Try to block by promoting a pawn. Promotions that are also
+     * captures are handled earlier.
+     */
+    occ = pos->bb_all;
+    slide = bb_rook_moves(occ, attacksq)&bb_rook_moves(occ, kingsq);
+    slide &= (~sq_mask[attacksq]);
+    slide &= (~sq_mask[kingsq]);
+    if (pos->stm == WHITE) {
+        slide &= rank_mask[RANK_8];
+        blockers = (slide >> 8)&pos->bb_pieces[WHITE_PAWN];
+    } else {
+        slide &= rank_mask[RANK_1];
+        blockers = (slide << 8)&pos->bb_pieces[BLACK_PAWN];
+    }
+    while (blockers != 0ULL) {
+        from = POPBIT(&blockers);
+        add_promotion_moves(pos, list, from,
+                            pos->stm==WHITE?sq_mask[from+8]:sq_mask[from-8],
+                            PROMOTION, true);
     }
 }
 
