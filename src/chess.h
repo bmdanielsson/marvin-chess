@@ -272,8 +272,8 @@ struct moveselector {
     struct moveinfo moveinfo[MAX_MOVES+MAX_CAPTURES];
     /* Index of the last move plus one */
     int last_idx;
-    /* The number of bad captures */
-    int nbadcaps;
+    /* The number of bad tactical moves */
+    int nbadtacticals;
     /* Index of the move currently being searched */
     int idx;
     /* The current move generation phase */

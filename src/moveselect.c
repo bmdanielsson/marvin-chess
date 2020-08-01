@@ -78,7 +78,6 @@ static void add_move(struct search_worker *worker, struct moveselector *ms,
     uint32_t        move;
     struct moveinfo *info;
     struct position *pos;
-    bool            gez;
 
     pos = &worker->pos;
 
@@ -96,12 +95,12 @@ static void add_move(struct search_worker *worker, struct moveselector *ms,
     /*
      * If the SEE score is positive (normal moves or good captures) then
      * the move is added to the moveinfo list. If the SEE score is
-     * negative (bad captures) the the move is added to be bad capture list.
+     * negative (bad captures) then the move is added to be bad tacticals
+     * list.
      */
-    gez = (ISCAPTURE(move) || ISENPASSANT(move))?see_ge(pos, move, 0):true;
-    if ((ISCAPTURE(move) || ISENPASSANT(move)) && !gez) {
-        info = &ms->moveinfo[MAX_MOVES+ms->nbadcaps];
-        ms->nbadcaps++;
+    if (ISTACTICAL(move) && !see_ge(pos, move, 0)) {
+        info = &ms->moveinfo[MAX_MOVES+ms->nbadtacticals];
+        ms->nbadtacticals++;
     } else {
         info = &ms->moveinfo[ms->last_idx];
         ms->last_idx++;
@@ -109,12 +108,10 @@ static void add_move(struct search_worker *worker, struct moveselector *ms,
     info->move = move;
 
     /* Assign a score to the move */
-    if ((ISCAPTURE(move) || ISENPASSANT(move)) && gez) {
+    if (ISTACTICAL(move)) {
         info->score = mvvlva(pos, move);
-    } else if (!(ISCAPTURE(move) || ISENPASSANT(move))) {
-        info->score = history_get_score(worker, move);
     } else {
-        info->score = mvvlva(pos, move);
+        info->score = history_get_score(worker, move);
     }
 }
 
@@ -240,7 +237,7 @@ static bool get_move(struct search_worker *worker, uint32_t *move)
         ms->phase++;
         /* Fall through */
     case PHASE_ADD_BAD_TACTICAL:
-        ms->last_idx = MAX_MOVES + ms->nbadcaps;
+        ms->last_idx = MAX_MOVES + ms->nbadtacticals;
         ms->idx = MAX_MOVES;
         ms->phase++;
         /* Fall through */
@@ -284,7 +281,7 @@ void select_init_node(struct search_worker *worker, bool tactical_only,
     ms->in_check = in_check;
     ms->idx = 0;
     ms->last_idx = 0;
-    ms->nbadcaps = 0;
+    ms->nbadtacticals = 0;
     ms->killer = killer_get_move(worker);
     ms->counter = counter_get_move(worker);
 }

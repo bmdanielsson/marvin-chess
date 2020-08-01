@@ -959,8 +959,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                  * save some time.
                  */
                 if (score >= beta) {
-                    if ((!ISCAPTURE(move) && !ISENPASSANT(move)) ||
-                        !see_ge(pos, move, 0)) {
+                    if (!ISTACTICAL(move) || !see_ge(pos, move, 0)) {
                         killer_add_move(worker, move);
                     }
                     tt_flag = TT_BETA;
