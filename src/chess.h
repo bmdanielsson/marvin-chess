@@ -442,8 +442,6 @@ struct search_worker {
     int id;
     /* The current position */
     struct position pos;
-    /* Move selector struct for each ply in the search tree */
-    struct moveselector ppms[MAX_PLY];
     /*
      * Parameter used during the search to keep track of the current
      * principle variation at a certain depth. After the search the

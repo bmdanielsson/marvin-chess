@@ -77,9 +77,7 @@ static void add_move(struct search_worker *worker, struct moveselector *ms,
 {
     uint32_t        move;
     struct moveinfo *info;
-    struct position *pos;
-
-    pos = &worker->pos;
+    struct position *pos = &worker->pos;
 
     /*
      * Moves in the transposition table, killer moves and counter moves
@@ -154,17 +152,14 @@ static uint32_t select_move(struct moveselector *ms)
     return ms->moveinfo[start].move;
 }
 
-static bool get_move(struct search_worker *worker, uint32_t *move)
+static bool get_move(struct moveselector *ms, struct search_worker *worker,
+                     uint32_t *move)
 {
-    struct moveselector *ms;
-    struct movelist     list;
-    uint32_t            killer;
-    uint32_t            counter;
-    int                 k;
-    struct position     *pos;
-
-    pos = &worker->pos;
-    ms = &worker->ppms[pos->sply];
+    struct movelist list;
+    uint32_t        killer;
+    uint32_t        counter;
+    int             k;
+    struct position *pos = &worker->pos;
 
     switch (ms->phase) {
     case PHASE_TT:
@@ -260,20 +255,17 @@ static bool get_move(struct search_worker *worker, uint32_t *move)
     return *move != NOMOVE;
 }
 
-void select_init_node(struct search_worker *worker, bool tactical_only,
-                      bool in_check, uint32_t ttmove)
+void select_init_node(struct moveselector *ms, struct search_worker *worker,
+                      bool tactical_only, bool in_check, uint32_t ttmove)
 {
-    struct moveselector *ms;
-    struct position     *pos;
+    struct position *pos = &worker->pos;
 
-    pos = &worker->pos;
-    ms = &worker->ppms[pos->sply];
     ms->phase = PHASE_TT;
     ms->tactical_only = tactical_only;
     ms->underpromote = !tactical_only;
     if ((ttmove == NOMOVE) || !board_is_move_pseudo_legal(pos, ttmove)) {
         ms->ttmove = NOMOVE;
-    } else if (ms->tactical_only && !in_check && !ISTACTICAL(ms->ttmove)) {
+    } else if (tactical_only && !in_check && !ISTACTICAL(ttmove)) {
         ms->ttmove = NOMOVE;
     } else {
         ms->ttmove = ttmove;
@@ -286,20 +278,15 @@ void select_init_node(struct search_worker *worker, bool tactical_only,
     ms->counter = counter_get_move(worker);
 }
 
-bool select_get_move(struct search_worker *worker, uint32_t *move)
+bool select_get_move(struct moveselector *ms, struct search_worker *worker,
+                     uint32_t *move)
 {
     assert(move != NULL);
 
-    return get_move(worker, move);
+    return get_move(ms, worker, move);
 }
 
-bool select_is_bad_capture_phase(struct search_worker *worker)
+bool select_is_bad_capture_phase(struct moveselector *ms)
 {
-    struct moveselector *ms;
-    struct position     *pos;
-
-    pos = &worker->pos;
-    ms = &worker->ppms[pos->sply];
-
     return ms->phase == PHASE_BAD_TACTICAL;
 }

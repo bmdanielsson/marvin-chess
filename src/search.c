@@ -317,17 +317,16 @@ static int material_gain(struct position *pos, uint32_t move)
 static int quiescence(struct search_worker *worker, int depth, int alpha,
                       int beta)
 {
-    int             score;
-    int             best_score;
-    int             static_score;
-    uint32_t        move;
-    bool            found_move;
-    bool            in_check;
-    bool            tt_found;
-    struct tt_item  tt_item;
-    struct position *pos;
-
-    pos = &worker->pos;
+    int                 score;
+    int                 best_score;
+    int                 static_score;
+    uint32_t            move;
+    bool                found_move;
+    bool                in_check;
+    bool                tt_found;
+    struct tt_item      tt_item;
+    struct position     *pos = &worker->pos;
+    struct moveselector ms;
 
     /* Update search statistics */
     if (depth < 0) {
@@ -382,14 +381,14 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     
     /* Search all moves */
     found_move = false;
-    select_init_node(worker, true, in_check, tt_found?tt_item.move:NOMOVE);
-    while (select_get_move(worker, &move)) {
+    select_init_node(&ms, worker, true, in_check, tt_found?tt_item.move:NOMOVE);
+    while (select_get_move(&ms, worker, &move)) {
         /*
          * Don't bother searching captures that
          * lose material according to SEE.
          */
         if (!in_check && ISCAPTURE(move) &&
-            select_is_bad_capture_phase(worker)) {
+            select_is_bad_capture_phase(&ms)) {
             continue;
         }
 
@@ -439,37 +438,36 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
 static int search(struct search_worker *worker, int depth, int alpha, int beta,
                   bool try_null, uint32_t exclude_move)
 {
-    int             score;
-    int             tt_score;
-    int             tb_score;
-    int             best_score;
-    int             static_score;
-    int             threshold;
-    uint32_t        move;
-    uint32_t        tt_move;
-    uint32_t        best_move;
-    int             movenumber;
-    bool            found_move;
-    int             reduction;
-    int             futility_pruning;
-    bool            in_check;
-    bool            gives_check;
-    int             tt_flag;
-    bool            pv_node;
-    bool            tactical;
-    bool            extended;
-    int             new_depth;
-    struct tt_item  tt_item;
-    bool            tt_found;
-    struct position *pos;
-    bool            is_singular;
-    struct movelist quiets;
-    int             see_prune_margin[2];
-    int             hist;
-    int             chist;
-    int             fhist;
-
-    pos = &worker->pos;
+    int                 score;
+    int                 tt_score;
+    int                 tb_score;
+    int                 best_score;
+    int                 static_score;
+    int                 threshold;
+    uint32_t            move;
+    uint32_t            tt_move;
+    uint32_t            best_move;
+    int                 movenumber;
+    bool                found_move;
+    int                 reduction;
+    int                 futility_pruning;
+    bool                in_check;
+    bool                gives_check;
+    int                 tt_flag;
+    bool                pv_node;
+    bool                tactical;
+    bool                extended;
+    int                 new_depth;
+    struct tt_item      tt_item;
+    bool                tt_found;
+    struct position     *pos = &worker->pos;
+    bool                is_singular;
+    struct movelist     quiets;
+    int                 see_prune_margin[2];
+    int                 hist;
+    int                 chist;
+    int                 fhist;
+    struct moveselector ms;
 
     /* Set node type */
     pv_node = (beta-alpha) > 1;
@@ -608,8 +606,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         board_has_non_pawn(&worker->pos, pos->stm)) {
         threshold = beta + PROBCUT_MARGIN;
 
-        select_init_node(worker, true, in_check, tt_move);
-        while (select_get_move(worker, &move)) {
+        select_init_node(&ms, worker, true, in_check, tt_move);
+        while (select_get_move(&ms, worker, &move)) {
             /*
              * Skip non-captures and captures that are not
              * good enough (according to SEE).
@@ -673,8 +671,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     tt_flag = TT_ALPHA;
     movenumber = 0;
     found_move = false;
-    select_init_node(worker, false, in_check, tt_move);
-    while (select_get_move(worker, &move)) {
+    select_init_node(&ms, worker, false, in_check, tt_move);
+    while (select_get_move(&ms, worker, &move)) {
         /*
          * If this a singular extension search then skip the move
          * that is expected to be singular.
@@ -872,20 +870,20 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
 static int search_root(struct search_worker *worker, int depth, int alpha,
                        int beta)
 {
-    int             score;
-    int             best_score;
-    uint32_t        move;
-    uint32_t        best_move;
-    int             tt_flag;
-    struct position *pos;
-    int             in_check;
-    int             new_depth;
-    struct movelist quiets;
-    bool            tt_found;
-    struct tt_item  tt_item;
+    int                 score;
+    int                 best_score;
+    uint32_t            move;
+    uint32_t            best_move;
+    int                 tt_flag;
+    struct position     *pos = &worker->pos;
+    int                 in_check;
+    int                 new_depth;
+    struct movelist     quiets;
+    bool                tt_found;
+    struct tt_item      tt_item;
+    struct moveselector ms;
 
-    pos = &worker->pos;
-
+    /* Check if the time is up or if we have received a new command */
     checkup(worker);
 
     /* Reset the search tree for this ply */
@@ -896,6 +894,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     best_move = tt_found?tt_item.move:NOMOVE;
     in_check = board_in_check(pos, pos->stm);
 
+    /* Remember the static evaluation of this positin */
     pos->eval_stack[pos->sply] = eval_evaluate(pos);
 
     /* Search all moves */
@@ -903,8 +902,8 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     tt_flag = TT_ALPHA;
     best_score = -INFINITE_SCORE;
     worker->currmovenumber = 0;
-    select_init_node(worker, false, in_check, best_move);
-    while (select_get_move(worker, &move)) {
+    select_init_node(&ms, worker, false, in_check, best_move);
+    while (select_get_move(&ms, worker, &move)) {
         if ((worker->multipv > 1) && is_multipv_move(worker, move)) {
             continue;
         }

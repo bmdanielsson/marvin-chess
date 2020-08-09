@@ -171,7 +171,6 @@ static void prepare_worker(struct search_worker *worker,
     /* Initialize helper variables */
     worker->resolving_root_fail = false;
     worker->resolving_tt_fail = false;
-    worker->ppms[0].last_idx = 0;
 
     /* Setup parent pointers */
     worker->state = state;

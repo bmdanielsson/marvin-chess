@@ -21,33 +21,36 @@
 #include "chess.h"
 
 /*
- * Initialize the move selector a node.
+ * Initialize the move selector.
  *
+ * @param ms The moveselector.
  * @param worker The worker.
  * @param captures_only Flags indicating if only tactical moves i.e., captures
  *                      and promotoions, should be considered.
  * @param in_check Is the side to move in check.
  * @param ttmove Transposition table move for this position.
  */
-void select_init_node(struct search_worker *worker, bool tactical_only,
-                      bool in_check, uint32_t ttmove);
+void select_init_node(struct moveselector *ms, struct search_worker *worker,
+                      bool tactical_only, bool in_check, uint32_t ttmove);
 
 /*
  * Get the next move to search.
  *
+ * @param ms The moveselector.
  * @param worker The worker.
  * @param move Location to store the move at.
  * @return Returns true if a move was available, false otherwise.
  */
-bool select_get_move(struct search_worker *worker, uint32_t *move);
+bool select_get_move(struct moveselector *ms, struct search_worker *worker,
+                     uint32_t *move);
 
 /*
  * Check if the current phase is the bad capture phase.
  *
- * @param worker The worker.
+ * @param ms The moveselector.
  * @return Returns the true if it is the bad capture phase.
  */
-bool select_is_bad_capture_phase(struct search_worker *worker);
+bool select_is_bad_capture_phase(struct moveselector *ms);
 
 #endif
 
