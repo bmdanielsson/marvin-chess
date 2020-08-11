@@ -62,8 +62,6 @@ static int mvvlva_table[NPIECES][NPIECES] = {
 
 static int mvvlva(struct position *pos, uint32_t move)
 {
-    assert(ISCAPTURE(move) || ISENPASSANT(move));
-
     if (ISCAPTURE(move)) {
         return mvvlva_table[pos->pieces[TO(move)]][pos->pieces[FROM(move)]];
     } else if (ISENPASSANT(move)) {
@@ -72,44 +70,48 @@ static int mvvlva(struct position *pos, uint32_t move)
     return 0;
 }
 
-static void add_move(struct search_worker *worker, struct moveselector *ms,
-                     struct movelist *list, int iter)
+static void add_moves(struct search_worker *worker, struct moveselector *ms,
+                      struct movelist *list)
 {
     uint32_t        move;
     struct moveinfo *info;
     struct position *pos = &worker->pos;
+    int             k;
 
-    /*
-     * Moves in the transposition table, killer moves and counter moves
-     * are handled separately and should not be considered here.
-     */
-    move = list->moves[iter];
-    if ((move == ms->ttmove) ||
-        (move == ms->killer) ||
-        (move == ms->counter)) {
-        return;
-    }
+    for (k=0;k<list->size;k++) {
+        move = list->moves[k];
 
-    /*
-     * If the SEE score is positive (normal moves or good captures) then
-     * the move is added to the moveinfo list. If the SEE score is
-     * negative (bad captures) then the move is added to be bad tacticals
-     * list.
-     */
-    if (ISTACTICAL(move) && !see_ge(pos, move, 0)) {
-        info = &ms->moveinfo[MAX_MOVES+ms->nbadtacticals];
-        ms->nbadtacticals++;
-    } else {
-        info = &ms->moveinfo[ms->last_idx];
-        ms->last_idx++;
-    }
-    info->move = move;
+        /*
+         * Moves in the transposition table, killer moves and counter moves
+         * are handled separately and should not be considered here.
+         */
+        if ((move == ms->ttmove) ||
+            (move == ms->killer) ||
+            (move == ms->counter)) {
+            continue;
+        }
 
-    /* Assign a score to the move */
-    if (ISTACTICAL(move)) {
-        info->score = mvvlva(pos, move);
-    } else {
-        info->score = history_get_score(worker, move);
+        /*
+         * If the SEE score is positive (normal moves or good captures) then
+         * the move is added to the moveinfo list. If the SEE score is
+         * negative (bad captures) then the move is added to be bad tacticals
+         * list.
+         */
+        if (ISTACTICAL(move) && !see_ge(pos, move, 0)) {
+            info = &ms->moveinfo[MAX_MOVES-1-ms->nbadtacticals];
+            ms->nbadtacticals++;
+        } else {
+            info = &ms->moveinfo[ms->last_idx];
+            ms->last_idx++;
+        }
+        info->move = move;
+
+        /* Assign a score to the move */
+        if (ISTACTICAL(move)) {
+            info->score = mvvlva(pos, move);
+        } else {
+            info->score = history_get_score(worker, move);
+        }
     }
 }
 
@@ -158,7 +160,6 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
     struct movelist list;
     uint32_t        killer;
     uint32_t        counter;
-    int             k;
     struct position *pos = &worker->pos;
 
     switch (ms->phase) {
@@ -178,9 +179,7 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
             gen_capture_moves(pos, &list);
             gen_promotion_moves(pos, &list, ms->underpromote);
         }
-        for (k=0;k<list.size;k++) {
-            add_move(worker, ms, &list, k);
-        }
+        add_moves(worker, ms, &list);
         ms->phase++;
         ms->idx = 0;
         /* Fall through */
@@ -220,9 +219,7 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
         } else {
             gen_quiet_moves(pos, &list);
         }
-        for (k=0;k<list.size;k++) {
-            add_move(worker, ms, &list, k);
-        }
+        add_moves(worker, ms, &list);
         ms->phase++;
         /* Fall through */
     case PHASE_MOVES:
@@ -232,8 +229,8 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
         ms->phase++;
         /* Fall through */
     case PHASE_ADD_BAD_TACTICAL:
-        ms->last_idx = MAX_MOVES + ms->nbadtacticals;
-        ms->idx = MAX_MOVES;
+        ms->last_idx = MAX_MOVES;
+        ms->idx = MAX_MOVES - ms->nbadtacticals;
         ms->phase++;
         /* Fall through */
     case PHASE_BAD_TACTICAL:

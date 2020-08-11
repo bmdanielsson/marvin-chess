@@ -207,9 +207,8 @@ enum {
 #define ISTACTICAL(m)           (ISCAPTURE(m)||ISENPASSANT(m)||ISPROMOTION(m))
 #define NOMOVE                  0
 
-/* The maximum number of chess moves that can occur in a game */
-#define MAX_MOVES 250
-#define MAX_CAPTURES 80
+/* The maximum number of legal moves for a chess moves position */
+#define MAX_MOVES 256
 
 /* The maximum size of the game history */
 #define MAX_HISTORY_SIZE 2048
@@ -269,7 +268,7 @@ struct moveselector {
     /* Counter move for this position */
     uint32_t counter;
     /* Additional information for the availables moves */
-    struct moveinfo moveinfo[MAX_MOVES+MAX_CAPTURES];
+    struct moveinfo moveinfo[MAX_MOVES];
     /* Index of the last move plus one */
     int last_idx;
     /* The number of bad tactical moves */
