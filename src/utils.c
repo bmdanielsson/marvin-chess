@@ -48,7 +48,7 @@ static thread_retval_t memset_func(void *data)
     return (thread_retval_t)0;
 }
 
-#if HAS_POPCNT && __GNUC__
+#if USE_POPCNT && __GNUC__
 int pop_count (uint64_t v)
 {
     return __builtin_popcountll(v);

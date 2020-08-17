@@ -22,7 +22,9 @@
 #define NNUE_FEATURE_SET_H_INCLUDED
 
 #include "features_common.h"
+#include "nnue_defs.h"
 #include <array>
+#include <cassert>
 
 namespace Eval::NNUE::Features {
 

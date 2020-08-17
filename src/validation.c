@@ -27,6 +27,7 @@
 #include "moveselect.h"
 #include "hash.h"
 #include "debug.h"
+#include "nnue.h"
 
 bool valid_position(struct position *pos)
 {
@@ -170,6 +171,58 @@ bool valid_move(uint32_t move)
         return false;
     }
     if ((type < 0) || (type > 63)) {
+        return false;
+    }
+
+    return true;
+}
+
+bool validate_nnue(struct position *pos)
+{
+    void *nnue_pos;
+    int  k;
+    bool ok;
+    int  v1;
+    int  v2;
+
+    if (pos->nnue_pos == NULL) {
+        return true;
+    }
+
+    /* Verify the NNUE position */
+    nnue_pos = nnue_create_pos();
+    nnue_setup_pos(nnue_pos, pos->start_pieces, pos->start_side);
+
+    for (k=0;k<pos->ply;k++) {
+        if (!ISNULLMOVE(pos->history[k].move)) {
+            nnue_make_move(nnue_pos,
+                            FROM(pos->history[k].move),
+                            TO(pos->history[k].move),
+                            TYPE(pos->history[k].move),
+                            PROMOTION(pos->history[k].move),
+                            pos->history[k].piece);
+        } else {
+            nnue_make_null_move(nnue_pos);
+        }
+    }
+
+    ok = nnue_compare_pos(pos->nnue_pos, nnue_pos);
+
+    nnue_destroy_pos(nnue_pos);
+    if (!ok) {
+        return ok;
+    }
+
+    /* Verify NNUE evaluation */
+    nnue_pos = nnue_create_pos();
+    nnue_setup_pos(nnue_pos, pos->pieces, pos->stm);
+
+    v1 = nnue_evaluate(pos->nnue_pos);
+    v2 = nnue_evaluate(nnue_pos);
+
+    nnue_destroy_pos(nnue_pos);
+
+    if (v1 != v2) {
         return false;
     }
 

@@ -37,6 +37,8 @@ extern enum protocol engine_protocol;
 extern char engine_syzygy_path[MAX_PATH_LENGTH+1];
 extern int engine_default_hash_size;
 extern int engine_default_num_threads;
+extern bool engine_using_nnue;
+extern char engine_eval_file[MAX_PATH_LENGTH+1];
 
 /*
  * The main engine loop.
@@ -123,5 +125,12 @@ void engine_send_move_info(struct search_worker *worker);
  * @param worker The worker.
  */
 void engine_send_multipv_info(struct search_worker *worker);
+
+/*
+ * Send information about which evaluation that is being used.
+ *
+ * @param worker The worker.
+ */
+void engine_send_eval_info(struct search_worker *worker);
 
 #endif

@@ -8,13 +8,14 @@ Marvin was originally released as closed source in 2002 and activly developed un
 
 ### Configuration
 
-When started Marvin looks for a configuration file called marvin.ini in the same directory as the excutable. This file can be used to configure the engine. Currently the following options are recognized:
+When started Marvin looks for a configuration file called marvin.ini in the same directory as the excutable. This file can be used to configure the engine. The settings in the configuration file acts as default values for UCI options. Currently the following options are recognized:
 * HASH_SIZE: The amount of memory used for the main hash table (in MB). For best performance the size should be a power-of-2.
 * LOG_LEVEL: The log level. If set to 2 the engine will log all commands that are sent and received.
 * SYZYGY_PATH: Path to where the Syzygy tablebases are located.
 * NUM_THREADS: The number of threads to use for searching.
+* EVAL_FILE: Path to network for NNUE evaluation.
 
-Additionally Marvin looks for a file called book.bin in the same directory. The book.bin file should be an opening book file in Polyglot format.
+Additionally Marvin looks for a file called book.bin in the same directory as the executable. The book.bin file should be an opening book file in Polyglot format.
 
 ### Building
 
@@ -22,6 +23,8 @@ The easiest way to build Marvin is to use GCC and the included Makefile. Running
 
 ### License
 
-The source code is provided under the GPL3 license. For details see the LICENSE file.
+The source code is provided under the GPLv3 license. For details see the LICENSE file.
 
 Marvin uses the Fathom library (https://github.com/jdart1/Fathom) for probing Syzygy tablebases. The Fathom library is licensed under the MIT license. For details see the LICENSE file in the import/fathom folder.
+
+Marvin uses code from Stockfish (https://github.com/official-stockfish/Stockfish) for supporting NNUE based neural network evaluation. Stockfish is licensed under the GPLv3 license. For details see the Copying.txt file in the import/nnue folder. 

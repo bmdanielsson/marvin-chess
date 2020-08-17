@@ -29,6 +29,7 @@
 #include "engine.h"
 #include "search.h"
 #include "eval.h"
+#include "nnue.h"
 
 uint64_t sq_mask[NSQUARES];
 
@@ -348,6 +349,9 @@ struct gamestate* create_game_state(void)
         return NULL;
     }
     memset(state, 0, sizeof(struct gamestate));
+    if (engine_using_nnue) {
+        state->pos.nnue_pos = nnue_create_pos();
+    }
     board_reset(&state->pos);
     board_start_position(&state->pos);
     state->multipv = 1;
@@ -360,6 +364,9 @@ void destroy_game_state(struct gamestate *state)
     assert(state != NULL);
 
     hash_tt_destroy_table();
+    if (engine_using_nnue) {
+        nnue_destroy_pos(state->pos.nnue_pos);
+    }
     free(state);
 }
 

@@ -36,6 +36,7 @@
 #include "validation.h"
 #include "tbprobe.h"
 #include "smp.h"
+#include "nnue.h"
 
 /* Different UCI modes */
 static bool ponder_mode = false;
@@ -380,6 +381,19 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
                 }
                 state->multipv = value;
             }
+        } else if (!strncmp(iter, "EvalFile", 8)) {
+            iter = strstr(iter, "value");
+            iter += strlen("value");
+            iter = skip_whitespace(iter);
+            strncpy(engine_eval_file, iter, MAX_PATH_LENGTH);
+            engine_using_nnue = nnue_init(engine_eval_file);
+            if (engine_using_nnue) {
+                if (state->pos.nnue_pos == NULL) {
+                    state->pos.nnue_pos = nnue_create_pos();
+                }
+                nnue_setup_pos(state->pos.nnue_pos, state->pos.start_pieces,
+                               state->pos.start_side);
+            }
         }
         iter = strstr(iter, "name");
     }
@@ -413,6 +427,9 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command(
                        "option name LogLevel type spin default %d min 0 max %d",
                         dbg_get_log_level(), LOG_HIGHEST_LEVEL);
+    engine_write_command("option name EvalFile type string default %s",
+                         engine_eval_file[0] != '\0'?
+                                                engine_eval_file:"<empty>");
     engine_write_command("uciok");
 }
 
@@ -629,5 +646,15 @@ void uci_send_multipv_info(struct search_worker *worker)
         }
 
         engine_write_command(buffer);
+    }
+}
+
+void uci_send_eval_info(void)
+{
+    if (!engine_using_nnue) {
+        engine_write_command("info string Using classic evaluation");
+    } else {
+        engine_write_command("info string Using NNUE evaluation with %s",
+                             engine_eval_file);
     }
 }

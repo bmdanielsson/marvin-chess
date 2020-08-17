@@ -21,8 +21,8 @@
 #ifndef NNUE_FEATURES_HALF_KP_H_INCLUDED
 #define NNUE_FEATURES_HALF_KP_H_INCLUDED
 
-#include "../../evaluate.h"
 #include "features_common.h"
+#include "nnue_defs.h"
 
 namespace Eval::NNUE::Features {
 

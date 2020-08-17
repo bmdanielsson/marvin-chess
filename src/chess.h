@@ -398,7 +398,7 @@ struct position {
      * Location of each piece on the board. An
      * empty square is identified NO_PIECE.
      */
-    int pieces[NSQUARES];
+    uint8_t pieces[NSQUARES];
     /* Bitboards for the different pieces */
     uint64_t bb_pieces[NPIECES];
     /* Bitboards for the pieces of the different sides */
@@ -433,6 +433,11 @@ struct position {
     /* Pointers to the owning worker and the active game state */
     struct search_worker *worker;
     struct gamestate *state;
+
+    /* NNUE data */
+    uint8_t start_pieces[NSQUARES];
+    int start_side;
+    void *nnue_pos;
 };
 
 /* Per-thread worker instance */

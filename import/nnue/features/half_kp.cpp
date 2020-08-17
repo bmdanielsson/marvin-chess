@@ -55,7 +55,7 @@ namespace Eval::NNUE::Features {
     PieceSquare* pieces;
     Square sq_target_k;
     GetPieces(pos, perspective, &pieces, &sq_target_k);
-    for (PieceId i = PIECE_ID_ZERO; i < PIECE_ID_KING; ++i) {
+    for (int i = PIECE_ID_ZERO; i < PIECE_ID_KING; ++i) {
       if (pieces[i] != PS_NONE) {
         active->push_back(MakeIndex(sq_target_k, pieces[i]));
       }

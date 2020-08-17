@@ -48,6 +48,8 @@ enum protocol engine_protocol = PROTOCOL_UNSPECIFIED;
 char engine_syzygy_path[MAX_PATH_LENGTH+1] = {'\0'};
 int engine_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
 int engine_default_num_threads = 1;
+bool engine_using_nnue = false;
+char engine_eval_file[MAX_PATH_LENGTH+1] = {'\0'};
 
 /* Buffer used for receiving commands */
 static char rx_buffer[RX_BUFFER_SIZE+1];
@@ -115,6 +117,12 @@ static void cmd_eval(struct gamestate *state)
 
     phase = eval_game_phase(&state->pos);
     score = eval_evaluate(&state->pos);
+
+    if (engine_using_nnue) {
+        printf("NNUE eval (%s)\n", engine_eval_file);
+    } else {
+        printf("Classic eval\n");
+    }
     printf("Phase: %d (256)\n", phase);
     printf("Score: %d (for white)\n", state->pos.stm == WHITE?score:-score);
 }
@@ -344,5 +352,16 @@ void engine_send_multipv_info(struct search_worker *worker)
 
     if (engine_protocol == PROTOCOL_UCI) {
         uci_send_multipv_info(worker);
+    }
+}
+
+void engine_send_eval_info(struct search_worker *worker)
+{
+    if (worker->state->silent) {
+        return;
+    }
+
+    if (engine_protocol == PROTOCOL_UCI) {
+        uci_send_eval_info();
     }
 }

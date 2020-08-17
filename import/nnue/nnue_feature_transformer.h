@@ -23,6 +23,7 @@
 
 #include "nnue_common.h"
 #include "nnue_architecture.h"
+#include "nnue_accumulator.h"
 #include "features/index_list.h"
 
 #include <cstring> // std::memset()
@@ -102,7 +103,7 @@ namespace Eval::NNUE {
       const int8x8_t kZero = {0};
   #endif
 
-      const Color perspectives[2] = {pos.side_to_move(), ~pos.side_to_move()};
+      const Color perspectives[2] = {pos.side_to_move(), (Color)(((int)pos.side_to_move())^1)};
       for (IndexType p = 0; p < 2; ++p) {
         const IndexType offset = kHalfDimensions * p;
 

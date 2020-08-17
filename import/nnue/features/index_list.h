@@ -21,7 +21,7 @@
 #ifndef NNUE_FEATURES_INDEX_LIST_H_INCLUDED
 #define NNUE_FEATURES_INDEX_LIST_H_INCLUDED
 
-#include "../../position.h"
+#include "nnue.h"
 #include "../nnue_architecture.h"
 
 namespace Eval::NNUE::Features {

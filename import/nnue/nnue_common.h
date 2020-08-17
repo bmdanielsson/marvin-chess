@@ -21,6 +21,9 @@
 #ifndef NNUE_COMMON_H_INCLUDED
 #define NNUE_COMMON_H_INCLUDED
 
+#include <cstdint>
+#include <cstddef>
+
 #if defined(USE_AVX2)
 #include <immintrin.h>
 

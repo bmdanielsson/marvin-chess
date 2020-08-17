@@ -36,6 +36,7 @@
 #include "hash.h"
 #include "see.h"
 #include "search.h"
+#include "nnue.h"
 
 /* The maximum length of a line in the configuration file */
 #define CFG_MAX_LINE_LENGTH 1024
@@ -71,6 +72,8 @@ static void read_config_file(void)
             tb_init(engine_syzygy_path);
         } else if (sscanf(line, "NUM_THREADS=%d", &int_val) == 1) {
             engine_default_num_threads = CLAMP(int_val, 1, MAX_WORKERS);
+        } else if (sscanf(line, "EVAL_FILE=%s", engine_eval_file) == 1) {
+            engine_using_nnue = nnue_init(engine_eval_file);
         }
 
         /* Next line */
@@ -83,23 +86,7 @@ static void read_config_file(void)
 
 static void print_version(void)
 {
-    char str[256];
-
-    str[0] = '\0';
-    sprintf(str, "%s %s (%s", APP_NAME, APP_VERSION,
-            is64bit()?"64-bit":"32-bit");
-#ifdef HAS_POPCNT
-    strcat(str, ", popcnt");
-#endif
-#ifdef __GNUC__
-    strcat(str, ", memalign");
-#endif
-#ifdef __GNUC__
-    strcat(str, ", prefetch");
-#endif
-    strcat(str, ")");
-    printf("%s\n", str);
-
+    printf("%s %s (%s)\n", APP_NAME, APP_VERSION, APP_ARCH);
     printf("%s\n", APP_AUTHOR);
 }
 

@@ -1,52 +1,96 @@
 # Default options
-popcnt = yes
+popcnt = no
+sse = no
+sse3 = no
+ssse3 = no
+sse41 = no
+arch = x86-64-modern
 trace = no
 variant = release
 
-# Command line arguments
+# Update options based on the arch argument
 .PHONY : arch
-ifeq ($(arch), x86)
-    popcnt = no
-    CFLAGS += -m32
-    ARCH += -m32
-else
 ifeq ($(arch), x86-64)
-    CFLAGS += -m64
-    ARCH += -m64
+    sse = yes
+    APP_ARCH = \"x86-64\"
+else
+ifeq ($(arch), x86-64-modern)
+    popcnt = yes
+    sse = yes
+    sse3 = yes
+    ssse3 = yes
+    sse41 = yes
+    APP_ARCH = \"x86-64-modern\"
 endif
 endif
+
+# Common flags
+ARCH += -m64
+CPPFLAGS += -DAPP_ARCH=$(APP_ARCH)
+CFLAGS += -m64 -DIS_64BIT -DUSE_SSE2
+CXXFLAGS += -m64 -DIS_64BIT -DUSE_SSE2
+LDFLAGS += -m64 -DIS_64BIT -lm
+
+# Update flags based on options
 .PHONY : popcnt
 ifeq ($(popcnt), yes)
-    CPPFLAGS += -DHAS_POPCNT
+    CPPFLAGS += -DUSE_POPCNT
     CFLAGS += -msse3 -mpopcnt
+    CXXFLAGS += -msse3 -mpopcnt -DUSE_POPCNT
 else
     CPPFLAGS += -DTB_NO_HW_POP_COUNT
+endif
+.PHONY : sse
+ifeq ($(sse), yes)
+    CFLAGS += -msse
+    CXXFLAGS += -msse
+endif
+.PHONY : sse3
+ifeq ($(sse3), yes)
+    CFLAGS += -msse3 -DUSE_SSE3
+    CXXFLAGS += -msse3 -DUSE_SSE3
+endif
+.PHONY : ssse3
+ifeq ($(ssse3), yes)
+    CFLAGS += -mssse3 -DUSE_SSSE3
+    CXXFLAGS += -mssse3 -DUSE_SSSE3
+endif
+.PHONY : sse41
+ifeq ($(sse41), yes)
+    CFLAGS += -msse4.1 -DUSE_SSE41
+    CXXFLAGS += -msse4.1 -DUSE_SSE41
 endif
 .PHONY : trace
 ifeq ($(trace), yes)
     CPPFLAGS += -DTRACE
 endif
+
+# Update flags based on build variant
 .PHONY : variant
 ifeq ($(variant), release)
     CPPFLAGS += -DNDEBUG
     CFLAGS += -O3 -funroll-loops -fomit-frame-pointer -flto $(EXTRACFLAGS)
-    LDFLAGS += $(ARCH) -flto $(EXTRALDFLAGS)
+    CXXFLAGS += -O3 -funroll-loops -fomit-frame-pointer -flto $(EXTRACXXFLAGS)
+    LDFLAGS += -flto $(EXTRALDFLAGS)
 else
 ifeq ($(variant), debug)
     CFLAGS += -g
-    LDFLAGS += $(ARCH)
+    CXXFLAGS += -g
 else
 ifeq ($(variant), profile)
     CPPFLAGS += -DNDEBUG
     CFLAGS += -g -pg -O2 -funroll-loops
-    LDFLAGS += $(ARCH) -pg
+    CXXFLAGS += -g -pg -O2 -funroll-loops
+    LDFLAGS += -pg
 endif
 endif
 endif
 
-# Set special flags needed for Windows
+# Set special flags needed for different operating systems
 ifeq ($(OS), Windows_NT)
 CFLAGS += -DWINDOWS
+else
+LDFLAGS += -lpthread
 endif
 
 # Configure warnings
@@ -55,21 +99,22 @@ CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-t
 # Extra include directories
 CFLAGS += -Iimport/fathom -Isrc
 
+# Extra include directories for nnue
+CXXFLAGS += -Isrc
+CXXFLAGS += -Iimport/nnue
+CXXFLAGS += -Iimport/nnue/architectures
+CXXFLAGS += -Iimport/nnue/features
+CXXFLAGS += -Iimport/nnue/layers
+CXXFLAGS += --std=c++17
+
 # Enable evaluation tracing for tuner
 ifeq ($(MAKECMDGOALS), tuner)
 CFLAGS += -DTRACE
 endif
 
-# Common link options
-LDFLAGS += -lm
-
-# Set link options needed for non-Windows platforms
-ifneq ($(OS), Windows_NT)
-LDFLAGS += -lpthread
-endif
-
 # Compiler
 CC = gcc
+CXX = g++
 
 # Sources
 SOURCES = src/bitboard.c \
@@ -98,6 +143,9 @@ SOURCES = src/bitboard.c \
           src/validation.c \
           src/xboard.c \
           import/fathom/tbprobe.c
+NNUE_SOURCES = import/nnue/evaluate_nnue.cpp \
+               import/nnue/features/half_kp.cpp \
+               src/nnue.cpp
 TUNER_SOURCES = src/bitboard.c \
                 src/board.c \
                 src/chess.c \
@@ -136,8 +184,10 @@ OBJECTS = $(SOURCES:%.c=%.o)
 DEPS = $(SOURCES:%.c=%.d)
 TUNER_OBJECTS = $(TUNER_SOURCES:%.c=%.o)
 TUNER_DEPS = $(TUNER_SOURCES:%.c=%.d)
+NNUE_OBJECTS = $(NNUE_SOURCES:%.cpp=%.o)
 INTERMEDIATES = $(OBJECTS) $(DEPS)
 TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
+NNUE_INTERMEDIATES = $(NNUE_OBJECTS)
 
 # Include depencies
 -include $(SOURCES:.c=.d)
@@ -148,9 +198,11 @@ TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
 
 %.o : %.c
 	$(COMPILE.c) -MD -o $@ $<
+%.o : %.cpp
+	$(COMPILE.cpp) -MD -o $@ $<
 
 clean :
-	rm -f marvin marvin.exe tuner $(INTERMEDIATES) $(TUNER_INTERMEDIATES)
+	rm -f marvin marvin.exe tuner $(INTERMEDIATES) $(TUNER_INTERMEDIATES) $(NNUE_INTERMEDIATES)
 .PHONY : clean
 
 help :
@@ -164,17 +216,16 @@ help :
 	@echo "  clean: Remove all intermediate files."
 	@echo ""
 	@echo "Supported options:"
-	@echo "  arch=[x86|x86-64]: The architecture to build for."
-	@echo "  popcnt=[yes|no]: Use the popcnt HW instruction (default yes)."
+	@echo "  arch=[x86-64|x86-64-modern]: The architecture to build for."
 	@echo "  trace=[yes|no]: Include support for tracing the evaluation (default no)."
 	@echo "  variant=[release|debug|profile]: The variant to build."
 .PHONY : help
 
-marvin : $(OBJECTS)
-	$(CC) $(OBJECTS) $(LDFLAGS) -o marvin
+marvin : $(OBJECTS) $(NNUE_OBJECTS)
+	$(CXX) $(OBJECTS) $(NNUE_OBJECTS) $(LDFLAGS) -o marvin
 
-tuner : $(TUNER_OBJECTS)
-	$(CC) $(TUNER_OBJECTS) $(LDFLAGS) -o tuner
+tuner : $(TUNER_OBJECTS) $(NNUE_OBJECTS)
+	$(CXX) $(TUNER_OBJECTS) $(NNUE_OBJECTS) $(LDFLAGS) -o tuner
 
 pgo-generate:
 	$(MAKE) EXTRACFLAGS='-fprofile-generate' EXTRALDFLAGS='-fprofile-generate -lgcov'
