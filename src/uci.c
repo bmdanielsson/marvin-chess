@@ -319,8 +319,6 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
                 }
                 hash_tt_create_table(value);
             }
-        } else if (!strncmp(iter, "Clear Hash", 10)) {
-            hash_tt_clear_table();
         } else if (!strncmp(iter, "OwnBook", 7)) {
             iter = strstr(iter, "value");
             iter += strlen("value");
@@ -412,7 +410,6 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command("option name Hash type spin default %d min %d max %d",
                          engine_default_hash_size, MIN_MAIN_HASH_SIZE,
 						 hash_tt_max_size());
-    engine_write_command("option name Clear Hash type button");
     engine_write_command("option name OwnBook type check default true");
     engine_write_command("option name Ponder type check default false");
     engine_write_command("option name SyzygyPath type string default %s",
