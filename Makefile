@@ -69,9 +69,9 @@ endif
 .PHONY : variant
 ifeq ($(variant), release)
     CPPFLAGS += -DNDEBUG
-    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer -flto $(EXTRACFLAGS)
-    CXXFLAGS += -O3 -funroll-loops -fomit-frame-pointer -flto $(EXTRACXXFLAGS)
-    LDFLAGS += -flto $(EXTRALDFLAGS)
+    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer $(EXTRACFLAGS)
+    CXXFLAGS += -O3 -funroll-loops -fomit-frame-pointer $(EXTRACXXFLAGS)
+    LDFLAGS += $(EXTRALDFLAGS)
 else
 ifeq ($(variant), debug)
     CFLAGS += -g
@@ -89,8 +89,11 @@ endif
 # Set special flags needed for different operating systems
 ifeq ($(OS), Windows_NT)
 CFLAGS += -DWINDOWS
+LDFLAGS += -static
 else
-LDFLAGS += -lpthread
+CFLAGS += -flto
+CXXFLAGS += -flto
+LDFLAGS += -lpthread -flto
 endif
 
 # Configure warnings
