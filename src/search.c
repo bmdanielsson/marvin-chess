@@ -334,6 +334,11 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
         worker->qnodes++;
     }
 
+    /* Check if the selective depth should be updated */
+    if (pos->sply > worker->seldepth) {
+        worker->seldepth = pos->sply;
+    }
+
     /* Check if the time is up or if we have received a new command */
     checkup(worker);
 
