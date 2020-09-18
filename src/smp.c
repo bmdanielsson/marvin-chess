@@ -411,9 +411,7 @@ uint64_t smp_tbhits(void)
 
 void smp_stop_all(void)
 {
-    mutex_lock(&stop_lock);
-    should_stop = true;
-    mutex_unlock(&stop_lock);
+    atomic_store_explicit(&should_stop, true, memory_order_relaxed);
 }
 
 bool smp_should_stop(void)
@@ -437,21 +435,28 @@ int smp_complete_iteration(struct search_worker *worker)
         worker->state->completed_depth = worker->depth;
     }
 
-    /* Calculate the next depth for this worker to search */
+    /*
+     * Calculate the next depth for this worker to search. For the first worker
+     * always search the next depth since it is responsible for search output.
+     */
     new_depth = worker->depth;
-    while (true) {
+    if (worker->id == 0) {
         new_depth++;
-        count = 0;
-        for (k=0;k<number_of_workers;k++) {
-            if (workers[k].depth >= new_depth) {
-                count++;
+    } else {
+        while (true) {
+            new_depth++;
+            count = 0;
+            for (k=0;k<number_of_workers;k++) {
+                if (workers[k].depth >= new_depth) {
+                    count++;
+                }
+                if (((count+1)/2) >= (number_of_workers/2)) {
+                    break;
+                }
             }
-            if (((count+1)/2) >= (number_of_workers/2)) {
+            if (k == number_of_workers || (number_of_workers == 1)) {
                 break;
             }
-        }
-        if (k == number_of_workers || (number_of_workers == 1)) {
-            break;
         }
     }
 
