@@ -170,7 +170,6 @@ static void prepare_worker(struct search_worker *worker,
 
     /* Initialize helper variables */
     worker->resolving_root_fail = false;
-    worker->resolving_tt_fail = false;
 
     /* Setup parent pointers */
     worker->state = state;

@@ -461,7 +461,6 @@ struct search_worker {
     int pawntt_size;
     /* Indicates if the engine is resolving a fail-low at the root */
     bool resolving_root_fail;
-    bool resolving_tt_fail;
     /* The number of nodes searched so far */
     uint64_t nodes;
     /* The number of quiscence nodes searched so far */
