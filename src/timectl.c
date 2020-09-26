@@ -57,8 +57,6 @@ static time_t hard_time_limit = 0;
 /* The time when the current search was started */
 static time_t search_start = 0;
 
-static time_t medium_time_limit = 0;
-
 /* Keeps track if the clock is running or not */
 static bool clock_is_running = false;
 
@@ -70,7 +68,6 @@ void tc_configure_time_control(int time, int inc, int movestogo, int flags)
     tc_flags = flags;
     soft_time_limit = 0;
     hard_time_limit = 0;
-    medium_time_limit = 0;
 }
 
 int tc_get_flags(void)
@@ -101,27 +98,17 @@ void tc_allocate_time(void)
     /* Handle special cases first */
     if (tc_flags&TC_INFINITE_TIME) {
         soft_time_limit = 0;
-        medium_time_limit = 0;
         hard_time_limit = 0;
         return;
     } else if (tc_flags&TC_FIXED_TIME) {
         allocated = MAX(tc_time_left-SAFETY_MARGIN, 0);
         soft_time_limit = search_start + allocated;
-        medium_time_limit = soft_time_limit;
         hard_time_limit = soft_time_limit;
         return;
     }
 
-    /*
-     * Calculate how much time to allocate. For regular time
-     * controls (number of moves in fixed time) make sure to
-     * leave a little margin in order to be able to use extra
-     * time time in case of danger.
-     * */
+    /* Calculate how much time to allocate */
     allocated = tc_time_left/tc_movestogo + tc_increment;
-    if (tc_flags&TC_REGULAR) {
-        allocated = allocated*0.75;
-    }
     allocated = MIN(allocated, tc_time_left-SAFETY_MARGIN);
 
     /*
@@ -130,11 +117,6 @@ void tc_allocate_time(void)
      * is allowed to spend in case of panic.
      */
     soft_time_limit = search_start + allocated;
-
-    allocated = MIN(2*allocated, tc_time_left*0.8);
-    allocated = MIN(allocated, tc_time_left-SAFETY_MARGIN);
-    medium_time_limit = search_start + allocated;
-
     allocated = MIN(5*allocated, tc_time_left*0.8);
     allocated = MIN(allocated, tc_time_left-SAFETY_MARGIN);
     hard_time_limit = search_start + allocated;
@@ -171,12 +153,9 @@ bool tc_check_time(struct search_worker *worker)
      * When resolving a fail-low we allow the search to exceed the soft
      * limit in the hope that the iteration can be finished.
      */
-    if ((worker->resolving_root_fail || worker->resolving_tt_fail) &&
+    if (worker->resolving_root_fail &&
         (worker->depth > worker->state->completed_depth)) {
         return get_current_time() < hard_time_limit;
-    } else if ((worker->currmovenumber == 1) &&
-               (worker->depth > worker->state->completed_depth)) {
-        return get_current_time() < medium_time_limit;
     } else {
         return get_current_time() < soft_time_limit;
     }
