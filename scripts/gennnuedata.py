@@ -11,6 +11,7 @@ import chess.engine
 from multiprocessing import Process
 from datetime import datetime
 
+BATCH_SIZE = 1000
 MAX_PLY = 400
 MIN_DRAW_PLY = 80
 DRAW_SCORE = 0
@@ -39,7 +40,7 @@ def play_random_moves(board, nmoves):
             idx = 0
         move = legal_moves[idx]
         board.push(move)
-        if board.is_game_over():
+        if board.is_game_over(claim_draw=True):
             break
 
 
@@ -49,7 +50,7 @@ def play_game(fh, pos_left, args):
 
     # Play a random opening
     play_random_moves(board, args.random_plies)
-    if board.is_game_over():
+    if board.is_game_over(claim_draw=True):
         return pos_left
 
     # Start engine
@@ -68,27 +69,27 @@ def play_game(fh, pos_left, args):
     count = 0
     positions = []
     result_val = 0
-    while not board.is_game_over():
+    while not board.is_game_over(claim_draw=True):
         # Search the position to the required depth
-        info = engine.analyse(board, chess.engine.Limit(depth=args.depth))
+        result = engine.play(board, chess.engine.Limit(depth=args.depth),
+                            info=chess.engine.Info.SCORE)
 
         # Check eval limit
-        if abs(info['score'].relative.score()) > args.eval_limit:
-            if info['score'].white().score() > 0:
+        if abs(result.info['score'].relative.score()) > args.eval_limit:
+            log_fh.write('above eval limit\n')
+            if result.info['score'].white().score() > 0:
                 result_val = 1
             else:
                 result_val = -1
             break
 
         # Extract and store information
-        move = info['pv'][0]
-        score = info['score']
-        fen_str = board.fen()
         if board.turn == chess.WHITE:
             ply = board.fullmove_number*2
         else: 
             ply = board.fullmove_number*2 + 1
-        sfen = {'fen':fen_str, 'move':move, 'score':score, 'ply':ply}
+        sfen = {'fen':board.fen(), 'move':result.move,
+                'score':result.info['score'], 'ply':ply}
         positions.append(sfen)
 
         # Check ply limit
@@ -98,7 +99,7 @@ def play_game(fh, pos_left, args):
 
         # Check draw adjudication
         if ply > MIN_DRAW_PLY:
-            if abs(score.relative.score()) <= DRAW_SCORE:
+            if abs(result.info['score'].relative.score()) <= DRAW_SCORE:
                 draw_count = draw_count + 1;
             else:
                 draw_count = 0
@@ -106,18 +107,18 @@ def play_game(fh, pos_left, args):
                 result_val = 0
                 break;
 
-        # Apply move        
-        board.push(info['pv'][0])
+        # Apply move
+        board.push(result.move)
 
     engine.quit()
 
-    if board.is_game_over():
-        result = board.result(claim_draw=True)
-        if result == '1-0':
+    if board.is_game_over(claim_draw=True):
+        result_str = board.result(claim_draw=True)
+        if result_str == '1-0':
             result_val = 1
-        elif result == '0-1':
+        elif result_str == '0-1':
             result_val = -1
-        elif result == '1/2-1/2':
+        elif result_str == '1/2-1/2':
             result_val = 0
 
     for sfen in positions:
@@ -125,6 +126,7 @@ def play_game(fh, pos_left, args):
         pos_left = pos_left - 1
         if pos_left == 0:
             break
+    fh.flush()
 
     return pos_left
 
@@ -133,36 +135,50 @@ def process_func(pid, npos, training_file, args):
     pos_left = npos
 
     # Generate positions
-    fh = open(training_file, 'w')
+    fh = open(training_file, 'a+')
     while pos_left > 0:
         pos_left = play_game(fh, pos_left, args)
     fh.close()
 
 
-def main(args):
-    before = datetime.now();
-
-    parts = os.path.splitext(args.output)
-    pos_left = args.npositions
+def generate_batch(args, training_files, batch_size):
+    pos_left = batch_size
     processes = []
-    training_files = []
-    validation_files = []
     for pid in range(0, args.nthreads):
-        training_file = parts[0] + '_' + str(pid) + parts[1]
-        training_files.append(training_file)
-
         if pid != (args.nthreads-1):
-            npos = int(args.npositions/args.nthreads)
+            npos = int(batch_size/args.nthreads)
             pos_left = pos_left - npos
         else:
             npos = pos_left
             pos_left = 0
-        process_args = (pid, npos, training_file, args)
+        process_args = (pid, npos, training_files[pid], args)
         processes.append(Process(target=process_func, args=process_args))
         processes[pid].start()
 
     for p in processes:
         p.join()
+
+
+def main(args):
+    before = datetime.now();
+
+    training_files = []
+    parts = os.path.splitext(args.output)
+    for pid in range(0, args.nthreads):
+        training_file = parts[0] + '_' + str(pid) + parts[1]
+        training_files.append(training_file)
+
+    pos_generated = 0        
+    pos_left = args.npositions
+    while pos_left > 0:
+        batch_size = BATCH_SIZE*args.nthreads
+        if batch_size > pos_left:
+            batch_size = pos_left
+        generate_batch(args, training_files, batch_size)
+        pos_left = pos_left - batch_size
+        pos_generated = pos_generated + batch_size
+        print(f'\r{pos_generated}/{args.npositions}', end='')
+    print('\n');
 
     with open(args.output,'w') as wfd:
         for f in training_files:
