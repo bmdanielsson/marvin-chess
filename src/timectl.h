@@ -27,7 +27,8 @@
 #define TC_FIXED_TIME    0x00000002
 #define TC_TIME_LIMIT    0x00000004
 #define TC_DEPTH_LIMIT   0x00000008
-#define TC_REGULAR       0x00000010
+#define TC_NODE_LIMIT    0x00000010
+#define TC_REGULAR       0x00000020
 
 /*
  * Configure the time control to use for the next search.

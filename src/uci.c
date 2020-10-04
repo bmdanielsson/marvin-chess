@@ -62,6 +62,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     bool     infinite_time = false;
     bool     fixed_time = false;
     int      depth = 0;
+    uint64_t nodes = 0ULL;
     bool     in_movelist = false;
     char     *temp;
     bool     ponder = false;
@@ -153,6 +154,16 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = strchr(iter, ' ');
             in_movelist = false;
             flags |= TC_DEPTH_LIMIT;
+        } else if (!strncmp(iter, "nodes", 5)) {
+            if (sscanf(iter, "nodes %" SCNu64 "", &nodes) != 1) {
+                return;
+            }
+            state->max_nodes = nodes;
+            iter = strchr(iter, ' ');
+            iter = skip_whitespace(iter);
+            iter = strchr(iter, ' ');
+            in_movelist = false;
+            flags |= TC_NODE_LIMIT;
         } else if (!strncmp(iter, "infinite", 8)) {
             infinite_time = true;
             iter = strchr(iter, ' ');

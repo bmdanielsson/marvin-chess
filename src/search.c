@@ -45,9 +45,10 @@
 #define CHECKUP(n) (((n)&1023)==0)
 
 /* Different exceptions that can happen during search */
-#define EXCEPTION_COMMAND 1
-#define EXCEPTION_STOP 2
-#define EXCEPTION_TIMEOUT 3
+#define EXCEPTION_COMMAND    1
+#define EXCEPTION_STOP       2
+#define EXCEPTION_TIMEOUT    3
+#define EXCEPTION_NODE_LIMIT 4
 
 /* Configuration constants for null move pruning */
 #define NULLMOVE_DEPTH 3
@@ -273,16 +274,27 @@ static void checkup(struct search_worker *worker)
         longjmp(worker->env, EXCEPTION_STOP);
     }
 
-    /*
-     * For the master worker also check if the time
-     * is up or if a new command have been received.
-     */
-    if ((worker->id != 0) || !CHECKUP(worker->nodes)) {
+    /* Only check time limits for the main worker */
+    if (worker->id != 0) {
+        return;
+    }
+
+    /* Check if the node limit has been reached */
+    if (((tc_get_flags()&TC_NODE_LIMIT) != 0) &&
+        (smp_nodes() >= worker->state->max_nodes)) {
+        smp_stop_all();
+        longjmp(worker->env, EXCEPTION_NODE_LIMIT);
+    }
+
+    /* Check if the time is up or if a new command have been received */
+    if (!CHECKUP(worker->nodes)) {
         return;
     }
 
     /* Perform checkup */
-    if (!tc_check_time(worker)) {
+    if (!worker->state->pondering &&
+        ((tc_get_flags()&TC_TIME_LIMIT) != 0) &&
+        !tc_check_time(worker)) {
         smp_stop_all();
         longjmp(worker->env, EXCEPTION_TIMEOUT);
     }

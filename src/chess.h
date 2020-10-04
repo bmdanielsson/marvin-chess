@@ -515,6 +515,8 @@ struct gamestate {
     bool exit_on_mate;
     /* The maximum depth the engine should search to */
     int sd;
+    /* The maximum number of nodes the engine should search */
+    uint64_t max_nodes;
     /* Flag used to suppress output during search */
     bool silent;
     /*

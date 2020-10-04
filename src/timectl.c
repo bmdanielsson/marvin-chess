@@ -136,11 +136,6 @@ bool tc_check_time(struct search_worker *worker)
 {
     assert(worker != NULL);
 
-    if (worker->state->pondering ||
-        ((tc_flags&TC_TIME_LIMIT) == 0)) {
-        return true;
-    }
-
     /*
      * Always search at least one ply in order to make sure
      * a sensible (not random) move is always played
