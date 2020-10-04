@@ -325,7 +325,8 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     if ((legal.size == 1) &&
         !state->pondering &&
         (state->move_filter.size > 0) &&
-        ((tc_get_flags()&(TC_INFINITE_TIME|TC_FIXED_TIME)) != 0)) {
+        ((tc_get_flags()&TC_TIME_LIMIT) != 0) &&
+        ((tc_get_flags()&(TC_INFINITE_TIME|TC_FIXED_TIME)) == 0)) {
         return;
     }
 
