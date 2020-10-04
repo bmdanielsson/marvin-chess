@@ -68,6 +68,13 @@ def play_game(fh, pos_left, args):
     engine = chess.engine.SimpleEngine.popen_uci(args.engine)
     engine.configure(options)
 
+    # Setup search limits
+    limit = chess.engine.Limit(time=MAX_TIME)
+    if args.depth:
+        limit.depth = args.depth
+    if args.nodes:
+        limit.nodes = args.nodes
+
     # Let the engine play against itself and a record all positions
     draw_count = 0 
     count = 0
@@ -75,9 +82,7 @@ def play_game(fh, pos_left, args):
     result_val = 0
     while not board.is_game_over(claim_draw=True):
         # Search the position to the required depth
-        result = engine.play(board,
-                            chess.engine.Limit(depth=args.depth, time=MAX_TIME),
-                            info=chess.engine.Info.SCORE)
+        result = engine.play(board, limit, info=chess.engine.Info.SCORE)
 
         # If no score was received then skip this move
         if 'score' not in result.info:
@@ -219,8 +224,10 @@ def main(args):
 if __name__ == "__main__":
     # Parse command line arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument('-d', '--depth', type=int, default='8',
+    parser.add_argument('-d', '--depth', type=int,
                     help='the depth to search each position to')
+    parser.add_argument('--nodes', type=int,
+                    help='the number of nodes to search')
     parser.add_argument('-e', '--engine', help='the path to the engine',
                     required=True)
     parser.add_argument('-t', '--nthreads', type=int, default='1',
