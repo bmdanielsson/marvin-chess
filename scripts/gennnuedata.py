@@ -5,13 +5,17 @@ import argparse
 import random
 import os
 import shutil
+import time
 import chess
 import chess.engine
 
-from multiprocessing import Process
+from multiprocessing import Process, Lock, Value
 from datetime import datetime
 
 BATCH_SIZE = 1000
+PROGRESS_INTERVAL = 10
+MAX_TIME = 60
+
 MAX_PLY = 400
 MIN_DRAW_PLY = 80
 DRAW_SCORE = 0
@@ -71,12 +75,17 @@ def play_game(fh, pos_left, args):
     result_val = 0
     while not board.is_game_over(claim_draw=True):
         # Search the position to the required depth
-        result = engine.play(board, chess.engine.Limit(depth=args.depth),
+        result = engine.play(board,
+                            chess.engine.Limit(depth=args.depth, time=MAX_TIME),
                             info=chess.engine.Info.SCORE)
+
+        # If no score was received then skip this move
+        if 'score' not in result.info:
+            board.push(result.move)
+            continue
 
         # Check eval limit
         if abs(result.info['score'].relative.score()) > args.eval_limit:
-            log_fh.write('above eval limit\n')
             if result.info['score'].white().score() > 0:
                 result_val = 1
             else:
@@ -131,54 +140,70 @@ def play_game(fh, pos_left, args):
     return pos_left
 
 
-def process_func(pid, npos, training_file, args):
-    pos_left = npos
+def request_work(finished, remaining_work, finished_work, position_lock):
+    position_lock.acquire()
+    finished_work.value = finished_work.value + finished
+    if remaining_work.value == 0:
+        npos = 0
+    elif remaining_work.value < BATCH_SIZE:
+        npos = remaining_work.value
+    else:
+        npos = BATCH_SIZE
+    remaining_work.value = remaining_work.value - npos
+    position_lock.release()
+    return npos
 
-    # Generate positions
-    fh = open(training_file, 'a+')
-    while pos_left > 0:
-        pos_left = play_game(fh, pos_left, args)
+
+def process_func(pid, training_file, remaining_work, finished_work,
+                position_lock, args):
+    fh = open(training_file, 'w')
+
+    work_todo = 0
+    while True:
+        work_todo = request_work(work_todo, remaining_work, finished_work,
+                                position_lock)
+        if work_todo == 0:
+            break
+        pos_left = work_todo
+        while pos_left > 0:
+            pos_left = play_game(fh, pos_left, args)
+
     fh.close()
-
-
-def generate_batch(args, training_files, batch_size):
-    pos_left = batch_size
-    processes = []
-    for pid in range(0, args.nthreads):
-        if pid != (args.nthreads-1):
-            npos = int(batch_size/args.nthreads)
-            pos_left = pos_left - npos
-        else:
-            npos = pos_left
-            pos_left = 0
-        process_args = (pid, npos, training_files[pid], args)
-        processes.append(Process(target=process_func, args=process_args))
-        processes[pid].start()
-
-    for p in processes:
-        p.join()
 
 
 def main(args):
     before = datetime.now();
 
+    remaining_work = Value('i', args.npositions)
+    finished_work = Value('i', 0)
+    position_lock = Lock()
+
     training_files = []
+    processes = []
     parts = os.path.splitext(args.output)
     for pid in range(0, args.nthreads):
         training_file = parts[0] + '_' + str(pid) + parts[1]
         training_files.append(training_file)
 
-    pos_generated = 0        
-    pos_left = args.npositions
-    while pos_left > 0:
-        batch_size = BATCH_SIZE*args.nthreads
-        if batch_size > pos_left:
-            batch_size = pos_left
-        generate_batch(args, training_files, batch_size)
-        pos_left = pos_left - batch_size
-        pos_generated = pos_generated + batch_size
+        process_args = (pid, training_file, remaining_work, finished_work,
+                        position_lock, args)
+        processes.append(Process(target=process_func, args=process_args))
+        processes[pid].start()
+
+    while True:
+        time.sleep(PROGRESS_INTERVAL)
+
+        position_lock.acquire()
+        pos_generated = finished_work.value
+        position_lock.release()
         print(f'\r{pos_generated}/{args.npositions}', end='')
+
+        if pos_generated == args.npositions:
+            break;
     print('\n');
+
+    for p in processes:
+        p.join()
 
     with open(args.output,'w') as wfd:
         for f in training_files:
