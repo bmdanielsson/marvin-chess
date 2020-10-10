@@ -36,6 +36,7 @@
 #include "thread.h"
 #include "smp.h"
 #include "board.h"
+#include "nnue.h"
 
 /* Size of the receive buffer */
 #define RX_BUFFER_SIZE 4096

@@ -72,8 +72,12 @@ static void read_config_file(void)
             tb_init(engine_syzygy_path);
         } else if (sscanf(line, "NUM_THREADS=%d", &int_val) == 1) {
             engine_default_num_threads = CLAMP(int_val, 1, MAX_WORKERS);
-        } else if (sscanf(line, "EVAL_FILE=%s", engine_eval_file) == 1) {
-            engine_using_nnue = nnue_init(engine_eval_file);
+        } else if (strstr(line, "EVAL_FILE=") != NULL) {
+            engine_using_nnue = false;
+            engine_eval_file[0] = '\0';
+            if (sscanf(line, "EVAL_FILE=%s", engine_eval_file) == 1) {
+                engine_using_nnue = nnue_init(engine_eval_file);
+            }
         }
 
         /* Next line */
@@ -103,6 +107,10 @@ int main(int argc, char *argv[])
 
     /* Seed random number generator */
     srand((unsigned int)time(NULL));
+
+    /* Setup the default NNUE net */
+    strcpy(engine_eval_file, NETFILE_NAME);
+    engine_using_nnue = nnue_init(engine_eval_file);
 
     /* Read configuration file */
     read_config_file();

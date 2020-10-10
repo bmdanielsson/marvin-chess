@@ -50,4 +50,10 @@
 /* The name of the configuration file */
 #define CONFIGFILE_NAME "marvin.ini"
 
+/*
+ * The name of the default net file
+ * SHA-1: 531cad45787b073f3a578357c5190c6f58436574
+ */
+#define NETFILE_NAME "net-531cad4.nnue"
+
 #endif
