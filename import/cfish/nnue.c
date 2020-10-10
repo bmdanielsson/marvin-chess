@@ -27,11 +27,8 @@
 #include <arm_neon.h>
 #endif
 
-#include "evaluate.h"
 #include "misc.h"
 #include "nnue.h"
-#include "position.h"
-#include "uci.h"
 
 #ifdef NNUE_EMBEDDED
 #include "incbin.h"
@@ -226,7 +223,13 @@ INLINE Square orient(Color c, Square s)
 
 INLINE unsigned make_index(Color c, Square s, Piece pc, Square ksq)
 {
-  return orient(c, s) + PieceToIndex[c][pc] + PS_END * ksq;
+  Piece cvt_p = 0;
+
+  // Convert from Marvin piece representation to Cfish representation
+  if (pc != NO_PIECE) {
+    cvt_p = 1 + (VALUE(pc)/2) + COLOR(pc)*8;
+  }
+  return orient(c, s) + PieceToIndex[c][cvt_p] + PS_END * ksq;
 }
 
 static void half_kp_append_active_indices(const Position *pos, const Color c,
@@ -264,7 +267,7 @@ static void append_changed_indices(const Position *pos, IndexList removed[2],
     IndexList added[2], bool reset[2])
 {
   const DirtyPiece *dp = &(pos->st->dirtyPiece);
-  assert(dp->dirty_num != 0);
+  assert(dp->dirtyNum != 0);
 
   if ((pos->st-1)->accumulator.computedAccumulation) {
     for (unsigned c = 0; c < 2; c++) {
@@ -1663,36 +1666,20 @@ static bool load_eval_file(const char *evalFile)
 
 static char *loadedFile = NULL;
 
-void nnue_init(void)
+bool nnue_init(const char *evalFile)
 {
-#ifndef NNUE_PURE
-  const char *s = option_string_value(OPT_USE_NNUE);
-  useNNUE =  strcmp(s, "classical") == 0 ? EVAL_CLASSICAL
-           : strcmp(s, "pure"     ) == 0 ? EVAL_PURE : EVAL_HYBRID;
-#endif
-
-  const char *evalFile = option_string_value(OPT_EVAL_FILE);
   if (loadedFile && strcmp(evalFile, loadedFile) == 0)
-    return;
+    return true;
 
   if (loadedFile)
     free(loadedFile);
 
   if (load_eval_file(evalFile)) {
     loadedFile = strdup(evalFile);
-    return;
+    return true;
   }
 
-  printf("info string ERROR: The network file %s was not loaded successfully.\n"
-#ifdef NNUE_EMBEDDED
-         , evalFile
-#else
-         "info string ERROR: The default net can be downloaded from:\n"
-         "info string ERROR: https://tests.stockfishchess.org/api/nn/%s\n",
-         evalFile, option_default_string_value(OPT_EVAL_FILE)
-#endif
-         );
-  exit(EXIT_FAILURE);
+  return false;
 }
 
 #if 0

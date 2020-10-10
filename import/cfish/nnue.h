@@ -1,17 +1,11 @@
 #ifndef NNUE_H
 #define NNUE_H
 
-#include <stdalign.h>
 #include <stdint.h>
 
-#include "types.h"
+#include "nnueif.h"
 
-typedef struct {
-  alignas(64) int16_t accumulation[2][256];
-  bool computedAccumulation;
-} Accumulator;
-
-void nnue_init(void);
+bool nnue_init(const char *evalFile);
 Value nnue_evaluate(const Position *pos);
 
 #endif

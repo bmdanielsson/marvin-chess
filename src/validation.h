@@ -62,12 +62,4 @@ bool valid_piece(int piece);
  */
 bool valid_move(uint32_t move);
 
-/*
- * Validate NNUE position and evaluation.
- *
- * @param pos The position.
- * @return Returns true if NNUE is correct.
- */
-bool validate_nnue(struct position *pos);
-
 #endif

@@ -29,7 +29,7 @@
 #include "utils.h"
 #include "debug.h"
 #include "engine.h"
-#include "nnue.h"
+#include "nnueif.h"
 
 /* Phase valuse for different piece types */
 #define PAWN_PHASE      0
@@ -984,7 +984,7 @@ int eval_evaluate(struct position *pos)
 {
     /* Check if NNUE or classic eval should be used */
     if (engine_using_nnue) {
-        return nnue_evaluate(pos->nnue_pos);
+        return nnueif_evaluate(pos);
     }
 
     struct eval eval;

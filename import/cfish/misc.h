@@ -30,7 +30,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "types.h"
+#include "chess.h"
 
 void print_engine_info(bool to_uci);
 void print_compiler_info(void);

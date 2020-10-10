@@ -27,4 +27,4 @@ The source code is provided under the GPLv3 license. For details see the LICENSE
 
 Marvin uses the Fathom library (https://github.com/jdart1/Fathom) for probing Syzygy tablebases. The Fathom library is licensed under the MIT license. For details see the LICENSE file in the import/fathom folder.
 
-Marvin uses code from Stockfish (https://github.com/official-stockfish/Stockfish) for supporting NNUE based neural network evaluation. Stockfish is licensed under the GPLv3 license. For details see the Copying.txt file in the import/nnue folder. 
+Marvin uses code from Cfish (https://github.com/syzygy1/Cfish) for supporting NNUE based neural network evaluation. Cfish is licensed under the GPLv3 license. For details see the LICENSE file in the import/cfish folder. 

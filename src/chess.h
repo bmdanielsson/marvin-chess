@@ -25,6 +25,7 @@
 
 #include "thread.h"
 #include "config.h"
+#include "nnue_types.h"
 
 /* The maximum length of the string representation of a move */
 #define MAX_MOVESTR_LENGTH 7
@@ -435,9 +436,8 @@ struct position {
     struct gamestate *state;
 
     /* NNUE data */
-    uint8_t start_pieces[NSQUARES];
-    int start_side;
-    void *nnue_pos;
+    Stack *st;
+    Stack stack[MAX_HISTORY_SIZE];
 };
 
 /* Per-thread worker instance */

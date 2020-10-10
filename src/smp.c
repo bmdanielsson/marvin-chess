@@ -33,7 +33,7 @@
 #include "bitboard.h"
 #include "board.h"
 #include "history.h"
-#include "nnue.h"
+#include "nnueif.h"
 
 /* Worker actions */
 #define ACTION_IDLE 0
@@ -141,19 +141,11 @@ static thread_retval_t worker_thread_func(void *data)
 static void prepare_worker(struct search_worker *worker,
                            struct gamestate *state)
 {
-    int  mpvidx;
-    void *tmp;
+    int mpvidx;
 
     /* Copy data from game state */
-    tmp = worker->pos.nnue_pos;
     worker->pos = state->pos;
-    worker->pos.nnue_pos = tmp;
-    if (engine_using_nnue) {
-        if (worker->pos.nnue_pos == NULL) {
-            worker->pos.nnue_pos = nnue_create_pos();
-        }
-        nnue_copy_pos(state->pos.nnue_pos, worker->pos.nnue_pos);
-    }
+    nnueif_reset_pos(&worker->pos);
 
     /* Clear tables */
     killer_clear_table(worker);
@@ -222,10 +214,6 @@ void smp_destroy_workers(void)
 
     for (k=0;k<number_of_workers;k++) {
         hash_pawntt_destroy_table(&workers[k]);
-        if (workers[k].pos.nnue_pos != NULL) {
-            nnue_destroy_pos(workers[k].pos.nnue_pos);
-            workers[k].pos.nnue_pos = NULL;
-        }
     }
     free(workers);
     workers = NULL;

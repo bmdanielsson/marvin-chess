@@ -24,7 +24,7 @@
 /*
  * Evaluate the position and assign a static score to it.
  *
- * @param worker The position.
+ * @param pos The position.
  * @return Returns the score assigned to the position from the side
  *         to move point of view.
  */

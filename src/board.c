@@ -30,7 +30,7 @@
 #include "search.h"
 #include "movegen.h"
 #include "engine.h"
-#include "nnue.h"
+#include "nnueif.h"
 
 /*
  * Array of masks for updating castling permissions. For instance
@@ -226,11 +226,7 @@ bool board_setup_from_fen(struct position *pos, char *fenstr)
     board_reset(pos);
     ok = fen_setup_board(pos, fenstr) && valid_position(pos);
     if (ok) {
-        pos->start_side = pos->stm;
-        memcpy(pos->start_pieces, pos->pieces, NSQUARES*sizeof(uint8_t));
-        if (engine_using_nnue) {
-            nnue_setup_pos(pos->nnue_pos, pos->pieces, pos->stm);
-        }
+        nnueif_reset_pos(pos);
     }
 
     return ok;
@@ -278,6 +274,13 @@ bool board_make_move(struct position *pos, uint32_t move)
     elem->fifty = pos->fifty;
     elem->key = pos->key;
     elem->pawnkey = pos->pawnkey;
+
+    /*
+     * Update NNUE. This must be done before applying the
+     * move since it relies on the position 'before' the
+     * move.
+     */
+    nnueif_make_move(pos, move);
 
     /* Check if the move enables an en passant capture */
     if ((VALUE(piece) == PAWN) && (abs(to-from) == 16)) {
@@ -362,11 +365,6 @@ bool board_make_move(struct position *pos, uint32_t move)
     /* Update bitboard of all pieces */
     pos->bb_all = pos->bb_sides[WHITE]|pos->bb_sides[BLACK];
 
-    /* Update NNUE */
-    if (engine_using_nnue) {
-        nnue_make_move(pos->nnue_pos, from, to, TYPE(move), promotion, piece);
-    }
-
     /*
      * If the king was left in check then the move
      * was illegal and should be undone.
@@ -379,7 +377,6 @@ bool board_make_move(struct position *pos, uint32_t move)
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
-    assert(validate_nnue(pos));
 
     return true;
 }
@@ -454,15 +451,11 @@ void board_unmake_move(struct position *pos)
     pos->bb_all = pos->bb_sides[WHITE]|pos->bb_sides[BLACK];
 
     /* Update NNUE */
-    if (engine_using_nnue) {
-        nnue_unmake_move(pos->nnue_pos, from, to, TYPE(move), elem->capture,
-                         piece);
-    }
+    nnueif_unmake_move(pos);
 
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
-    assert(validate_nnue(pos));
 }
 
 void board_make_null_move(struct position *pos)
@@ -483,6 +476,9 @@ void board_make_null_move(struct position *pos)
     elem->key = pos->key;
     elem->pawnkey = pos->pawnkey;
 
+    /* Update NNUE */
+    nnueif_make_null_move(pos);
+
     /* Update the state structure */
     pos->ep_sq = NO_SQUARE;
     pos->key = key_update_ep_square(pos->key, elem->ep_sq, pos->ep_sq);
@@ -498,15 +494,9 @@ void board_make_null_move(struct position *pos)
         hash_prefetch(pos->worker);
     }
 
-    /* Update NNUE */
-    if (engine_using_nnue) {
-        nnue_make_null_move(pos->nnue_pos);
-    }
-
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
-    assert(validate_nnue(pos));
 }
 
 void board_unmake_null_move(struct position *pos)
@@ -531,14 +521,11 @@ void board_unmake_null_move(struct position *pos)
     pos->stm = FLIP_COLOR(pos->stm);
 
     /* Update NNUE */
-    if (engine_using_nnue) {
-        nnue_unmake_null_move(pos->nnue_pos);
-    }
+    nnueif_unmake_null_move(pos);
 
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
-    assert(validate_nnue(pos));
 }
 
 bool board_is_repetition(struct position *pos)
