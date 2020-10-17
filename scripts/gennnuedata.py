@@ -126,6 +126,7 @@ def play_game(fh, pos_left, args):
 
     engine.quit()
 
+    # Convert result to sfen representation
     if board.is_game_over(claim_draw=True):
         result_str = board.result(claim_draw=True)
         if result_str == '1-0':
@@ -135,6 +136,7 @@ def play_game(fh, pos_left, args):
         elif result_str == '1/2-1/2':
             result_val = 0
 
+    # Write positions to file
     for sfen in positions:
         write_position(fh, sfen, result_val)
         pos_left = pos_left - 1
@@ -163,6 +165,7 @@ def process_func(pid, training_file, remaining_work, finished_work,
                 position_lock, args):
     fh = open(training_file, 'w')
 
+    # Keep generating positions until the requested number is reached
     work_todo = 0
     while True:
         work_todo = request_work(work_todo, remaining_work, finished_work,
@@ -179,10 +182,13 @@ def process_func(pid, training_file, remaining_work, finished_work,
 def main(args):
     before = datetime.now();
 
+    # Initialize
+    random.seed()
     remaining_work = Value('i', args.npositions)
     finished_work = Value('i', 0)
     position_lock = Lock()
 
+    # Start generating data with all threads
     training_files = []
     processes = []
     parts = os.path.splitext(args.output)
@@ -195,6 +201,7 @@ def main(args):
         processes.append(Process(target=process_func, args=process_args))
         processes[pid].start()
 
+    # Handle progress output
     while True:
         time.sleep(PROGRESS_INTERVAL)
 
@@ -207,9 +214,11 @@ def main(args):
             break;
     print('\n');
 
+    # Wait for all threads to exit
     for p in processes:
         p.join()
 
+    # Merge data from all threads into one file
     with open(args.output,'w') as wfd:
         for f in training_files:
             with open(f,'r') as fd:
