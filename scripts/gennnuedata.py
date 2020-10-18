@@ -9,6 +9,8 @@ import time
 import chess
 import chess.engine
 
+import numpy as np
+
 from multiprocessing import Process, Lock, Value
 from datetime import datetime
 
@@ -21,7 +23,153 @@ MIN_DRAW_PLY = 80
 DRAW_SCORE = 0
 DRAW_COUNT = 8
 
-def write_position(fh, sfen, result):
+HUFFMAN_TABLE = [np.uint8(0),    # No piece (1 bit)
+                 np.uint8(1),    # Pawn (4 bits)
+                 np.uint8(3),    # Knight (4 bits)
+                 np.uint8(5),    # Bishop (4 bits)
+                 np.uint8(7),    # Rook (4 bits)
+                 np.uint8(9)]    # Queen (4 bits)
+
+
+# Encode a single-bit value according to Stockfish bitstream format
+def encode_bit(data, pos, value):
+    if np.uint16(value) != np.uint16(0):
+        data[int(pos/8)] = data[int(pos/8)] | (1 << (pos & np.uint16(7)))
+
+    return pos + 1
+
+
+# Encode a multi-bit value according to Stockfish bitstream format
+def encode_bits(data, pos, value, nbits):
+    for i in range(0, nbits):
+        pos = encode_bit(data, pos, np.uint16(value & np.uint16(1 << i)))
+
+    return pos
+
+
+def encode_piece_at(data, pos, board, sq):
+    piece_type = board.piece_type_at(sq)
+    piece_color = board.color_at(sq)
+
+    if piece_type == None:
+        pos = encode_bits(data, pos, np.uint16(HUFFMAN_TABLE[0]), 1)
+        return pos
+
+    pos = encode_bits(data, pos, np.uint16(HUFFMAN_TABLE[piece_type]), 4)
+    pos = encode_bit(data, pos, np.uint16(not piece_color))
+
+    return pos
+
+
+# Side to move (White = 0, Black = 1) (1bit)
+# White King Position (6 bits)
+# Black King Position (6 bits)
+# Huffman Encoding of the board
+# Castling availability (1 bit x 4)
+# En passant square (1 or 1 + 6 bits)
+# 50-move counter (6 bits)
+# Full move counter (8 bits)
+def encode_position(board):
+    data = np.zeros(32, dtype='uint8')
+    pos = np.uint16(0)
+
+    # Encode side to move
+    pos = encode_bit(data, pos, np.uint16(not board.turn))
+
+    # Encode king positions
+    pos = encode_bits(data, pos, np.uint16(board.king(chess.WHITE)), 6)
+    pos = encode_bits(data, pos, np.uint16(board.king(chess.BLACK)), 6)
+
+    # Encode piece positions
+    for r in reversed(range(0, 8)):
+        for f in range(0, 8):
+            sq = r*8 + f
+            pc = board.piece_at(sq)
+            if pc:
+                if pc.piece_type == chess.KING or pc.piece_type == chess.KING:
+                    continue
+            pos = encode_piece_at(data, pos, board, sq)
+
+    # Encode castling availability
+    pos = encode_bit(data, pos,
+                    np.uint16(board.has_kingside_castling_rights(chess.WHITE)))
+    pos = encode_bit(data, pos,
+                    np.uint16(board.has_queenside_castling_rights(chess.WHITE)))
+    pos = encode_bit(data, pos,
+                    np.uint16(board.has_kingside_castling_rights(chess.BLACK)))
+    pos = encode_bit(data, pos,
+                    np.uint16(board.has_queenside_castling_rights(chess.BLACK)))
+
+    # Encode en-passant square
+    if not board.ep_square:
+        pos = encode_bit(data, pos, np.uint16(0))
+    else:
+        pos = encode_bit(data, pos, np.uint16(1))
+        pos = encode_bits(data, pos, np.uint16(board.ep_square), 6)
+
+    # Encode 50-move counter
+    pos = encode_bits(data, pos, np.uint16(board.halfmove_clock), 6)
+
+    # Encode move counter
+    pos = encode_bits(data, pos, np.uint16(board.fullmove_number), 8)
+
+    return data
+
+
+# bit  0- 5: destination square (from 0 to 63)
+# bit  6-11: origin square (from 0 to 63)
+# bit 12-13: promotion piece type - 2 (from KNIGHT-2 to QUEEN-2)
+# bit 14-15: special move flag: promotion (1), en passant (2), castling (3)
+def encode_move(board, move):
+    data = np.uint16(0)
+
+    to_sq = move.to_square
+    from_sq = move.from_square
+    if board.turn == chess.WHITE and board.is_kingside_castling(move):
+        to_sq = 7
+    elif board.turn == chess.WHITE and board.is_queenside_castling(move):
+        to_sq = 0
+    elif board.turn == chess.BLACK and board.is_kingside_castling(move):
+        to_sq = 63
+    elif board.turn == chess.BLACK and board.is_queenside_castling(move):
+        to_sq = 56
+
+    data = data | np.uint16(to_sq)
+    data = data | np.uint16(from_sq << 6)
+    if move.promotion:
+        data = data | np.uint16((move.promotion-2) << 12)
+        data = data | np.uint16(1 << 14)
+    if board.is_en_passant(move):
+        data = data | np.uint16(2 << 14)
+    elif board.is_castling(move):
+        data = data | np.uint16(3 << 14)
+
+    return data
+
+# position (256 bits)
+# score (16 bits)
+# move (16 bits)
+# ply (16 bits)
+# result (8 bits)
+# padding (8 bits)
+def write_sfen_bin(fh, sfen, result):
+    board = chess.Board(fen=sfen['fen'])
+    pov_result = result
+    if sfen['score'].turn == chess.BLACK:
+        pov_result = -1*pov_result
+    pov_score = sfen['score'].pov(sfen['score'].turn).score()
+
+    pos_data = encode_position(board)
+    pos_data.tofile(fh)
+    np.int16(pov_score).tofile(fh)
+    move_data = encode_move(board, sfen['move'])
+    move_data.tofile(fh)
+    np.uint16(sfen['ply']).tofile(fh)
+    np.int8(pov_result).tofile(fh)
+    np.uint8(0).tofile(fh)
+
+
+def write_sfen_plain(fh, sfen, result):
     pov_result = result
     if sfen['score'].turn == chess.BLACK:
         pov_result = -1*pov_result
@@ -138,7 +286,10 @@ def play_game(fh, pos_left, args):
 
     # Write positions to file
     for sfen in positions:
-        write_position(fh, sfen, result_val)
+        if args.format == 'plain':
+            write_sfen_plain(fh, sfen, result_val)
+        else:
+            write_sfen_bin(fh, sfen, result_val)
         pos_left = pos_left - 1
         if pos_left == 0:
             break
@@ -163,7 +314,10 @@ def request_work(finished, remaining_work, finished_work, position_lock):
 
 def process_func(pid, training_file, remaining_work, finished_work,
                 position_lock, args):
-    fh = open(training_file, 'w')
+    if args.format == 'plain':
+        fh = open(training_file, 'w')
+    else:
+        fh = open(training_file, 'wb')
 
     # Keep generating positions until the requested number is reached
     work_todo = 0
@@ -219,10 +373,16 @@ def main(args):
         p.join()
 
     # Merge data from all threads into one file
-    with open(args.output,'w') as wfd:
-        for f in training_files:
-            with open(f,'r') as fd:
-                shutil.copyfileobj(fd, wfd)
+    if args.format == 'plain':
+        with open(args.output, 'w') as wfd:
+            for f in training_files:
+                with open(f, 'r') as fd:
+                    shutil.copyfileobj(fd, wfd)
+    else:
+        with open(args.output, 'wb') as wfd:
+            for f in training_files:
+                with open(f, 'rb') as fd:
+                    shutil.copyfileobj(fd, wfd)
     for f in training_files:
         os.remove(f)
 
@@ -255,10 +415,13 @@ if __name__ == "__main__":
                     help='the path to syzygy tablebases')
     parser.add_argument('-f', '--eval_file', type=str,
                     help='the path to the NNUE eval file')
+    parser.add_argument('--format', choices=['plain', 'bin'], default='bin',
+                    help='the output format')
 
     args = parser.parse_args()
 
     print(f'Engine: {args.engine}')
+    print(f'Output format: {args.format}')
     print(f'Number of positions: {args.npositions}')
     print(f'Depth: {args.depth}')
     print(f'Number of random plies: {args.random_plies}')
