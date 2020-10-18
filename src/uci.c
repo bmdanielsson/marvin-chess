@@ -390,12 +390,21 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
                 }
                 state->multipv = value;
             }
+        } else if (!strncmp(iter, "UseNNUE", 7)) {
+            iter = strstr(iter, "value");
+            iter += strlen("value");
+            iter = skip_whitespace(iter);
+            if (!strncmp(iter, "false", 5)) {
+                engine_using_nnue = false;
+            } else if (!strncmp(iter, "true", 4)) {
+                engine_using_nnue = true;
+            }
         } else if (!strncmp(iter, "EvalFile", 8)) {
             iter = strstr(iter, "value");
             iter += strlen("value");
             iter = skip_whitespace(iter);
             strncpy(engine_eval_file, iter, MAX_PATH_LENGTH);
-            engine_using_nnue = nnueif_init(engine_eval_file);
+            engine_loaded_net = nnueif_init(engine_eval_file);
         }
         iter = strstr(iter, "name");
     }
@@ -428,6 +437,8 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command(
                        "option name LogLevel type spin default %d min 0 max %d",
                         dbg_get_log_level(), LOG_HIGHEST_LEVEL);
+    engine_write_command("option name UseNNUE type check default %s",
+                         engine_using_nnue?"true":"false");
     engine_write_command("option name EvalFile type string default %s",
                          engine_eval_file[0] != '\0'?
                                                 engine_eval_file:"<empty>");

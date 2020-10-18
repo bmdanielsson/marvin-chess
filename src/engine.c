@@ -50,6 +50,7 @@ char engine_syzygy_path[MAX_PATH_LENGTH+1] = {'\0'};
 int engine_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
 int engine_default_num_threads = 1;
 bool engine_using_nnue = false;
+bool engine_loaded_net = false;
 char engine_eval_file[MAX_PATH_LENGTH+1] = {'\0'};
 
 /* Buffer used for receiving commands */

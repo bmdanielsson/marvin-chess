@@ -38,6 +38,7 @@ extern char engine_syzygy_path[MAX_PATH_LENGTH+1];
 extern int engine_default_hash_size;
 extern int engine_default_num_threads;
 extern bool engine_using_nnue;
+extern bool engine_loaded_net;
 extern char engine_eval_file[MAX_PATH_LENGTH+1];
 
 /*
