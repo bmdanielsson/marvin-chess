@@ -4,6 +4,7 @@ sse = no
 sse3 = no
 ssse3 = no
 sse41 = no
+avx2 = no
 arch = x86-64-modern
 trace = no
 variant = release
@@ -21,6 +22,16 @@ ifeq ($(arch), x86-64-modern)
     ssse3 = yes
     sse41 = yes
     APP_ARCH = \"x86-64-modern\"
+else
+ifeq ($(arch), x86-64-avx2)
+    popcnt = yes
+    sse = yes
+    sse3 = yes
+    ssse3 = yes
+    sse41 = yes
+    avx2 = yes
+    APP_ARCH = \"x86-64-avx2\"
+endif
 endif
 endif
 
@@ -53,6 +64,10 @@ endif
 .PHONY : sse41
 ifeq ($(sse41), yes)
     CFLAGS += -msse4.1 -DUSE_SSE41
+endif
+.PHONY : avx2
+ifeq ($(avx2), yes)
+    CFLAGS += -mavx2 -DUSE_AVX2
 endif
 .PHONY : trace
 ifeq ($(trace), yes)
