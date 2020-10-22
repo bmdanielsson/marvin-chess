@@ -209,10 +209,9 @@ def play_game(fh, pos_left, args):
     options = {}
     options['Hash'] = args.hash
     options['Threads'] = 1
+    options['UseNNUE'] = args.use_nnue
     if args.syzygy_path:
         options['SyzygyPath'] = args.syzygy_path
-    if args.eval_file:
-        options['EvalFile'] = args.eval_file
     engine = chess.engine.SimpleEngine.popen_uci(args.engine)
     engine.configure(options)
 
@@ -413,8 +412,8 @@ if __name__ == "__main__":
                     help='the amount of hash the engine should use (in MB)')
     parser.add_argument('-s', '--syzygy_path', type=str,
                     help='the path to syzygy tablebases')
-    parser.add_argument('-f', '--eval_file', type=str,
-                    help='the path to the NNUE eval file')
+    parser.add_argument('--use_nnue', action='store_true',
+                    help='flag indicating if NNUE evaluation should be used')
     parser.add_argument('--format', choices=['plain', 'bin'], default='bin',
                     help='the output format')
 
@@ -427,8 +426,8 @@ if __name__ == "__main__":
     print(f'Number of random plies: {args.random_plies}')
     print(f'Eval limit: {args.eval_limit}')
     print(f'Hash: {args.hash} MB')
+    print(f'Use NNUE: {args.use_nnue}')
     print(f'Syzygy path: {args.syzygy_path}')
-    print(f'NNUE eval file path: {args.eval_file}')
     print('')
 
     main(args)
