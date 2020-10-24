@@ -1,6 +1,7 @@
 # Default options
 popcnt = no
 sse = no
+sse2 = no
 sse3 = no
 ssse3 = no
 sse41 = no
@@ -13,11 +14,13 @@ variant = release
 .PHONY : arch
 ifeq ($(arch), x86-64)
     sse = yes
+    sse2 = yes
     APP_ARCH = \"x86-64\"
 else
 ifeq ($(arch), x86-64-modern)
     popcnt = yes
     sse = yes
+    sse2 = yes
     sse3 = yes
     ssse3 = yes
     sse41 = yes
@@ -26,6 +29,7 @@ else
 ifeq ($(arch), x86-64-avx2)
     popcnt = yes
     sse = yes
+    sse2 = yes
     sse3 = yes
     ssse3 = yes
     sse41 = yes
@@ -38,7 +42,7 @@ endif
 # Common flags
 ARCH += -m64
 CPPFLAGS += -DAPP_ARCH=$(APP_ARCH)
-CFLAGS += -m64 -DIS_64BIT -DUSE_SSE2
+CFLAGS += -m64 -DIS_64BIT
 LDFLAGS += -m64 -DIS_64BIT -lm
 
 # Update flags based on options
@@ -52,6 +56,10 @@ endif
 .PHONY : sse
 ifeq ($(sse), yes)
     CFLAGS += -msse
+endif
+.PHONY : sse2
+ifeq ($(sse2), yes)
+    CFLAGS += -msse2 -DUSE_SSE2
 endif
 .PHONY : sse3
 ifeq ($(sse3), yes)
@@ -206,14 +214,14 @@ help :
 	@echo "make <target> <option>=<value>"
 	@echo ""
 	@echo "Supported targets:"
-	@echo "  marvin: Build the engine."
+	@echo "  marvin: Build the engine (default target)."
 	@echo "  pgo: Build the engine using profile guided optimization."
 	@echo "  tuner: Build the tuner program."
 	@echo "  help: Display this message."
 	@echo "  clean: Remove all intermediate files."
 	@echo ""
 	@echo "Supported options:"
-	@echo "  arch=[x86-64|x86-64-modern]: The architecture to build for."
+	@echo "  arch=[x86-64|x86-64-modern|x86-64-avx2]: The architecture to build for."
 	@echo "  trace=[yes|no]: Include support for tracing the evaluation (default no)."
 	@echo "  variant=[release|debug|profile]: The variant to build."
 .PHONY : help
