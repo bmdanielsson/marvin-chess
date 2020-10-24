@@ -344,7 +344,7 @@ struct gamestate* create_game_state(void)
 {
     struct gamestate *state;
 
-    state = malloc(sizeof(struct gamestate));
+    state = aligned_malloc(64, sizeof(struct gamestate));
     if (state == NULL) {
         return NULL;
     }
@@ -361,7 +361,7 @@ void destroy_game_state(struct gamestate *state)
     assert(state != NULL);
 
     hash_tt_destroy_table();
-    free(state);
+    aligned_free(state);
 }
 
 void move2str(uint32_t move, char *str)

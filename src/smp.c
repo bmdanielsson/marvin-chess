@@ -199,7 +199,8 @@ void smp_create_workers(int nthreads)
     int k;
 
     number_of_workers = nthreads;
-    workers = malloc(number_of_workers*sizeof(struct search_worker));
+    workers = aligned_malloc(64,
+                             number_of_workers*sizeof(struct search_worker));
     for (k=0;k<number_of_workers;k++) {
         memset(&workers[k], 0, sizeof(struct search_worker));
         hash_pawntt_create_table(&workers[k], PAWN_HASH_SIZE);
@@ -215,7 +216,7 @@ void smp_destroy_workers(void)
     for (k=0;k<number_of_workers;k++) {
         hash_pawntt_destroy_table(&workers[k]);
     }
-    free(workers);
+    aligned_free(workers);
     workers = NULL;
     number_of_workers = 0;
 }

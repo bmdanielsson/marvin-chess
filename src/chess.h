@@ -437,7 +437,7 @@ struct position {
 
     /* NNUE data */
     Stack *st;
-    Stack stack[MAX_HISTORY_SIZE];
+    alignas(64) Stack stack[MAX_HISTORY_SIZE];
 };
 
 /* Per-thread worker instance */
@@ -445,7 +445,7 @@ struct search_worker {
     /* The id of this thread */
     int id;
     /* The current position */
-    struct position pos;
+    alignas(64) struct position pos;
     /*
      * Parameter used during the search to keep track of the current
      * principle variation at a certain depth. After the search the
@@ -499,7 +499,7 @@ struct search_worker {
 /* Data structure holding the state of an ongoing game */
 struct gamestate {
     /* The current position */
-    struct position pos;
+    alignas(64) struct position pos;
     /* Flag indicating if the root position was found in the tablebases */
     bool root_in_tb;
     /* Score for the root position based on tablebases */
