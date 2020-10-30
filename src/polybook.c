@@ -461,10 +461,10 @@ static bool read_book_entry(long offset, struct polybook_entry *entry)
         return false;
     }
 
-    entry->key = read_uint64(buffer);
-    entry->move = read_uint16(buffer+8);
-    entry->weight = read_uint16(buffer+10);
-    entry->learn = read_uint32(buffer+12);
+    entry->key = read_uint64_be(buffer);
+    entry->move = read_uint16_be(buffer+8);
+    entry->weight = read_uint16_be(buffer+10);
+    entry->learn = read_uint32_be(buffer+12);
 
     return true;
 }

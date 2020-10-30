@@ -27,7 +27,6 @@
 #include "moveselect.h"
 #include "hash.h"
 #include "debug.h"
-#include "nnueif.h"
 
 bool valid_position(struct position *pos)
 {

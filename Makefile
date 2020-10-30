@@ -21,9 +21,9 @@ ifeq ($(arch), x86-64-modern)
     popcnt = yes
     sse = yes
     sse2 = yes
-    sse3 = yes
-    ssse3 = yes
-    sse41 = yes
+    sse3 = no
+    ssse3 = no
+    sse41 = no
     APP_ARCH = \"x86-64-modern\"
 else
 ifeq ($(arch), x86-64-avx2)
@@ -136,7 +136,7 @@ SOURCES = src/bitboard.c \
           src/main.c \
           src/movegen.c \
           src/moveselect.c \
-          src/nnueif.c \
+          src/nnue.c \
           src/polybook.c \
           src/search.c \
           src/see.c \
@@ -148,8 +148,6 @@ SOURCES = src/bitboard.c \
           src/utils.c \
           src/validation.c \
           src/xboard.c \
-          import/cfish/misc.c \
-          import/cfish/nnue.c \
           import/fathom/tbprobe.c
 TUNER_SOURCES = src/bitboard.c \
                 src/board.c \
@@ -164,7 +162,7 @@ TUNER_SOURCES = src/bitboard.c \
                 src/key.c \
                 src/movegen.c \
                 src/moveselect.c \
-                src/nnueif.c \
+                src/nnue.c \
                 src/polybook.c \
                 src/search.c \
                 src/see.c \
@@ -179,8 +177,6 @@ TUNER_SOURCES = src/bitboard.c \
                 src/utils.c \
                 src/validation.c \
                 src/xboard.c \
-                import/cfish/misc.c \
-                import/cfish/nnue.c \
                 import/fathom/tbprobe.c
 .PHONY : trace
 ifeq ($(trace), yes)
@@ -194,7 +190,6 @@ TUNER_OBJECTS = $(TUNER_SOURCES:%.c=%.o)
 TUNER_DEPS = $(TUNER_SOURCES:%.c=%.d)
 INTERMEDIATES = $(OBJECTS) $(DEPS)
 TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
-NNUE_INTERMEDIATES = $(NNUE_OBJECTS)
 
 # Include depencies
 -include $(SOURCES:.c=.d)

@@ -36,7 +36,7 @@
 #include "validation.h"
 #include "tbprobe.h"
 #include "smp.h"
-#include "nnueif.h"
+#include "nnue.h"
 
 /* Different UCI modes */
 static bool ponder_mode = false;
@@ -404,7 +404,7 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
             iter += strlen("value");
             iter = skip_whitespace(iter);
             strncpy(engine_eval_file, iter, MAX_PATH_LENGTH);
-            engine_loaded_net = nnueif_init(engine_eval_file);
+            engine_loaded_net = nnue_load_net(engine_eval_file);
         }
         iter = strstr(iter, "name");
     }

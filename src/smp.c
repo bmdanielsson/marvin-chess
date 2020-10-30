@@ -33,7 +33,6 @@
 #include "bitboard.h"
 #include "board.h"
 #include "history.h"
-#include "nnueif.h"
 
 /* Worker actions */
 #define ACTION_IDLE 0
@@ -145,7 +144,6 @@ static void prepare_worker(struct search_worker *worker,
 
     /* Copy data from game state */
     worker->pos = state->pos;
-    nnueif_reset_pos(&worker->pos);
 
     /* Clear tables */
     killer_clear_table(worker);

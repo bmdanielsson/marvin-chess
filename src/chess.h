@@ -25,7 +25,6 @@
 
 #include "thread.h"
 #include "config.h"
-#include "nnue_types.h"
 
 /* The maximum length of the string representation of a move */
 #define MAX_MOVESTR_LENGTH 7
@@ -434,10 +433,6 @@ struct position {
     /* Pointers to the owning worker and the active game state */
     struct search_worker *worker;
     struct gamestate *state;
-
-    /* NNUE data */
-    Stack *st;
-    alignas(64) Stack stack[MAX_HISTORY_SIZE];
 };
 
 /* Per-thread worker instance */
@@ -445,7 +440,7 @@ struct search_worker {
     /* The id of this thread */
     int id;
     /* The current position */
-    alignas(64) struct position pos;
+    struct position pos;
     /*
      * Parameter used during the search to keep track of the current
      * principle variation at a certain depth. After the search the
@@ -499,7 +494,7 @@ struct search_worker {
 /* Data structure holding the state of an ongoing game */
 struct gamestate {
     /* The current position */
-    alignas(64) struct position pos;
+    struct position pos;
     /* Flag indicating if the root position was found in the tablebases */
     bool root_in_tb;
     /* Score for the root position based on tablebases */

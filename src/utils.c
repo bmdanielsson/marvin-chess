@@ -26,6 +26,7 @@
 #else
 #include <sys/time.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
 #endif
@@ -227,7 +228,22 @@ void sleep_ms(int ms)
 #endif
 }
 
-uint16_t read_uint16(uint8_t *buffer)
+uint16_t read_uint16_le(uint8_t *buffer)
+{
+    uint16_t val;
+    uint8_t  *p = (uint8_t*)&val;
+
+#ifndef TARGET_BIG_ENDIAN
+    p[0] = buffer[0];
+    p[1] = buffer[1];
+#else
+    p[1] = buffer[0];
+    p[0] = buffer[1];
+#endif
+    return val;
+}
+
+uint16_t read_uint16_be(uint8_t *buffer)
 {
     uint16_t val;
     uint8_t  *p = (uint8_t*)&val;
@@ -242,7 +258,26 @@ uint16_t read_uint16(uint8_t *buffer)
     return val;
 }
 
-uint32_t read_uint32(uint8_t *buffer)
+uint32_t read_uint32_le(uint8_t *buffer)
+{
+    uint32_t val;
+    uint8_t  *p = (uint8_t*)&val;
+
+#ifndef TARGET_BIG_ENDIAN
+    p[0] = buffer[0];
+    p[1] = buffer[1];
+    p[2] = buffer[2];
+    p[3] = buffer[3];
+#else
+    p[3] = buffer[0];
+    p[2] = buffer[1];
+    p[1] = buffer[2];
+    p[0] = buffer[3];
+#endif
+    return val;
+}
+
+uint32_t read_uint32_be(uint8_t *buffer)
 {
     uint32_t val;
     uint8_t  *p = (uint8_t*)&val;
@@ -261,7 +296,34 @@ uint32_t read_uint32(uint8_t *buffer)
     return val;
 }
 
-uint64_t read_uint64(uint8_t *buffer)
+uint64_t read_uint64_le(uint8_t *buffer)
+{
+    uint64_t val;
+    uint8_t  *p = (uint8_t*)&val;
+
+#ifndef TARGET_BIG_ENDIAN
+    p[0] = buffer[0];
+    p[1] = buffer[1];
+    p[2] = buffer[2];
+    p[3] = buffer[3];
+    p[4] = buffer[4];
+    p[5] = buffer[5];
+    p[6] = buffer[6];
+    p[7] = buffer[7];
+#else
+    p[7] = buffer[0];
+    p[6] = buffer[1];
+    p[5] = buffer[2];
+    p[4] = buffer[3];
+    p[3] = buffer[4];
+    p[2] = buffer[5];
+    p[1] = buffer[6];
+    p[0] = buffer[7];
+#endif
+    return val;
+}
+
+uint64_t read_uint64_be(uint8_t *buffer)
 {
     uint64_t val;
     uint8_t  *p = (uint8_t*)&val;
@@ -364,4 +426,28 @@ bool is64bit(void)
 	char *dummy;
 
     return sizeof(dummy) == 8;
+}
+
+uint32_t get_file_size(char *file)
+{
+    assert(file != NULL);
+
+#ifdef WINDOWS
+    HANDLE fh;
+    DWORD  size;
+
+    fh = CreateFile(file, GENERIC_READ, 0, NULL, OPEN_EXISTING,
+                    FILE_ATTRIBUTE_NORMAL, NULL);
+    size = GetFileSize(fh, NULL);
+    CloseHandle(fh);
+
+    return (uint32_t)size;
+#else
+    struct stat sb;
+
+    if (stat(file, &sb) != 0) {
+        return 0xFFFFFFFF;
+    }
+    return (uint32_t)sb.st_size;
+#endif
 }

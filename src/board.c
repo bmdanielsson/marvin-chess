@@ -30,7 +30,6 @@
 #include "search.h"
 #include "movegen.h"
 #include "engine.h"
-#include "nnueif.h"
 
 /*
  * Array of masks for updating castling permissions. For instance
@@ -225,9 +224,6 @@ bool board_setup_from_fen(struct position *pos, char *fenstr)
 
     board_reset(pos);
     ok = fen_setup_board(pos, fenstr) && valid_position(pos);
-    if (ok) {
-        nnueif_reset_pos(pos);
-    }
 
     return ok;
 }
@@ -274,13 +270,6 @@ bool board_make_move(struct position *pos, uint32_t move)
     elem->fifty = pos->fifty;
     elem->key = pos->key;
     elem->pawnkey = pos->pawnkey;
-
-    /*
-     * Update NNUE. This must be done before applying the
-     * move since it relies on the position 'before' the
-     * move.
-     */
-    nnueif_make_move(pos, move);
 
     /* Check if the move enables an en passant capture */
     if ((VALUE(piece) == PAWN) && (abs(to-from) == 16)) {
@@ -450,9 +439,6 @@ void board_unmake_move(struct position *pos)
     /* Update bitboard of all pieces */
     pos->bb_all = pos->bb_sides[WHITE]|pos->bb_sides[BLACK];
 
-    /* Update NNUE */
-    nnueif_unmake_move(pos);
-
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
@@ -475,9 +461,6 @@ void board_make_null_move(struct position *pos)
     elem->fifty = pos->fifty;
     elem->key = pos->key;
     elem->pawnkey = pos->pawnkey;
-
-    /* Update NNUE */
-    nnueif_make_null_move(pos);
 
     /* Update the state structure */
     pos->ep_sq = NO_SQUARE;
@@ -519,9 +502,6 @@ void board_unmake_null_move(struct position *pos)
         pos->fullmove--;
     }
     pos->stm = FLIP_COLOR(pos->stm);
-
-    /* Update NNUE */
-    nnueif_unmake_null_move(pos);
 
     assert(pos->key == key_generate(pos));
     assert(pos->pawnkey == key_generate_pawnkey(pos));

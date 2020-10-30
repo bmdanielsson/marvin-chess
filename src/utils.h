@@ -100,12 +100,28 @@ bool poll_input(void);
 void sleep_ms(int ms);
 
 /*
+ * Read a 16-bit unsigned integer in little endian format.
+ *
+ * @param buffer The buffer to read from.
+ * @return Returns the read value in the native endian format.
+ */
+uint16_t read_uint16_le(uint8_t *buffer);
+
+/*
  * Read a 16-bit unsigned integer in big endian format.
  *
  * @param buffer The buffer to read from.
  * @return Returns the read value in the native endian format.
  */
-uint16_t read_uint16(uint8_t *buffer);
+uint16_t read_uint16_be(uint8_t *buffer);
+
+/*
+ * Read a 32-bit unsigned integer in little endian format.
+ *
+ * @param buffer The buffer to read from.
+ * @return Returns the read value in the native endian format.
+ */
+uint32_t read_uint32_le(uint8_t *buffer);
 
 /*
  * Read a 32-bit unsigned integer in big endian format.
@@ -113,15 +129,23 @@ uint16_t read_uint16(uint8_t *buffer);
  * @param buffer The buffer to read from.
  * @return Returns the read value in the native endian format.
  */
-uint32_t read_uint32(uint8_t *buffer);
+uint32_t read_uint32_be(uint8_t *buffer);
 
 /*
- * Reads a 64-bit unsigned integer from a file in big-endian format.
+ * Reads a 64-bit unsigned integer from a file in little endian format.
  *
  * @param buffer The buffer to read from.
  * @return Returns the read value in the native endian format.
  */
-uint64_t read_uint64(uint8_t *buffer);
+uint64_t read_uint64_le(uint8_t *buffer);
+
+/*
+ * Reads a 64-bit unsigned integer from a file in little endian format.
+ *
+ * @param buffer The buffer to read from.
+ * @return Returns the read value in the native endian format.
+ */
+uint64_t read_uint64_be(uint8_t *buffer);
 
 /*
  * Remove leading white space from a string.
@@ -163,5 +187,13 @@ void parallel_memset(void *memory, uint8_t value, size_t size, int nthreads);
  * @return Returns true if this is a 64-bit build.
  */
 bool is64bit(void);
+
+/*
+ * Get the size of a file in a portable way.
+ *
+ * @param file The file.
+ * @return The size of the file, or 0xFFFFFFFF in case of error.
+ */
+uint32_t get_file_size(char *file);
 
 #endif
