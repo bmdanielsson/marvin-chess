@@ -1,40 +1,27 @@
 # Default options
-popcnt = no
-sse = no
-sse2 = no
-sse3 = no
-ssse3 = no
-sse41 = no
-avx2 = no
-arch = x86-64-modern
+arch = x86-64-popcnt
 trace = no
 variant = release
 
-# Update options based on the arch argument
+# Set architecture specific options
 .PHONY : arch
+ifeq ($(arch), generic-64)
+    sse = no
+    sse2 = no
+    popcnt = no
+    APP_ARCH = \"generic-64\"
+else
 ifeq ($(arch), x86-64)
     sse = yes
     sse2 = yes
+    popcnt = no
     APP_ARCH = \"x86-64\"
 else
-ifeq ($(arch), x86-64-modern)
-    popcnt = yes
+ifeq ($(arch), x86-64-popcnt)
     sse = yes
     sse2 = yes
-    sse3 = no
-    ssse3 = no
-    sse41 = no
-    APP_ARCH = \"x86-64-modern\"
-else
-ifeq ($(arch), x86-64-avx2)
     popcnt = yes
-    sse = yes
-    sse2 = yes
-    sse3 = yes
-    ssse3 = yes
-    sse41 = yes
-    avx2 = yes
-    APP_ARCH = \"x86-64-avx2\"
+    APP_ARCH = \"x86-64-popcnt\"
 endif
 endif
 endif
@@ -60,22 +47,6 @@ endif
 .PHONY : sse2
 ifeq ($(sse2), yes)
     CFLAGS += -msse2 -DUSE_SSE2
-endif
-.PHONY : sse3
-ifeq ($(sse3), yes)
-    CFLAGS += -msse3 -DUSE_SSE3
-endif
-.PHONY : ssse3
-ifeq ($(ssse3), yes)
-    CFLAGS += -mssse3 -DUSE_SSSE3
-endif
-.PHONY : sse41
-ifeq ($(sse41), yes)
-    CFLAGS += -msse4.1 -DUSE_SSE41
-endif
-.PHONY : avx2
-ifeq ($(avx2), yes)
-    CFLAGS += -mavx2 -DUSE_AVX2
 endif
 .PHONY : trace
 ifeq ($(trace), yes)
