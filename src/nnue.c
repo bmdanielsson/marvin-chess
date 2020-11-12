@@ -171,7 +171,7 @@ static void layer_activate(int32_t *input, int16_t *output, uint32_t ndims)
 static void transformer_propagate(struct position *pos, struct net_data *data)
 {
     struct feature_list active_features[NSIDES];
-    int16_t             features[NSIDES][HALF_DIMS];
+    alignas(64) int16_t features[NSIDES][HALF_DIMS];
     int                 nchunks = HALF_DIMS/8;
     int                 side;
     int                 ft;
