@@ -15,6 +15,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+/*
+ * This file implements support for NNUE style neural networks. NNUE
+ * was invented by Yu Nasu for use with shogi and adapted to chess
+ * by Hisayori Noda.
+ */
 #include <assert.h>
 #include <stdint.h>
 #include <stdio.h>
