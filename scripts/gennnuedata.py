@@ -67,9 +67,9 @@ def encode_piece_at(data, pos, board, sq):
 # Huffman Encoding of the board
 # Castling availability (1 bit x 4)
 # En passant square (1 or 1 + 6 bits)
-# 50-move counter (6 bits)
+# 50-move counter (7 bits)
 # Full move counter (8 bits)
-def encode_position(board):
+def encode_position(board, sf):
     data = np.zeros(32, dtype='uint8')
     pos = np.uint16(0)
 
@@ -107,11 +107,24 @@ def encode_position(board):
         pos = encode_bit(data, pos, np.uint16(1))
         pos = encode_bits(data, pos, np.uint16(board.ep_square), 6)
 
-    # Encode 50-move counter
-    pos = encode_bits(data, pos, np.uint16(board.halfmove_clock), 6)
+    # Encode 50-move counter. Use 7 bits for counter unless Stockfish
+    # compatibility is requested. In that case the last bit is stored
+    # at the end instead in order to be backwards compoatible with
+    # older parsers.
+    if sf:
+        pos = encode_bits(data, pos, np.uint16(board.halfmove_clock), 6)
+    else:
+        pos = encode_bits(data, pos, np.uint16(board.halfmove_clock), 7)
 
     # Encode move counter
     pos = encode_bits(data, pos, np.uint16(board.fullmove_number), 8)
+
+    # Backwards compatible fix for 50-move counter only being stored
+    # with 6 bits. Only used if Stockfish compatibility is requested.
+    if sf:
+        high_bit = (board.halfmove_clock >> 6) & 1
+        pos = encode_bits(data, pos, np.uint16(board.fullmove_number>>8), 8)
+        pos = encode_bit(data, pos, np.uint16(high_bit))
 
     return data
 
@@ -152,21 +165,21 @@ def encode_move(board, move):
 # ply (16 bits)
 # result (8 bits)
 # padding (8 bits)
-def write_sfen_bin(fh, sfen, result):
+def write_sfen_bin(fh, sfen, result, sf):
     board = chess.Board(fen=sfen['fen'])
     pov_result = result
     if sfen['score'].turn == chess.BLACK:
         pov_result = -1*pov_result
     pov_score = sfen['score'].pov(sfen['score'].turn).score()
 
-    pos_data = encode_position(board)
+    pos_data = encode_position(board, sf)
     pos_data.tofile(fh)
     np.int16(pov_score).tofile(fh)
     move_data = encode_move(board, sfen['move'])
     move_data.tofile(fh)
     np.uint16(sfen['ply']).tofile(fh)
     np.int8(pov_result).tofile(fh)
-    np.uint8(0).tofile(fh)
+    np.uint8(0xFF).tofile(fh)
 
 
 def write_sfen_plain(fh, sfen, result):
@@ -288,7 +301,7 @@ def play_game(fh, pos_left, args):
         if args.format == 'plain':
             write_sfen_plain(fh, sfen, result_val)
         else:
-            write_sfen_bin(fh, sfen, result_val)
+            write_sfen_bin(fh, sfen, result_val, args.sf)
         pos_left = pos_left - 1
         if pos_left == 0:
             break
@@ -422,6 +435,8 @@ if __name__ == "__main__":
                     help='the output format')
     parser.add_argument('--seed', type=int,
                     help='seed to use for random number generator')
+    parser.add_argument('--sf', action='store_true',
+                    help='enable Stockfish compatibility mode')
 
     args = parser.parse_args()
 
