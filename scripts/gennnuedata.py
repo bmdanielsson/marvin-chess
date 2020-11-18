@@ -313,6 +313,11 @@ def request_work(finished, remaining_work, finished_work, position_lock):
 
 def process_func(pid, training_file, remaining_work, finished_work,
                 position_lock, args):
+    if (args.seed):
+        random.seed(a=args.seed+pid*10)
+    else:
+        random.seed()
+
     if args.format == 'plain':
         fh = open(training_file, 'w')
     else:
@@ -336,7 +341,6 @@ def main(args):
     before = datetime.now();
 
     # Initialize
-    random.seed()
     remaining_work = Value('i', args.npositions)
     finished_work = Value('i', 0)
     position_lock = Lock()
@@ -416,6 +420,8 @@ if __name__ == "__main__":
                     help='flag indicating if NNUE evaluation should be used')
     parser.add_argument('--format', choices=['plain', 'bin'], default='bin',
                     help='the output format')
+    parser.add_argument('--seed', type=int,
+                    help='seed to use for random number generator')
 
     args = parser.parse_args()
 
