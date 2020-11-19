@@ -26,9 +26,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdalign.h>
-#ifdef USE_SSE2
-#include <emmintrin.h>
-#endif
 
 #include "nnue.h"
 #include "utils.h"
@@ -168,66 +165,6 @@ static void layer_activate(int32_t *input, int16_t *output, uint32_t ndims)
     }
 }
 
-#ifdef USE_SSE2
-/*
- * The SIMD code in this function is taken from Cfish,
- * https://github.com/syzygy1/Cfish
- */
-static void transformer_propagate(struct position *pos, struct net_data *data)
-{
-    struct feature_list active_features[NSIDES];
-    alignas(64) int16_t features[NSIDES][HALF_DIMS];
-    int                 nchunks = HALF_DIMS/8;
-    int                 side;
-    int                 ft;
-    int                 k;
-
-    /* Find active features for each half */
-    find_active_features(pos, WHITE, &active_features[0]);
-    find_active_features(pos, BLACK, &active_features[1]);
-
-    /* Process the neurons in each half */
-    for (side=0;side<NSIDES;side++) {
-        __m128i *biases_vec = (__m128i*)&feature_biases[0];
-        __m128i *feature_vec = (__m128i*)&features[side][0];
-
-        /* Add bias */
-        for (k=0;k<nchunks;k++) {
-            feature_vec[k] = biases_vec[k];
-        }
-
-        /* Summarize the weights for all active features */
-        for (ft=0;ft<active_features[side].size;ft++) {
-            uint32_t index = active_features[side].features[ft];
-            __m128i *column = (__m128i*)&feature_weights[HALF_DIMS*index];
-
-            for (k=0;k<nchunks;k++) {
-                feature_vec[k] = _mm_add_epi16(feature_vec[k], column[k]);
-            }
-        }
-    }
-
-    /*
-     * Combine the two halves to form the inputs to the network. The
-     * values are clamped to be in the range [0, 127].
-     */
-    __m128i k0x7f80 = _mm_set1_epi16(0x7f80);
-    __m128i k0x0080 = _mm_set1_epi16(0x0080);
-    __m128i k0x8000 = _mm_set1_epi16(-0x8000);
-    int     perspectives[NSIDES] = {pos->stm, FLIP_COLOR(pos->stm)};
-
-    for (side=0;side<NSIDES;side++) {
-        __m128i *out = (__m128i*)&data->input[HALF_DIMS*side];
-
-        for (k=0;k<nchunks;k++) {
-            __m128i sum = ((__m128i*)&features[perspectives[side]])[k];
-            __m128i t1 = _mm_adds_epi16(sum, k0x7f80);
-            __m128i t2 = _mm_add_epi16(t1, k0x0080);
-            out[k] = _mm_subs_epu16(t2, k0x8000);
-        }
-    }
-}
-#else
 static void transformer_propagate(struct position *pos, struct net_data *data)
 {
     struct feature_list active_features[NSIDES];
@@ -275,7 +212,6 @@ static void transformer_propagate(struct position *pos, struct net_data *data)
         }
     }
 }
-#endif
 
 static void network_propagate(struct net_data *data)
 {

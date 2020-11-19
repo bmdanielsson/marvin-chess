@@ -46,7 +46,7 @@ ifeq ($(sse), yes)
 endif
 .PHONY : sse2
 ifeq ($(sse2), yes)
-    CFLAGS += -msse2 -DUSE_SSE2
+    CFLAGS += -msse2
 endif
 .PHONY : trace
 ifeq ($(trace), yes)

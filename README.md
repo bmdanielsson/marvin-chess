@@ -26,5 +26,3 @@ The easiest way to build Marvin is to use GCC and the included Makefile. Running
 The source code is provided under the GPLv3 license. For details see the LICENSE file.
 
 Marvin uses the Fathom library (https://github.com/jdart1/Fathom) for probing Syzygy tablebases. The Fathom library is licensed under the MIT license. For details see the LICENSE file in the import/fathom folder.
-
-Marvin uses some SIMD code from Cfish (https://github.com/syzygy1/Cfish) in order to optimize neural network inference. Cfish is licensed under the GPLv3 license.
