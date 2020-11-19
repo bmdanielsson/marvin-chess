@@ -30,7 +30,7 @@ endif
 ARCH += -m64
 CPPFLAGS += -DAPP_ARCH=$(APP_ARCH)
 CFLAGS += -m64 -DIS_64BIT
-LDFLAGS += -m64 -DIS_64BIT -lm
+LDFLAGS += -m64 -DIS_64BIT
 
 # Update flags based on options
 .PHONY : popcnt
@@ -57,8 +57,8 @@ endif
 .PHONY : variant
 ifeq ($(variant), release)
     CPPFLAGS += -DNDEBUG
-    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer -flto $(EXTRACFLAGS)
-    LDFLAGS += -flto $(EXTRALDFLAGS)
+    CFLAGS += -O3 -funroll-loops -fomit-frame-pointer $(EXTRACFLAGS)
+    LDFLAGS += $(EXTRALDFLAGS)
 else
 ifeq ($(variant), debug)
     CFLAGS += -g
@@ -73,9 +73,15 @@ endif
 
 # Set special flags needed for different operating systems
 ifeq ($(OS), Windows_NT)
-CFLAGS += -DWINDOWS
+    CFLAGS += -DWINDOWS -D_CRT_SECURE_NO_DEPRECATE
+    EXEFILE = marvin.exe
 else
-LDFLAGS += -lpthread
+ifeq ($(variant), release)
+    CFLAGS += -flto
+    LDFLAGS += -flto
+endif
+    LDFLAGS += -lpthread -lm
+    EXEFILE = marvin
 endif
 
 # Configure warnings
@@ -86,11 +92,11 @@ CFLAGS += -Iimport/cfish -Iimport/fathom -Isrc
 
 # Enable evaluation tracing for tuner
 ifeq ($(MAKECMDGOALS), tuner)
-CFLAGS += -DTRACE
+    CFLAGS += -DTRACE
 endif
 
 # Compiler
-CC = gcc
+CC = clang
 
 # Sources
 SOURCES = src/bitboard.c \
@@ -173,7 +179,7 @@ TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
 	$(COMPILE.c) -MD -o $@ $<
 
 clean :
-	rm -f marvin marvin.exe tuner $(INTERMEDIATES) $(TUNER_INTERMEDIATES)
+	rm -f $(EXEFILE) tuner $(INTERMEDIATES) $(TUNER_INTERMEDIATES)
 .PHONY : clean
 
 help :
@@ -181,7 +187,6 @@ help :
 	@echo ""
 	@echo "Supported targets:"
 	@echo "  marvin: Build the engine (default target)."
-	@echo "  pgo: Build the engine using profile guided optimization."
 	@echo "  tuner: Build the tuner program."
 	@echo "  help: Display this message."
 	@echo "  clean: Remove all intermediate files."
@@ -193,22 +198,7 @@ help :
 .PHONY : help
 
 marvin : $(OBJECTS)
-	$(CC) $(OBJECTS) $(LDFLAGS) -o marvin
+	$(CC) $(OBJECTS) $(LDFLAGS) -o $(EXEFILE)
 
 tuner : $(TUNER_OBJECTS)
 	$(CC) $(TUNER_OBJECTS) $(LDFLAGS) -o tuner
-
-pgo-generate:
-	$(MAKE) EXTRACFLAGS='-fprofile-generate' EXTRALDFLAGS='-fprofile-generate -lgcov'
-
-pgo-use:
-	$(MAKE) EXTRACFLAGS='-fprofile-use' EXTRALDFLAGS='-fprofile-use -lgcov'
-
-pgo:
-	$(MAKE) clean
-	$(MAKE) pgo-generate
-	rm -f src/*.gcda import/cfish/*.gcda import/fathom/*.gcda
-	./marvin -b
-	$(MAKE) clean
-	$(MAKE) pgo-use
-	rm -f src/*.gcda import/cfish/*.gcda import/fathom/*.gcda

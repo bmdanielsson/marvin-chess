@@ -367,6 +367,8 @@ bool hash_pawntt_lookup(struct search_worker *worker, struct pawntt_item *item)
 
 void hash_prefetch(struct search_worker *worker)
 {
+    (void)worker;
+
     PREFETCH_ADDRESS(&transposition_table[worker->pos.key&(tt_size-1)]);
     PREFETCH_ADDRESS(&worker->pawntt[worker->pos.pawnkey&(worker->pawntt_size-1)]);
 }
