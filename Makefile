@@ -1,27 +1,43 @@
-# Default options
-arch = x86-64-popcnt
+# Default configuration
+arch = x86-64-modern
 trace = no
 variant = release
 
-# Set architecture specific options
+# Default options
+sse = no
+sse2 = no
+ssse3 = no
+sse41 = no
+avx2 = no
+popcnt = no
+
+# Set options based on selected architecture
 .PHONY : arch
 ifeq ($(arch), generic-64)
-    sse = no
-    sse2 = no
-    popcnt = no
     APP_ARCH = \"generic-64\"
 else
 ifeq ($(arch), x86-64)
     sse = yes
     sse2 = yes
-    popcnt = no
     APP_ARCH = \"x86-64\"
 else
-ifeq ($(arch), x86-64-popcnt)
+ifeq ($(arch), x86-64-modern)
     sse = yes
     sse2 = yes
+    ssse3 = yes
+    sse41 = yes
     popcnt = yes
-    APP_ARCH = \"x86-64-popcnt\"
+    APP_ARCH = \"x86-64-modern\"
+else
+ifeq ($(arch), x86-64-avx2)
+    sse = yes
+    sse2 = yes
+    ssse3 = yes
+    sse41 = yes
+    avx2 = yes
+    popcnt = yes
+    APP_ARCH = \"x86-64-avx2\"
+endif
 endif
 endif
 endif
@@ -30,16 +46,9 @@ endif
 ARCH += -m64
 CPPFLAGS += -DAPP_ARCH=$(APP_ARCH)
 CFLAGS += -m64 -DIS_64BIT
-LDFLAGS += -m64 -DIS_64BIT
+LDFLAGS += -m64
 
-# Update flags based on options
-.PHONY : popcnt
-ifeq ($(popcnt), yes)
-    CPPFLAGS += -DUSE_POPCNT
-    CFLAGS += -msse3 -mpopcnt
-else
-    CPPFLAGS += -DTB_NO_HW_POP_COUNT
-endif
+# Set compiler flags based on options
 .PHONY : sse
 ifeq ($(sse), yes)
     CFLAGS += -msse
@@ -47,6 +56,25 @@ endif
 .PHONY : sse2
 ifeq ($(sse2), yes)
     CFLAGS += -msse2
+endif
+.PHONY : ssse3
+ifeq ($(ssse3), yes)
+    CFLAGS += -mssse3
+endif
+.PHONY : sse41
+ifeq ($(sse41), yes)
+    CFLAGS += -msse4.1
+endif
+.PHONY : avx2
+ifeq ($(avx2), yes)
+    CFLAGS += -mavx2
+endif
+.PHONY : popcnt
+ifeq ($(popcnt), yes)
+    CPPFLAGS += -DUSE_POPCNT
+    CFLAGS += -msse3 -mpopcnt
+else
+    CPPFLAGS += -DTB_NO_HW_POP_COUNT
 endif
 .PHONY : trace
 ifeq ($(trace), yes)
@@ -192,7 +220,7 @@ help :
 	@echo "  clean: Remove all intermediate files."
 	@echo ""
 	@echo "Supported options:"
-	@echo "  arch=[x86-64|x86-64-modern|x86-64-avx2]: The architecture to build for."
+	@echo "  arch=[generic-64|x86-64|x86-64-modern|x86-64-avx2]: The architecture to build for."
 	@echo "  trace=[yes|no]: Include support for tracing the evaluation (default no)."
 	@echo "  variant=[release|debug|profile]: The variant to build."
 .PHONY : help
