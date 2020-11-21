@@ -19,7 +19,7 @@ Additionally Marvin looks for a file called book.bin in the same directory as th
 
 ### Building
 
-The easiest way to build Marvin is to use GCC and the included Makefile. Running `make` should produce a binary that is compatible with your system. For more information about availbale targets and options run `make help`.
+The easiest way to build Marvin is to use the included Makefile and just run `make`. This should produce a binary that is compatible with most systems. The default compiler is Clang, but if you want to use GCC instead run `make CC=gcc`. However if you plan on using NNUE I highly recommend using Clang since a GCC build will be almost 100 ELO weaker. For more information about available targets and build options run `make help`.
 
 ### License
 
