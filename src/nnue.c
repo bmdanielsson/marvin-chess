@@ -62,12 +62,12 @@
  * The network consists of a set of hidden layers and an output layer with
  * a single neuron.
  */
-static int16_t hidden1_weights[HIDDEN_LAYER_SIZE*FEATURE_OUT_DIMS];
-static int16_t hidden2_weights[HIDDEN_LAYER_SIZE*HIDDEN_LAYER_SIZE];
-static int16_t output_weights[HIDDEN_LAYER_SIZE];
-static int32_t hidden1_biases[HIDDEN_LAYER_SIZE];
-static int32_t hidden2_biases[HIDDEN_LAYER_SIZE];
-static int32_t output_biases[OUTPUT_LAYER_SIZE];
+static alignas(64) int16_t hidden1_weights[HIDDEN_LAYER_SIZE*FEATURE_OUT_DIMS];
+static alignas(64) int16_t hidden2_weights[HIDDEN_LAYER_SIZE*HIDDEN_LAYER_SIZE];
+static alignas(64) int16_t output_weights[HIDDEN_LAYER_SIZE];
+static alignas(64) int32_t hidden1_biases[HIDDEN_LAYER_SIZE];
+static alignas(64) int32_t hidden2_biases[HIDDEN_LAYER_SIZE];
+static alignas(64) int32_t output_biases[OUTPUT_LAYER_SIZE];
 static alignas(64) int16_t feature_biases[HALF_DIMS];
 static alignas(64) int16_t feature_weights[HALF_DIMS*FEATURE_IN_DIMS];
 
@@ -77,10 +77,10 @@ static alignas(64) int16_t feature_weights[HALF_DIMS*FEATURE_IN_DIMS];
  */
 struct net_data {
     alignas(64) int16_t input[FEATURE_OUT_DIMS];
-    int32_t hidden1_values[HIDDEN_LAYER_SIZE];
-    int32_t hidden2_values[HIDDEN_LAYER_SIZE];
-    int16_t hidden1_output[HIDDEN_LAYER_SIZE];
-    int16_t hidden2_output[HIDDEN_LAYER_SIZE];
+    alignas(64) int32_t hidden1_values[HIDDEN_LAYER_SIZE];
+    alignas(64) int32_t hidden2_values[HIDDEN_LAYER_SIZE];
+    alignas(64) int16_t hidden1_output[HIDDEN_LAYER_SIZE];
+    alignas(64) int16_t hidden2_output[HIDDEN_LAYER_SIZE];
     int32_t output;
 };
 
@@ -149,6 +149,7 @@ static void layer_propagate(int16_t *input, int32_t *output, int ninputs,
      */
     for (k=0;k<noutputs;k++) {
         output[k] = biases[k];
+        #pragma omp simd aligned(weights,output:64) simdlen(16)
         for (l=0;l<ninputs;l++) {
             output[k] += (input[l]*weights[k*ninputs+l]);
         }
@@ -160,6 +161,7 @@ static void layer_activate(int32_t *input, int16_t *output, uint32_t ndims)
     uint32_t k;
 
     /* Apply activation function */
+    #pragma omp simd aligned(input,output:64) simdlen(16)
     for (k=0;k<ndims;k++) {
         output[k] = CLAMP((input[k]>>6), 0, 127);
     }
@@ -168,7 +170,7 @@ static void layer_activate(int32_t *input, int16_t *output, uint32_t ndims)
 static void transformer_propagate(struct position *pos, struct net_data *data)
 {
     struct feature_list active_features[NSIDES];
-    int16_t             features[NSIDES][HALF_DIMS];
+    alignas(64) int16_t features[NSIDES][HALF_DIMS];
     int                 perspectives[NSIDES];
     int                 side;
     int                 k;
@@ -184,6 +186,7 @@ static void transformer_propagate(struct position *pos, struct net_data *data)
     /* Process the neurons in each half */
     for (side=0;side<NSIDES;side++) {
         /* Add biases */
+        #pragma omp simd aligned(features,feature_biases:64) simdlen(16)
         for (k=0;k<HALF_DIMS;k++) {
             features[side][k] = feature_biases[k];
         }
@@ -192,6 +195,7 @@ static void transformer_propagate(struct position *pos, struct net_data *data)
         for (k=0;k<active_features[side].size;k++) {
             index = active_features[side].features[k];
             offset = HALF_DIMS*index;
+            #pragma omp simd aligned(features,feature_weights:64) simdlen(16)
             for (l=0;l<HALF_DIMS;l++) {
                 features[side][l] += feature_weights[offset+l];
             }
@@ -206,9 +210,11 @@ static void transformer_propagate(struct position *pos, struct net_data *data)
     perspectives[1] = FLIP_COLOR(pos->stm);
     for (side=0;side<NSIDES;side++) {
         offset = HALF_DIMS*side;
+        int16_t *temp = &data->input[offset];
+        #pragma omp simd aligned(features,temp:64) simdlen(16)
         for (k=0;k<HALF_DIMS;k++) {
             value = features[perspectives[side]][k];
-            data->input[offset+k] = CLAMP(value, 0, 127);
+            temp[k] = CLAMP(value, 0, 127);
         }
     }
 }

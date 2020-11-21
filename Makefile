@@ -10,6 +10,7 @@ ssse3 = no
 sse41 = no
 avx2 = no
 popcnt = no
+openmp = no
 
 # Set options based on selected architecture
 .PHONY : arch
@@ -19,6 +20,7 @@ else
 ifeq ($(arch), x86-64)
     sse = yes
     sse2 = yes
+    openmp = yes
     APP_ARCH = \"x86-64\"
 else
 ifeq ($(arch), x86-64-modern)
@@ -27,6 +29,7 @@ ifeq ($(arch), x86-64-modern)
     ssse3 = yes
     sse41 = yes
     popcnt = yes
+    openmp = yes
     APP_ARCH = \"x86-64-modern\"
 else
 ifeq ($(arch), x86-64-avx2)
@@ -36,6 +39,7 @@ ifeq ($(arch), x86-64-avx2)
     sse41 = yes
     avx2 = yes
     popcnt = yes
+    openmp = yes
     APP_ARCH = \"x86-64-avx2\"
 endif
 endif
@@ -75,6 +79,10 @@ ifeq ($(popcnt), yes)
     CFLAGS += -msse3 -mpopcnt
 else
     CPPFLAGS += -DTB_NO_HW_POP_COUNT
+endif
+.PHONY : openmp
+ifeq ($(openmp), yes)
+    CFLAGS += -fopenmp-simd
 endif
 .PHONY : trace
 ifeq ($(trace), yes)
