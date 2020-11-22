@@ -33,6 +33,7 @@
 #include "bitboard.h"
 #include "board.h"
 #include "history.h"
+#include "nnue.h"
 
 /* Worker actions */
 #define ACTION_IDLE 0
@@ -178,6 +179,13 @@ static void prepare_worker(struct search_worker *worker,
 
     /* Worker is initiallly idle */
     worker->action = ACTION_IDLE;
+}
+
+static void reset_worker(struct search_worker *worker)
+{
+    worker->state = NULL;
+    worker->pos.state = NULL;
+    worker->pos.worker = NULL;
 }
 
 void smp_init(void)
@@ -370,6 +378,11 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
 
     /* Reset move filter since it's not needed anymore */
     state->move_filter.size = 0;
+
+    /* Reset workers */
+    for (k=0;k<number_of_workers;k++) {
+        reset_worker(&workers[k]);
+    }
 }
 
 uint64_t smp_nodes(void)

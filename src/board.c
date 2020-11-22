@@ -30,6 +30,7 @@
 #include "search.h"
 #include "movegen.h"
 #include "engine.h"
+#include "nnue.h"
 
 /*
  * Array of masks for updating castling permissions. For instance
@@ -205,6 +206,8 @@ void board_reset(struct position *pos)
     pos->ply = 0;
     pos->sply = 0;
     pos->fifty = 0;
+
+    pos->eval_stack[0].state.valid = false;
 }
 
 void board_start_position(struct position *pos)
@@ -217,15 +220,11 @@ void board_start_position(struct position *pos)
 
 bool board_setup_from_fen(struct position *pos, char *fenstr)
 {
-    bool ok;
-
     assert(pos != NULL);
     assert(fenstr != NULL);
 
     board_reset(pos);
-    ok = fen_setup_board(pos, fenstr) && valid_position(pos);
-
-    return ok;
+    return fen_setup_board(pos, fenstr) && valid_position(pos);
 }
 
 bool board_in_check(struct position *pos, int side)
@@ -270,6 +269,9 @@ bool board_make_move(struct position *pos, uint32_t move)
     elem->fifty = pos->fifty;
     elem->key = pos->key;
     elem->pawnkey = pos->pawnkey;
+
+    /* Update NNUE */
+    nnue_make_move(pos, move);
 
     /* Check if the move enables an en passant capture */
     if ((VALUE(piece) == PAWN) && (abs(to-from) == 16)) {
@@ -462,6 +464,9 @@ void board_make_null_move(struct position *pos)
     elem->key = pos->key;
     elem->pawnkey = pos->pawnkey;
 
+    /* Update NNUE */
+    nnue_make_null_move(pos);
+
     /* Update the state structure */
     pos->ep_sq = NO_SQUARE;
     pos->key = key_update_ep_square(pos->key, elem->ep_sq, pos->ep_sq);
@@ -545,13 +550,13 @@ bool board_has_non_pawn(struct position *pos, int side)
 
 bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
 {
-    uint64_t    bb;
-    int         from;
-    int         to;
-    int         piece;
-    int         opp;
-    int         sq;
-    int         victim;
+    uint64_t bb;
+    int      from;
+    int      to;
+    int      piece;
+    int      opp;
+    int      sq;
+    int      victim;
 
     assert(valid_position(pos));
     assert(valid_move(move));

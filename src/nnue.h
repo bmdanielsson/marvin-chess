@@ -42,4 +42,19 @@ bool nnue_load_net(char *path);
  */
 int16_t nnue_evaluate(struct position *pos); 
 
+/*
+ * Make a new move.
+ *
+ * @param pos The position.
+ * @param move The move.
+ */
+void nnue_make_move(struct position *pos, uint32_t move);
+
+/*
+ * Make a new null move.
+ *
+ * @param pos The position.
+ */
+void nnue_make_null_move(struct position *pos);
+
 #endif

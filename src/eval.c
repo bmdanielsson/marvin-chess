@@ -982,11 +982,6 @@ static void do_eval(struct position *pos, struct eval *eval)
 
 int eval_evaluate(struct position *pos)
 {
-    /* Check if NNUE or classic eval should be used */
-    if (engine_using_nnue) {
-        return nnue_evaluate(pos);
-    }
-
     struct eval eval;
     int         k;
     int         phase;
@@ -994,6 +989,12 @@ int eval_evaluate(struct position *pos)
     int         tapered_score;
 
     assert(valid_position(pos));
+
+    /* Check if NNUE or classic eval should be used */
+    if (engine_using_nnue) {
+        pos->eval_stack[pos->sply].score = nnue_evaluate(pos);
+        return pos->eval_stack[pos->sply].score;
+    }
 
     /*
      * If no player have enough material left
@@ -1020,7 +1021,9 @@ int eval_evaluate(struct position *pos)
     phase = eval_game_phase(pos);
     tapered_score = calculate_tapered_eval(phase, score[MIDDLEGAME],
                                            score[ENDGAME]);
-    return tapered_score + TEMPO_BONUS;
+
+    pos->eval_stack[pos->sply].score = tapered_score + TEMPO_BONUS;
+    return pos->eval_stack[pos->sply].score;
 }
 
 /*

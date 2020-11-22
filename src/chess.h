@@ -22,6 +22,7 @@
 #include <stdbool.h>
 #include <time.h>
 #include <setjmp.h>
+#include <stdalign.h>
 
 #include "thread.h"
 #include "config.h"
@@ -392,6 +393,32 @@ struct pawntt_item {
     uint8_t padding[24];
 };
 
+/* Information about pieces impacted by a move */
+struct dirty_pieces {
+    int ndirty;
+    int piece[3];
+    int from[3];
+    int to[3];
+};
+
+/* The state of NNUE input features for a position */
+struct nnue_input_state {
+    /* State data */
+    alignas(64) int16_t data[NSIDES][256];
+    /* Flag indicating if the state data us up to date */
+    bool valid;
+};
+
+/* Item in the evaluation stack */
+struct eval_item {
+    /* State of NNUE input features */
+    struct nnue_input_state state;
+    /* Pieces impacted by the latest move */
+    struct dirty_pieces dirty_pieces;
+    /* The evaluation score */
+    int score;
+};
+
 /* Internal representation of a chess position */
 struct position {
     /*
@@ -428,7 +455,8 @@ struct position {
     int fullmove;
     /* Game history used for undoing moves */
     struct unmake history[MAX_HISTORY_SIZE];
-    int eval_stack[MAX_HISTORY_SIZE];
+    /* Stack used to keep track of evaluation information */
+    struct eval_item eval_stack[MAX_PLY];
 
     /* Pointers to the owning worker and the active game state */
     struct search_worker *worker;

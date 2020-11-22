@@ -96,47 +96,6 @@ struct feature_list {
 /* Table mapping piece to piece index */
 static uint32_t piece2index[NSIDES][NPIECES];
 
-static void find_active_features(struct position *pos, int side,
-                                 struct feature_list *list)
-{
-    int      king_sq;
-    int      sq;
-    int      piece;
-    uint32_t index;
-    uint64_t bb;
-
-    /* Initialize */
-    list->size = 0;
-
-    /*
-     * Find the location of the king. For black
-     * the board is rotated 180 degrees.
-     */
-    king_sq = LSB(pos->bb_pieces[side+KING]);
-    if (side == BLACK) {
-        king_sq = SQUARE(7-FILENR(king_sq), 7-RANKNR(king_sq));
-    }
-
-    /* Construct a bitboard of all pieces excluding the two kings */
-    bb = pos->bb_all&(~(pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING]));
-
-    /* Construct a king/piece index for each piece and add it to the list */
-    while (bb != 0ULL) {
-        sq = POPBIT(&bb);
-        piece = pos->pieces[sq];
-
-        /*
-         * Calculate the input feature index for this piece and add it
-         * to the list. For black the board is rotated 180 degrees.
-         */
-        if (side == BLACK) {
-            sq = SQUARE(7-FILENR(sq), 7-RANKNR(sq));
-        }
-        index = sq + piece2index[side][piece] + (KING*NSQUARES+1)*king_sq;
-        list->features[list->size++] = index;
-    }
-}
-
 static void layer_propagate(int16_t *input, int32_t *output, int ninputs,
                             int noutputs, int32_t *biases, int16_t *weights)
 {
@@ -149,7 +108,7 @@ static void layer_propagate(int16_t *input, int32_t *output, int ninputs,
      */
     for (k=0;k<noutputs;k++) {
         output[k] = biases[k];
-        #pragma omp simd aligned(weights,output:64) simdlen(16)
+        #pragma omp simd aligned(weights,output,input:64) simdlen(16)
         for (l=0;l<ninputs;l++) {
             output[k] += (input[l]*weights[k*ninputs+l]);
         }
@@ -167,39 +126,234 @@ static void layer_activate(int32_t *input, int16_t *output, uint32_t ndims)
     }
 }
 
-static void transformer_propagate(struct position *pos, struct net_data *data)
+static int transform_square(int sq, int side)
 {
-    struct feature_list active_features[NSIDES];
-    alignas(64) int16_t features[NSIDES][HALF_DIMS];
-    int                 perspectives[NSIDES];
-    int                 side;
+    /* For black the board is rotated 180 degrees */
+    if (side == BLACK) {
+        sq = SQUARE(7-FILENR(sq), 7-RANKNR(sq));
+    }
+    return sq;
+}
+
+static int calculate_feature_index(int sq, int piece, int king_sq, int side)
+{
+    sq = transform_square(sq, side);
+    return sq + piece2index[side][piece] + (KING*NSQUARES+1)*king_sq;
+}
+
+static void find_active_features(struct position *pos, int side,
+                                 struct feature_list *list)
+{
+    int      king_sq;
+    int      sq;
+    uint32_t index;
+    uint64_t bb;
+
+    /* Initialize */
+    list->size = 0;
+
+    /* Find the location of the king */
+    king_sq = transform_square(LSB(pos->bb_pieces[side+KING]), side);
+
+    /* Construct a bitboard of all pieces excluding the two kings */
+    bb = pos->bb_all&(~(pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING]));
+
+    /* Construct a king/piece index for each piece and add it to the list */
+    while (bb != 0ULL) {
+        sq = POPBIT(&bb);
+
+        /*
+         * Calculate the feature index for this
+         * piece and add it to the list.
+         */
+        index = calculate_feature_index(sq, pos->pieces[sq], king_sq, side);
+        list->features[list->size++] = index;
+    }
+}
+
+static bool find_changed_features(struct position *pos, int side,
+                                  struct feature_list *added,
+                                  struct feature_list *removed)
+{
+    struct dirty_pieces *dp = &pos->eval_stack[pos->sply].dirty_pieces;
+    int                 k;
+    int                 king_sq;
+    int                 piece;
+    uint32_t            index;
+
+    /* Initialize */
+    added->size = 0;
+    removed->size = 0;
+
+    /*
+     * Find the location of the king. For black
+     * the board is rotated 180 degrees.
+     */
+    king_sq = transform_square(LSB(pos->bb_pieces[side+KING]), side);
+
+    /* Loop over all dirty pieces and update feature lists */
+    for (k=0;k<dp->ndirty;k++) {
+        piece = dp->piece[k];
+
+        /* Ignore the two kings */
+        if (VALUE(piece) == KING) {
+            continue;
+        }
+
+        /* Look for removed or added features */
+        if (dp->from[k] != NO_SQUARE) {
+            /*
+             * Calculate the feature index for this piece and add it
+             * to the list of removed features.
+             */
+            index = calculate_feature_index(dp->from[k], piece, king_sq, side);
+            removed->features[removed->size++] = index;
+        }
+        if (dp->to[k] != NO_SQUARE) {
+            /*
+             * Calculate the feature index for this piece and add it
+             * to the list of added pieces.
+             */
+            index = calculate_feature_index(dp->to[k], piece, king_sq, side);
+            added->features[added->size++] = index;
+        }
+    }
+
+    return false;
+}
+
+static void perform_full_update(struct position *pos, int side)
+{
+    struct feature_list active_features;
+    uint32_t            offset;
+    uint32_t            index;
+    int16_t             *data;
     int                 k;
     int                 l;
-    uint32_t            index;
-    uint32_t            offset;
-    int16_t             value;
 
-    /* Find active features for each half */
-    find_active_features(pos, WHITE, &active_features[0]);
-    find_active_features(pos, BLACK, &active_features[1]);
+    /* Find all active features */
+    find_active_features(pos, side, &active_features);
 
-    /* Process the neurons in each half */
-    for (side=0;side<NSIDES;side++) {
-        /* Add biases */
-        #pragma omp simd aligned(features,feature_biases:64) simdlen(16)
-        for (k=0;k<HALF_DIMS;k++) {
-            features[side][k] = feature_biases[k];
+    /* Setup data pointer */
+    data = &pos->eval_stack[pos->sply].state.data[side][0];
+
+    /* Add biases */
+    #pragma omp simd aligned(data,feature_biases:64) simdlen(16)
+    for (k=0;k<HALF_DIMS;k++) {
+        data[k] = feature_biases[k];
+    }
+
+    /* Summarize the weights for all active features */
+    for (k=0;k<active_features.size;k++) {
+        index = active_features.features[k];
+        offset = HALF_DIMS*index;
+        #pragma omp simd aligned(data,feature_weights:64) simdlen(16)
+        for (l=0;l<HALF_DIMS;l++) {
+            data[l] += feature_weights[offset+l];
         }
+    }
+}
 
-        /* Summarize the weights for all active features */
-        for (k=0;k<active_features[side].size;k++) {
-            index = active_features[side].features[k];
-            offset = HALF_DIMS*index;
-            #pragma omp simd aligned(features,feature_weights:64) simdlen(16)
-            for (l=0;l<HALF_DIMS;l++) {
-                features[side][l] += feature_weights[offset+l];
+static void perform_incremental_update(struct position *pos, int side)
+{
+    struct feature_list added;
+    struct feature_list removed;
+    uint32_t            offset;
+    uint32_t            index;
+    int                 k;
+    int                 l;
+    int16_t             *data;
+    int16_t             *prev_data;
+
+    /* Find all changed features */
+    find_changed_features(pos, side, &added, &removed);
+
+    /* Setup data pointers */
+    data = &pos->eval_stack[pos->sply].state.data[side][0];
+    prev_data = &pos->eval_stack[pos->sply-1].state.data[side][0];
+
+    /* Copy the state from previous position */
+    #pragma omp simd aligned(data,prev_data:64) simdlen(16)
+    for (k=0;k<HALF_DIMS;k++) {
+        data[k] = prev_data[k];
+    }
+
+    /* Subtract weights for removed features */
+    for (k=0;k<removed.size;k++) {
+        index = removed.features[k];
+        offset = HALF_DIMS*index;
+        #pragma omp simd aligned(data,feature_weights:64) simdlen(16)
+        for (l=0;l<HALF_DIMS;l++) {
+            data[l] -= feature_weights[offset+l];
+        }
+    }
+
+    /* Add weights for added features */
+    for (k=0;k<added.size;k++) {
+        index = added.features[k];
+        offset = HALF_DIMS*index;
+        #pragma omp simd aligned(data,feature_weights:64) simdlen(16)
+        for (l=0;l<HALF_DIMS;l++) {
+            data[l] += feature_weights[offset+l];
+        }
+    }
+}
+
+static bool incremental_update_possible(struct position *pos, int side)
+{
+    /*
+     * If there is no worker associated with the position then
+     * the engine is not searching so it doesn't matter if a
+     * full update is done.
+     */
+    if (pos->worker == NULL) {
+        return false;
+    }
+
+    /*
+     * If the state of the previous position is not valid
+     * then a full refresh is required.
+     */
+    if ((pos->sply == 0) || !pos->eval_stack[pos->sply-1].state.valid) {
+        return false;
+    }
+
+    /*
+     * If the king for this side has moved then all feature
+     * indeces are invalid and a refresh is required.
+     */
+    if (pos->eval_stack[pos->sply].dirty_pieces.piece[0] == (side + KING)) {
+        return false;
+    }
+
+    return true;
+}
+
+static void transformer_propagate(struct position *pos, struct net_data *data)
+{
+    int      perspectives[NSIDES];
+    int      side;
+    int      k;
+    uint32_t offset;
+    int16_t  *temp;
+    int16_t  *features;
+    int16_t  value;
+
+    /*
+     * Check if the state is up to date. If it's
+     * not then it has to be updated.
+     */
+    if (!pos->eval_stack[pos->sply].state.valid) {
+        for (side=0;side<NSIDES;side++) {
+            if (incremental_update_possible(pos, side)) {
+                perform_incremental_update(pos, side);
+            } else {
+                perform_full_update(pos, side);
             }
         }
+
+        /* Mark the state as valid */
+        pos->eval_stack[pos->sply].state.valid = true;
     }
 
     /*
@@ -210,10 +364,11 @@ static void transformer_propagate(struct position *pos, struct net_data *data)
     perspectives[1] = FLIP_COLOR(pos->stm);
     for (side=0;side<NSIDES;side++) {
         offset = HALF_DIMS*side;
-        int16_t *temp = &data->input[offset];
+        temp = &data->input[offset];
+        features = pos->eval_stack[pos->sply].state.data[perspectives[side]];
         #pragma omp simd aligned(features,temp:64) simdlen(16)
         for (k=0;k<HALF_DIMS;k++) {
-            value = features[perspectives[side]][k];
+            value = features[k];
             temp[k] = CLAMP(value, 0, 127);
         }
     }
@@ -414,4 +569,89 @@ int16_t nnue_evaluate(struct position *pos)
     network_propagate(&data);
 
     return data.output/16;
+}
+
+void nnue_make_move(struct position *pos, uint32_t move)
+{
+    int                 from = FROM(move);
+    int                 to = TO(move);
+    int                 promotion = PROMOTION(move);
+    int                 capture = pos->pieces[to];
+    int                 piece = pos->pieces[from];
+    struct dirty_pieces *dp;
+
+    assert(pos != NULL);
+
+    if (pos->worker == NULL) {
+        return;
+    }
+
+    pos->eval_stack[pos->sply].state.valid = false;
+    dp = &(pos->eval_stack[pos->sply].dirty_pieces);
+    dp->ndirty = 1;
+
+    if (ISKINGSIDECASTLE(move)) {
+        dp->ndirty = 2;
+
+        dp->piece[0] = KING + pos->stm;
+        dp->from[0] = from;
+        dp->to[0] = to;
+
+        dp->piece[1] = ROOK + pos->stm;
+        dp->from[1] = to + 1;
+        dp->to[1] = to - 1;
+    } else if (ISQUEENSIDECASTLE(move)) {
+        dp->ndirty = 2;
+
+        dp->piece[0] = KING + pos->stm;
+        dp->from[0] = from;
+        dp->to[0] = to;
+
+        dp->piece[1] = ROOK + pos->stm;
+        dp->from[1] = to - 2;
+        dp->to[1] = to + 1;
+    } else if (ISENPASSANT(move)) {
+        dp->ndirty = 2;
+
+        dp->piece[0] = piece;
+        dp->from[0] = from;
+        dp->to[0] = to;
+
+        dp->piece[1] = PAWN + FLIP_COLOR(pos->stm);
+        dp->from[1] = (pos->stm == WHITE)?to-8:to+8;
+        dp->to[1] = NO_SQUARE;
+    } else {
+        dp->piece[0] = piece;
+        dp->from[0] = from;
+        dp->to[0] = to;
+
+        if (ISCAPTURE(move)) {
+            dp->ndirty = 2;
+            dp->piece[1] = capture;
+            dp->from[1] = to;
+            dp->to[1] = NO_SQUARE;
+        }
+        if (ISPROMOTION(move)) {
+            dp->to[0] = NO_SQUARE;
+            dp->piece[dp->ndirty] = promotion;
+            dp->from[dp->ndirty] = NO_SQUARE;
+            dp->to[dp->ndirty] = to;
+            dp->ndirty++;
+        }
+    }
+}
+
+void nnue_make_null_move(struct position *pos)
+{
+    assert(pos != NULL);
+
+    if (pos->worker == NULL) {
+        return;
+    }
+
+    if ((pos->sply > 0) && pos->eval_stack[pos->sply-1].state.valid) {
+        pos->eval_stack[pos->sply].state = pos->eval_stack[pos->sply-1].state;
+    } else {
+        pos->eval_stack[pos->sply].state.valid = false;
+    }
 }

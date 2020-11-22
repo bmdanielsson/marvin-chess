@@ -554,9 +554,9 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * to use for pruning decisions.
      */
     static_score = tt_found?tt_item.eval_score:eval_evaluate(pos);
-    pos->eval_stack[pos->sply] = static_score;
+    pos->eval_stack[pos->sply].score = static_score;
     bool improving = (pos->sply >= 2 &&
-                    static_score > pos->eval_stack[pos->sply-2]);
+                    static_score > pos->eval_stack[pos->sply-2].score);
 
     /* Reverse futility pruning */
     in_check = board_in_check(pos, pos->stm);
@@ -911,8 +911,8 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     best_move = tt_found?tt_item.move:NOMOVE;
     in_check = board_in_check(pos, pos->stm);
 
-    /* Remember the static evaluation of this positin */
-    pos->eval_stack[pos->sply] = eval_evaluate(pos);
+    /* Trigger an update of the evaluation stack */
+    (void)eval_evaluate(pos);
 
     /* Search all moves */
     quiets.size = 0;
