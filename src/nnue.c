@@ -99,8 +99,8 @@ static uint32_t piece2index[NSIDES][NPIECES];
 static void layer_propagate(int16_t *input, int32_t *output, int ninputs,
                             int noutputs, int32_t *biases, int16_t *weights)
 {
-    int k;
-    int l;
+    int k = 0;
+    int l = 0;
 
     /*
      * Perform neuron calculations. Multiply each input with the
@@ -117,7 +117,7 @@ static void layer_propagate(int16_t *input, int32_t *output, int ninputs,
 
 static void layer_activate(int32_t *input, int16_t *output, uint32_t ndims)
 {
-    uint32_t k;
+    uint32_t k = 0;
 
     /* Apply activation function */
     #pragma omp simd aligned(input,output:64) simdlen(16)
@@ -228,8 +228,8 @@ static void perform_full_update(struct position *pos, int side)
     uint32_t            offset;
     uint32_t            index;
     int16_t             *data;
-    int                 k;
-    int                 l;
+    int                 k = 0;
+    int                 l = 0;
 
     /* Find all active features */
     find_active_features(pos, side, &active_features);
@@ -260,8 +260,8 @@ static void perform_incremental_update(struct position *pos, int side)
     struct feature_list removed;
     uint32_t            offset;
     uint32_t            index;
-    int                 k;
-    int                 l;
+    int                 k = 0;
+    int                 l = 0;
     int16_t             *data;
     int16_t             *prev_data;
 
@@ -332,8 +332,8 @@ static bool incremental_update_possible(struct position *pos, int side)
 static void transformer_propagate(struct position *pos, struct net_data *data)
 {
     int      perspectives[NSIDES];
-    int      side;
-    int      k;
+    int      side = 0;
+    int      k = 0;
     uint32_t offset;
     int16_t  *temp;
     int16_t  *features;
