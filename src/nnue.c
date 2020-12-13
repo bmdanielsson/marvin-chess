@@ -81,7 +81,7 @@ struct net_data {
     alignas(64) int32_t hidden2_values[HIDDEN_LAYER_SIZE];
     alignas(64) int16_t hidden1_output[HIDDEN_LAYER_SIZE];
     alignas(64) int16_t hidden2_output[HIDDEN_LAYER_SIZE];
-    int32_t output;
+    alignas(64) int32_t output;
 };
 
 /*
@@ -502,6 +502,15 @@ void nnue_init(void)
         piece2index[WHITE][piece+1] = (piece+1)*NSQUARES + 1;
         piece2index[BLACK][piece] = (piece+1)*NSQUARES + 1;
         piece2index[BLACK][piece+1] = piece*NSQUARES + 1;
+    }
+}
+
+void nnue_reset_state(struct position *pos)
+{
+    int k;
+
+    for (k=0;k<MAX_PLY;k++) {
+        pos->eval_stack[k].state.valid = false;
     }
 }
 

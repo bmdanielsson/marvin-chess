@@ -26,6 +26,13 @@
 void nnue_init(void);
 
 /*
+ * Reset the NNUE state for a position.
+ *
+ * @param pos The position.
+ */
+void nnue_reset_state(struct position *pos);
+
+/*
  * Load a NNUE net.
  *
  * @param path The path of the net to load.

@@ -207,7 +207,7 @@ void board_reset(struct position *pos)
     pos->sply = 0;
     pos->fifty = 0;
 
-    pos->eval_stack[0].state.valid = false;
+    nnue_reset_state(pos);
 }
 
 void board_start_position(struct position *pos)

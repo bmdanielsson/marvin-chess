@@ -40,6 +40,7 @@
 #include "smp.h"
 #include "fen.h"
 #include "history.h"
+#include "nnue.h"
 
 /* Calculates if it is time to check the clock and poll for commands */
 #define CHECKUP(n) (((n)&1023)==0)
@@ -366,7 +367,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     static_score = eval_evaluate(pos);
 
     /* If we have reached the maximum depth then we stop */
-    if (pos->sply >= MAX_PLY) {
+    if (pos->sply >= (MAX_PLY-1)) {
         return static_score;
     }
 
@@ -1095,6 +1096,9 @@ void search_find_best_move(struct search_worker *worker)
     int mpvidx;
 
     assert(valid_position(&worker->pos));
+
+    /* Reset NNUE state */
+    nnue_reset_state(&worker->pos);
 
     /* Setup the first iteration */
     depth = 1 + worker->id%2;
