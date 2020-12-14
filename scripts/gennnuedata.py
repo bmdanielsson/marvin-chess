@@ -219,13 +219,14 @@ def play_game(fh, pos_left, args):
         return pos_left
 
     # Start engine
+    engine = chess.engine.SimpleEngine.popen_uci(args.engine)
     options = {}
     options['Hash'] = args.hash
     options['Threads'] = 1
-    options['UseNNUE'] = args.use_nnue
-    if args.syzygy_path:
+    if 'UseNNUE' in engine.options:
+        options['UseNNUE'] = args.use_nnue
+    if args.syzygy_path and 'SyzygyPath' in engine.options:
         options['SyzygyPath'] = args.syzygy_path
-    engine = chess.engine.SimpleEngine.popen_uci(args.engine)
     engine.configure(options)
 
     # Setup search limits
