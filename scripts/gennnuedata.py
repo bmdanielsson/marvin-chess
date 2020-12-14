@@ -67,9 +67,11 @@ def encode_piece_at(data, pos, board, sq):
 # Huffman Encoding of the board
 # Castling availability (1 bit x 4)
 # En passant square (1 or 1 + 6 bits)
-# 50-move counter (7 bits)
+# 50-move counter (6 bits)
 # Full move counter (8 bits)
-def encode_position(board, sf):
+# Full move counter high bits (8 bits)
+# 50-move counter high bit (1 bit)
+def encode_position(board):
     data = np.zeros(32, dtype='uint8')
     pos = np.uint16(0)
 
@@ -120,11 +122,11 @@ def encode_position(board, sf):
     pos = encode_bits(data, pos, np.uint16(board.fullmove_number), 8)
 
     # Backwards compatible fix for 50-move counter only being stored
-    # with 6 bits. Only used if Stockfish compatibility is requested.
-    if sf:
-        high_bit = (board.halfmove_clock >> 6) & 1
-        pos = encode_bits(data, pos, np.uint16(board.fullmove_number>>8), 8)
-        pos = encode_bit(data, pos, np.uint16(high_bit))
+    # with 6 bits. It's done this way to keep compatibility with
+    # Stockfish trainer.
+    high_bit = (board.halfmove_clock >> 6) & 1
+    pos = encode_bits(data, pos, np.uint16(board.fullmove_number>>8), 8)
+    pos = encode_bit(data, pos, np.uint16(high_bit))
 
     return data
 
@@ -165,14 +167,14 @@ def encode_move(board, move):
 # ply (16 bits)
 # result (8 bits)
 # padding (8 bits)
-def write_sfen_bin(fh, sfen, result, sf):
+def write_sfen_bin(fh, sfen, result):
     board = chess.Board(fen=sfen['fen'])
     pov_result = result
     if sfen['score'].turn == chess.BLACK:
         pov_result = -1*pov_result
     pov_score = sfen['score'].pov(sfen['score'].turn).score()
 
-    pos_data = encode_position(board, sf)
+    pos_data = encode_position(board)
     pos_data.tofile(fh)
     np.int16(pov_score).tofile(fh)
     move_data = encode_move(board, sfen['move'])
@@ -302,7 +304,7 @@ def play_game(fh, pos_left, args):
         if args.format == 'plain':
             write_sfen_plain(fh, sfen, result_val)
         else:
-            write_sfen_bin(fh, sfen, result_val, args.sf)
+            write_sfen_bin(fh, sfen, result_val)
         pos_left = pos_left - 1
         if pos_left == 0:
             break
@@ -436,8 +438,6 @@ if __name__ == "__main__":
                     help='the output format')
     parser.add_argument('--seed', type=int,
                     help='seed to use for random number generator')
-    parser.add_argument('--sf', action='store_true',
-                    help='enable Stockfish compatibility mode')
 
     args = parser.parse_args()
 
