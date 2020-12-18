@@ -33,15 +33,7 @@
 
 /* Parameters for validating the network file */
 #define NET_SIZE 21022697
-#define NET_VERSION 0x7AF32F16
-#define NET_HEADER_HASH 0x3E5AA6EE
-#define NET_TRANSFORMER_HASH 0x5D69D7B8
-#define NET_NETWORK_HASH 0x63337156
-#define NET_ARCHITECTURE_SIZE 177
-#define NET_ARCHITECTURE "Features=HalfKP(Friend)[41024->256x2],"\
-                         "Network=AffineTransform[1<-32](ClippedReLU[32]"\
-                         "(AffineTransform[32<-32](ClippedReLU[32]"\
-                         "(AffineTransform[32<-512](InputSlice[512(0:512)])))))"
+#define NET_VERSION 0x00000001
 
 /* Parameters describing the network architecture */
 #define HALF_DIMS 256
@@ -398,38 +390,20 @@ static bool parse_header(uint8_t **data)
 {
     uint8_t  *iter = *data;
     uint32_t version;
-    uint32_t hash;
-    uint32_t size;
-    char     architecture[NET_ARCHITECTURE_SIZE+1] = {0};
 
+    /* Read version */
     version = read_uint32_le(iter);
-    hash = read_uint32_le(iter+4);
-    size = read_uint32_le(iter+8);
-    if (size > NET_ARCHITECTURE_SIZE) {
-        return false;
-    }
-    memcpy(architecture, iter+12, size);
+    iter += 4;
 
-    *data = iter + 12 + size;
+    *data = iter;
 
-    return (version == NET_VERSION) &&
-           (hash == NET_HEADER_HASH) &&
-           (size == NET_ARCHITECTURE_SIZE) &&
-           !strcmp(architecture, NET_ARCHITECTURE);
+    return version == NET_VERSION;
 }
 
 static bool parse_transformer(uint8_t **data)
 {
     uint8_t  *iter = *data;
-    uint32_t hash;
     int      k;
-
-    /* Read hash */
-    hash = read_uint32_le(iter);
-    if (hash != NET_TRANSFORMER_HASH) {
-        return false;
-    }
-    iter += 4;
 
     /* Read biases and weights */
     for (k=0;k<HALF_DIMS;k++,iter+=2) {
@@ -447,16 +421,8 @@ static bool parse_transformer(uint8_t **data)
 static bool parse_network(uint8_t **data)
 {
     uint8_t  *iter = *data;
-    uint32_t hash;
     int8_t   temp;
     int      k;
-
-    /* Read hash */
-    hash = read_uint32_le(iter);
-    if (hash != NET_NETWORK_HASH) {
-        return false;
-    }
-    iter += 4;
 
     /* Read biases and weights of the first hidden layer */
     for (k=0;k<HIDDEN_LAYER_SIZE;k++,iter+=4) {
