@@ -32,8 +32,15 @@
 #include "bitboard.h"
 
 /* Parameters for validating the network file */
-#define NET_SIZE 10511912
 #define NET_VERSION 0x00000001
+#define NET_SIZE \
+    (                                                           \
+    4                   +                                       \
+    2*HALF_DIMS         + 2*HALF_DIMS*FEATURE_IN_DIMS         + \
+    4*HIDDEN_LAYER_SIZE + HIDDEN_LAYER_SIZE*FEATURE_OUT_DIMS  + \
+    4*HIDDEN_LAYER_SIZE + HIDDEN_LAYER_SIZE*HIDDEN_LAYER_SIZE + \
+    4*OUTPUT_LAYER_SIZE + HIDDEN_LAYER_SIZE*OUTPUT_LAYER_SIZE   \
+    )
 
 /* Parameters describing the network architecture */
 #define HALF_DIMS 128
@@ -420,38 +427,31 @@ static bool parse_transformer(uint8_t **data)
 
 static bool parse_network(uint8_t **data)
 {
-    uint8_t  *iter = *data;
-    int8_t   temp;
-    int      k;
+    uint8_t *iter = *data;
+    int     k;
 
     /* Read biases and weights of the first hidden layer */
     for (k=0;k<HIDDEN_LAYER_SIZE;k++,iter+=4) {
         hidden1_biases[k] = read_uint32_le(iter);
     }
-    for (k=0;k<HIDDEN_LAYER_SIZE*FEATURE_OUT_DIMS;k++) {
-        temp = *iter;
-        hidden1_weights[k] = temp;
-        iter++;
+    for (k=0;k<HIDDEN_LAYER_SIZE*FEATURE_OUT_DIMS;k++,iter++) {
+        hidden1_weights[k] = (int8_t)*iter;
     }
 
     /* Read biases and weights of the second hidden layer */
     for (k=0;k<HIDDEN_LAYER_SIZE;k++,iter+=4) {
         hidden2_biases[k] = read_uint32_le(iter);
     }
-    for (k=0;k<HIDDEN_LAYER_SIZE*HIDDEN_LAYER_SIZE;k++) {
-        temp = *iter;
-        hidden2_weights[k] = temp;
-        iter++;
+    for (k=0;k<HIDDEN_LAYER_SIZE*HIDDEN_LAYER_SIZE;k++,iter++) {
+        hidden2_weights[k] = (int8_t)*iter;
     }
 
     /* Read biases and weights of the output layer */
     for (k=0;k<OUTPUT_LAYER_SIZE;k++,iter+=4) {
         output_biases[k] = read_uint32_le(iter);
     }
-    for (k=0;k<HIDDEN_LAYER_SIZE*OUTPUT_LAYER_SIZE;k++) {
-        temp = *iter;
-        output_weights[k] = temp;
-        iter++;
+    for (k=0;k<HIDDEN_LAYER_SIZE*OUTPUT_LAYER_SIZE;k++,iter++) {
+        output_weights[k] = (int8_t)*iter;
     }
 
     *data = iter;
