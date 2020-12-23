@@ -52,8 +52,8 @@
 
 /*
  * The name of the default net file
- * SHA-1: 531cad45787b073f3a578357c5190c6f58436574
+ * SHA-1: cfd69854ad7e3d699c81f81ffb8847c1838c8047
  */
-#define NETFILE_NAME "net-531cad4.nnue"
+#define NETFILE_NAME "net-cfd6985.nnue"
 
 #endif

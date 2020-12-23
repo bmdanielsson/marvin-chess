@@ -32,11 +32,11 @@
 #include "bitboard.h"
 
 /* Parameters for validating the network file */
-#define NET_SIZE 21022697
+#define NET_SIZE 10511912
 #define NET_VERSION 0x00000001
 
 /* Parameters describing the network architecture */
-#define HALF_DIMS 256
+#define HALF_DIMS 128
 #define FEATURE_IN_DIMS 64*(64*10 + 1)
 #define FEATURE_OUT_DIMS HALF_DIMS*2
 #define MAX_ACTIVE_FEATURES 30
