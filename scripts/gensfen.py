@@ -451,7 +451,7 @@ if __name__ == "__main__":
                     help='the name of the output file', required=True)
     parser.add_argument('-r', '--random_plies', type=int, default='10',
                     help='the number of random plies at the beginning')
-    parser.add_argument('-l', '--eval_limit', type=int, default='20000',
+    parser.add_argument('-l', '--eval_limit', type=int, default='19000',
                     help='the highest evaluation that is accepted')
     parser.add_argument('-a', '--hash', type=int, default='128',
                     help='the amount of hash the engine should use (in MB)')
