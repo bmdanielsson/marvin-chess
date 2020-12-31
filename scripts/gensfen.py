@@ -20,8 +20,10 @@ MAX_TIME = 60
 
 MAX_PLY = 400
 MIN_DRAW_PLY = 80
-DRAW_SCORE = 0
-DRAW_COUNT = 8
+DRAW_SCORE = 10
+DRAW_COUNT = 10
+RESIGN_SCORE = 10000
+RESIGN_COUNT = 10
 
 HUFFMAN_TABLE = [np.uint8(0),    # No piece (1 bit)
                  np.uint8(1),    # Pawn (4 bits)
@@ -247,6 +249,7 @@ def play_game(fh, pos_left, args):
         limit.nodes = args.nodes
 
     # Let the engine play against itself and a record all positions
+    resign_count = 0
     draw_count = 0 
     count = 0
     positions = []
@@ -282,10 +285,22 @@ def play_game(fh, pos_left, args):
             result_val = 0
             break
 
+        # Check resign condition
+        if abs(result.info['score'].relative.score()) >= RESIGN_SCORE:
+            resign_count += 1;
+        else:
+            resign_count = 0
+        if resign_count >= RESIGN_COUNT:
+            if result.info['score'].relative.score() > 0:
+                result_val = 1
+            else:
+                result_val = -1
+            break;
+
         # Check draw adjudication
         if ply > MIN_DRAW_PLY:
             if abs(result.info['score'].relative.score()) <= DRAW_SCORE:
-                draw_count = draw_count + 1;
+                draw_count += 1;
             else:
                 draw_count = 0
             if draw_count >= DRAW_COUNT:
