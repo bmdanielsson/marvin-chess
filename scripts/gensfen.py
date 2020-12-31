@@ -221,6 +221,13 @@ def setup_board(args):
 
     return board
 
+
+def is_quiet(board, move):
+    if board.is_check():
+        return False
+    return not board.is_capture(move)
+
+
 def play_game(fh, pos_left, args):
     # Setup a new board
     board = setup_board(args)
@@ -260,6 +267,11 @@ def play_game(fh, pos_left, args):
 
         # If no score was received then skip this move
         if 'score' not in result.info:
+            board.push(result.move)
+            continue
+
+        # Skip non-quiet moves
+        if not is_quiet(board, result.move):
             board.push(result.move)
             continue
 
