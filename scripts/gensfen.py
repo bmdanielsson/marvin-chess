@@ -113,10 +113,7 @@ def encode_position(board):
     # compatibility is requested. In that case the last bit is stored
     # at the end instead in order to be backwards compoatible with
     # older parsers.
-    if sf:
-        pos = encode_bits(data, pos, np.uint16(board.halfmove_clock), 6)
-    else:
-        pos = encode_bits(data, pos, np.uint16(board.halfmove_clock), 7)
+    pos = encode_bits(data, pos, np.uint16(board.halfmove_clock), 6)
 
     # Encode move counter
     pos = encode_bits(data, pos, np.uint16(board.fullmove_number), 8)
@@ -160,6 +157,7 @@ def encode_move(board, move):
         data = data | np.uint16(3 << 14)
 
     return data
+
 
 # position (256 bits)
 # score (16 bits)
@@ -211,9 +209,19 @@ def play_random_moves(board, nmoves):
             break
 
 
+def setup_board(args):
+    if args.use_frc and random.random() < args.frc_prob:
+        frc_board = chess.Board.from_chess960_pos(random.randint(0, 959))
+        frc_board.set_castling_fen('-')
+        board = chess.Board(fen=frc_board.fen())
+    else:
+        board = chess.Board()
+
+    return board
+
 def play_game(fh, pos_left, args):
     # Setup a new board
-    board = chess.Board()
+    board = setup_board(args)
 
     # Play a random opening
     play_random_moves(board, args.random_plies)
@@ -329,11 +337,13 @@ def request_work(finished, remaining_work, finished_work, position_lock):
 
 def process_func(pid, training_file, remaining_work, finished_work,
                 position_lock, args):
+    # Set seed for random number generation
     if (args.seed):
         random.seed(a=args.seed+pid*10)
     else:
         random.seed()
 
+    # Open output file
     if args.format == 'plain':
         fh = open(training_file, 'w')
     else:
@@ -438,6 +448,10 @@ if __name__ == "__main__":
                     help='the output format')
     parser.add_argument('--seed', type=int,
                     help='seed to use for random number generator')
+    parser.add_argument('--use_frc', action='store_true',
+                    help="Include Chess960 starting positions")
+    parser.add_argument('--frc_prob', type=float, default=0.2,
+                    help="Probability of using a Chess960 starting position")
 
     args = parser.parse_args()
 
