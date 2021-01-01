@@ -393,6 +393,15 @@ struct pawntt_item {
     uint8_t padding[24];
 };
 
+/*
+ * An item in the NNUE cache. The size should be a power-of-2
+ * for best performance.
+ */
+struct nnue_cache_item {
+    uint64_t key;
+    int score;
+};
+
 /* Information about pieces impacted by a move */
 struct dirty_pieces {
     int ndirty;
@@ -503,6 +512,10 @@ struct search_worker {
     int currmovenumber;
     /* The number of tablebase hits */
     uint64_t tbhits;
+
+    /* Cache for NNUE evaluations */
+    struct nnue_cache_item *nnue_cache;
+    int nnue_cache_size;
 
     /* PV information */
     int multipv;

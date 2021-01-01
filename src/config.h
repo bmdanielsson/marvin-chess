@@ -38,6 +38,9 @@
 /* The size to use for the pawn hash tables (in MB) */
 #define PAWN_HASH_SIZE 2
 
+/* The size to use for the NNUE cache (in MB) */
+#define NNUE_CACHE_SIZE 2
+
 /* The maximum number of supported worker threads */
 #define MAX_WORKERS 512
 

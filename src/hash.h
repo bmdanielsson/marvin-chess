@@ -135,6 +135,45 @@ void hash_pawntt_store(struct search_worker *worker, struct pawntt_item *item);
 bool hash_pawntt_lookup(struct search_worker *worker, struct pawntt_item *item);
 
 /*
+ * Create the NNUE cache.
+ *
+ * @param worker The worker.
+ * @param size The amount of memory to use for the cache (in MB).
+ */
+void hash_nnue_create_table(struct search_worker *worker, int size);
+
+/*
+ * Destroy the NNUE cache.
+ *
+ * @param worker The worker.
+ */
+void hash_nnue_destroy_table(struct search_worker *worker);
+
+/*
+ * Clear the NNUE cache.
+ *
+ * @param worker The worker.
+ */
+void hash_nnue_clear_table(struct search_worker *worker);
+
+/*
+ * Store a new score in the NNUE cache.
+ *
+ * @param worker The worker.
+ * @param score The score to store.
+ */
+void hash_nnue_store(struct search_worker *worker, int score);
+
+/*
+ * Lookup the current position in the NNUE cache.
+ *
+ * @param worker The worker.
+ * @param score Location to store the score at.
+ * @return Returns true if a score was found in the table, false otherwise.
+ */
+bool hash_nnue_lookup(struct search_worker *worker, int *score);
+
+/*
  * Prefetch hash table entries for a specific position.
  *
  * @param worker The worker.
