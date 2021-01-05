@@ -466,6 +466,12 @@ struct position {
     struct unmake history[MAX_HISTORY_SIZE];
     /* Stack used to keep track of evaluation information */
     struct eval_item eval_stack[MAX_PLY];
+    /*
+     * The material score and piece/square table score for each
+     * side. These values are incrementally updated during the search.
+     */
+    int material[NPHASES][NSIDES];
+    int psq[NPHASES][NSIDES];
 
     /* Pointers to the owning worker and the active game state */
     struct search_worker *worker;
