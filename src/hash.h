@@ -88,53 +88,6 @@ bool hash_tt_lookup(struct position *pos, struct tt_item *item);
 int hash_tt_usage(void);
 
 /*
- * Create the pawn transposition table.
- *
- * @param worker The worker.
- * @param size The amount of memory to use for the table (in MB).
- */
-void hash_pawntt_create_table(struct search_worker *worker, int size);
-
-/*
- * Destroy the pawn transposition table.
- *
- * @param worker The worker.
- */
-void hash_pawntt_destroy_table(struct search_worker *worker);
-
-/*
- * Clear the pawn transposition table.
- *
- * @param worker The worker.
- */
-void hash_pawntt_clear_table(struct search_worker *worker);
-
-/*
- * Initialize an item to store in the pawn transposition table.
- *
- * @param item The item to initialize.
- */
-void hash_pawntt_init_item(struct pawntt_item *item);
-
-/*
- * Store a new position in the pawn transposition table.
- *
- * @param worker The worker.
- * @param item The item to store. Note that the pawn key field is ignored,
- *             the key in the board structure is always used.
- */
-void hash_pawntt_store(struct search_worker *worker, struct pawntt_item *item);
-
-/*
- * Lookup the current position in the pawn transposition table.
- *
- * @param worker The worker.
- * @param item Location where the found item is stored.
- * @return Returns true if the position was found, false otherwise.
- */
-bool hash_pawntt_lookup(struct search_worker *worker, struct pawntt_item *item);
-
-/*
  * Create the NNUE cache.
  *
  * @param worker The worker.

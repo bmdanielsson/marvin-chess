@@ -35,9 +35,6 @@
 #define MAX_MAIN_HASH_SIZE_32BIT 1024
 #define MAX_MAIN_HASH_SIZE_64BIT 131072
 
-/* The size to use for the pawn hash tables (in MB) */
-#define PAWN_HASH_SIZE 2
-
 /* The size to use for the NNUE cache (in MB) */
 #define NNUE_CACHE_SIZE 2
 

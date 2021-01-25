@@ -364,36 +364,6 @@ struct tt_bucket {
 };
 
 /*
- * An item in the pawn transposition table. The size should be a
- * power-of-2 for best performance.
- */
-struct pawntt_item {
-    /* The pawn key */
-    uint64_t pawnkey;
-    /* Bitboard of all passed pawns (for both sides) */
-    uint64_t passers;
-    /* Bitboard of all candidate passed pawns (for both sides) */
-    uint64_t candidates;
-    /* Bitboard of all squares attacked by pawns */
-    uint64_t attacked[NSIDES];
-    /* Bitboard of all squares attacked by two pawns */
-    uint64_t attacked2[NSIDES];
-    /* Combined rear span of all pawns */
-    uint64_t rear_span[NSIDES];
-    /* Description of all potential pawn shields */
-    uint8_t pawn_shield[NSIDES][2][3];
-    /* The score of pawn related terms for each side */
-    int score[NPHASES][NSIDES];
-    /* Indicates if the item is being used */
-    bool used;
-    /*
-     * Padding added to make sure that the
-     * size of the struct is a power-of-2.
-     */
-    uint8_t padding[24];
-};
-
-/*
  * An item in the NNUE cache. The size should be a power-of-2
  * for best performance.
  */
@@ -498,10 +468,6 @@ struct search_worker {
     int history_table[NPIECES][NSQUARES];
     int counter_history[NPIECES][NSQUARES][NPIECES][NSQUARES];
     int follow_history[NPIECES][NSQUARES][NPIECES][NSQUARES];
-    /* Pawn transposition table */
-    struct pawntt_item *pawntt;
-    /* The number of entries in the pawn transposition table */
-    int pawntt_size;
     /* Indicates if the engine is resolving a fail-low at the root */
     bool resolving_root_fail;
     /* The number of nodes searched so far */

@@ -49,9 +49,11 @@
 
 /* Different evaluation components */
 struct eval {
-    bool in_pawntt;
-    struct pawntt_item pawntt;
     bool endgame[NSIDES];
+    uint64_t passers;
+    uint64_t candidates;
+    uint64_t rear_span[NSIDES];
+    uint8_t pawn_shield[NSIDES][2][3];
     uint64_t attacked_by[NPIECES];
     uint64_t attacked[NSIDES];
     uint64_t attacked2[NSIDES];
@@ -122,7 +124,7 @@ static void evaluate_space(struct position *pos, struct eval *eval)
     int      side;
 
     for (side=0;side<NSIDES;side++) {
-        squares = space_eval_squares[side] & eval->pawntt.rear_span[side] &
+        squares = space_eval_squares[side] & eval->rear_span[side] &
                     (~pos->bb_pieces[side+PAWN]) &
                     (~eval->attacked[FLIP_COLOR(side)]);
         eval->score[MIDDLEGAME][side] += BITCOUNT(squares)*SPACE_SQUARE;
@@ -391,25 +393,23 @@ static bool is_backward_pawn(struct position *pos, int side, int sq)
 
 static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
 {
-    uint64_t            pieces;
-    int                 sq;
-    int                 index;
-    int                 file;
-    int                 rank;
-    int                 rel_rank;
-    int                 side;
-    int                 oside;
-    bool                isolated;
-    uint64_t            attackspan;
-    uint64_t            attackers;
-    uint64_t            defenders;
-    uint64_t            helpers;
-    uint64_t            sentries;
-    uint64_t            neighbours;
-    uint64_t            attacks;
-    struct pawntt_item  *item;
+    uint64_t pieces;
+    int      sq;
+    int      index;
+    int      file;
+    int      rank;
+    int      rel_rank;
+    int      side;
+    int      oside;
+    bool     isolated;
+    uint64_t attackspan;
+    uint64_t attackers;
+    uint64_t defenders;
+    uint64_t helpers;
+    uint64_t sentries;
+    uint64_t neighbours;
+    uint64_t attacks;
 
-    item = &eval->pawntt;
     pieces = pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN];
     while (pieces != 0ULL) {
         isolated = false;
@@ -430,17 +430,17 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
         /* Look for isolated pawns */
         if ((attackspan&pos->bb_pieces[side+PAWN]) == 0ULL) {
             isolated = true;
-            item->score[MIDDLEGAME][side] += ISOLATED_PAWN_MG;
-            item->score[ENDGAME][side] += ISOLATED_PAWN_EG;
+            eval->score[MIDDLEGAME][side] += ISOLATED_PAWN_MG;
+            eval->score[ENDGAME][side] += ISOLATED_PAWN_EG;
             TRACE_M(ISOLATED_PAWN_MG, ISOLATED_PAWN_EG, 1);
         }
 
         /* Look for passed pawns */
         if (ISEMPTY(front_attackspan[side][sq]&pos->bb_pieces[oside+PAWN]) &&
             ISEMPTY(front_span[side][sq]&pos->bb_pieces[oside+PAWN])) {
-            SETBIT(item->passers, sq);
-            item->score[MIDDLEGAME][side] += PASSED_PAWN_MG[rel_rank];
-            item->score[ENDGAME][side] += PASSED_PAWN_EG[rel_rank];
+            SETBIT(eval->passers, sq);
+            eval->score[MIDDLEGAME][side] += PASSED_PAWN_MG[rel_rank];
+            eval->score[ENDGAME][side] += PASSED_PAWN_EG[rel_rank];
             TRACE_OM(PASSED_PAWN_MG, PASSED_PAWN_EG, rel_rank, 1);
         }
 
@@ -449,21 +449,21 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
         helpers = rear_attackspan[side][sq]&pos->bb_pieces[side+PAWN];
         attackers = bb_pawn_attacks_to(sq, oside)&pos->bb_pieces[oside+PAWN];
         defenders = bb_pawn_attacks_to(sq, side)&pos->bb_pieces[side+PAWN];
-        if (!ISBITSET(item->passers&pos->bb_sides[side], sq) &&
+        if (!ISBITSET(eval->passers&pos->bb_sides[side], sq) &&
             ISEMPTY(front_span[side][sq]&pos->bb_pieces[oside+PAWN]) &&
             (BITCOUNT(helpers) >= BITCOUNT(sentries)) &&
             (BITCOUNT(defenders) >= BITCOUNT(attackers))) {
-            SETBIT(item->candidates, sq);
-            item->score[MIDDLEGAME][side] += CANDIDATE_PASSED_PAWN_MG[rel_rank];
-            item->score[ENDGAME][side] += CANDIDATE_PASSED_PAWN_EG[rel_rank];
+            SETBIT(eval->candidates, sq);
+            eval->score[MIDDLEGAME][side] += CANDIDATE_PASSED_PAWN_MG[rel_rank];
+            eval->score[ENDGAME][side] += CANDIDATE_PASSED_PAWN_EG[rel_rank];
             TRACE_OM(CANDIDATE_PASSED_PAWN_MG, CANDIDATE_PASSED_PAWN_EG,
                      rel_rank, 1);
         }
 
         /* Check if the pawn is considered backward */
         if (!isolated && is_backward_pawn(pos, side, sq)) {
-            item->score[MIDDLEGAME][side] += BACKWARD_PAWN_MG;
-            item->score[ENDGAME][side] += BACKWARD_PAWN_EG;
+            eval->score[MIDDLEGAME][side] += BACKWARD_PAWN_MG;
+            eval->score[ENDGAME][side] += BACKWARD_PAWN_EG;
             TRACE_M(BACKWARD_PAWN_MG, BACKWARD_PAWN_EG, 1);
         }
 
@@ -471,26 +471,27 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
         neighbours = rear_attackspan[side][sq]&pos->bb_pieces[side+PAWN];
         if (!ISEMPTY(neighbours&rank_mask[rank]) ||
             !ISEMPTY(neighbours&bb_pawn_attacks_to(sq, side))) {
-            item->score[MIDDLEGAME][side] += CONNECTED_PAWNS_MG[rel_rank];
-            item->score[ENDGAME][side] += CONNECTED_PAWNS_EG[rel_rank];
+            eval->score[MIDDLEGAME][side] += CONNECTED_PAWNS_MG[rel_rank];
+            eval->score[ENDGAME][side] += CONNECTED_PAWNS_EG[rel_rank];
             TRACE_OM(CONNECTED_PAWNS_MG, CONNECTED_PAWNS_EG, rel_rank, 1);
         }
 
         /* Update pawn attacks */
         attacks = bb_pawn_attacks_from(sq, side);
-        item->attacked2[side] |= (attacks&item->attacked[side]);
-        item->attacked[side] |= attacks;
+        eval->attacked2[side] |= (attacks&eval->attacked[side]);
+        eval->attacked[side] |= attacks;
+        eval->attacked_by[side+PAWN] |= attacks;
 
         /* Update rear span information */
-        item->rear_span[side] |= rear_span[side][sq];
+        eval->rear_span[side] |= rear_span[side][sq];
     }
 
     /* Look for double pawns */
     for (side=0;side<NSIDES;side++) {
         for (file=0;file<NFILES;file++) {
             if (BITCOUNT(pos->bb_pieces[side+PAWN]&file_mask[file]) >= 2) {
-                item->score[MIDDLEGAME][side] += DOUBLE_PAWNS_MG;
-                item->score[ENDGAME][side] += DOUBLE_PAWNS_EG;
+                eval->score[MIDDLEGAME][side] += DOUBLE_PAWNS_MG;
+                eval->score[ENDGAME][side] += DOUBLE_PAWNS_EG;
                 TRACE_M(DOUBLE_PAWNS_MG, DOUBLE_PAWNS_EG, 1);
             }
         }
@@ -531,18 +532,15 @@ static bool is_free_pawn(struct position *pos, struct eval *eval, int side,
  */
 static void evaluate_passers(struct position *pos, struct eval *eval)
 {
-    struct pawntt_item *item;
-    uint64_t           passers;
-    int                sq;
-    int                to;
-    int                side;
-    int                dist;
-    int                odist;
-
-    item = &eval->pawntt;
+    uint64_t passers;
+    int      sq;
+    int      to;
+    int      side;
+    int      dist;
+    int      odist;
 
     /* Iterate over all passers */
-    passers = item->passers;
+    passers = eval->passers;
     while (passers != 0ULL) {
         sq = POPBIT(&passers);
         side = COLOR(pos->pieces[sq]);
@@ -909,16 +907,11 @@ static void init_attack_tables(struct position *pos, struct eval *eval)
 
 static void do_eval(struct position *pos, struct eval *eval)
 {
-    int k;
-
+    /* Initialize eval struct */
     memset(eval, 0, sizeof(struct eval));
 
     /* Init attack table */
     init_attack_tables(pos, eval);
-
-    /* Check if the position is present in the pawn transposition table */
-    eval->in_pawntt = (pos->worker != NULL)?
-                        hash_pawntt_lookup(pos->worker, &eval->pawntt):false;
 
     /* Add incrementally updated features */
     eval->score[MIDDLEGAME][WHITE] += pos->material[MIDDLEGAME][WHITE];
@@ -931,16 +924,7 @@ static void do_eval(struct position *pos, struct eval *eval)
     eval->score[ENDGAME][BLACK] += pos->psq[ENDGAME][BLACK];
 
     /* Evaluate the position */
-    if (!eval->in_pawntt) {
-        hash_pawntt_init_item(&eval->pawntt);
-        evaluate_pawn_structure(pos, eval);
-    }
-    eval->attacked_by[WHITE_PAWN] |= eval->pawntt.attacked[WHITE];
-    eval->attacked_by[BLACK_PAWN] |= eval->pawntt.attacked[BLACK];
-    eval->attacked[WHITE] |= eval->pawntt.attacked[WHITE];
-    eval->attacked[BLACK] |= eval->pawntt.attacked[BLACK];
-    eval->attacked2[WHITE] |= eval->pawntt.attacked2[WHITE];
-    eval->attacked2[BLACK] |= eval->pawntt.attacked2[BLACK];
+    evaluate_pawn_structure(pos, eval);
     evaluate_knights(pos, eval);
     evaluate_bishops(pos, eval);
     evaluate_rooks(pos, eval);
@@ -950,22 +934,6 @@ static void do_eval(struct position *pos, struct eval *eval)
     evaluate_space(pos, eval);
     evaluate_threats(pos, eval, WHITE);
     evaluate_threats(pos, eval, BLACK);
-
-    /*
-     * Update the evaluation scores with information from
-     * the pawn tranposition table. If the position was not
-     * found then the item field have been updated during the
-     * evaluation and therefore contains the correct information.
-     */
-    for (k=0;k<NPHASES;k++) {
-        eval->score[k][WHITE] += eval->pawntt.score[k][WHITE];
-        eval->score[k][BLACK] += eval->pawntt.score[k][BLACK];
-    }
-
-    /* Update the pawn hash table */
-    if (!eval->in_pawntt && (pos->worker != NULL)) {
-        hash_pawntt_store(pos->worker, &eval->pawntt);
-    }
 }
 
 int eval_evaluate(struct position *pos)

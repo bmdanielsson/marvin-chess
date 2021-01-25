@@ -72,14 +72,6 @@ static void allocate_tt(int size)
     assert(transposition_table != NULL);
 }
 
-static void allocate_pawntt(struct search_worker *worker, int size)
-{
-    worker->pawntt_size = largest_power_of_2(size, sizeof(struct pawntt_item));
-    worker->pawntt = aligned_malloc(CACHE_LINE_SIZE,
-                                worker->pawntt_size*sizeof(struct pawntt_item));
-    assert(worker->pawntt != NULL);
-}
-
 static void allocate_nnue_cache(struct search_worker *worker, int size)
 {
     worker->nnue_cache_size = largest_power_of_2(size,
@@ -288,93 +280,6 @@ int hash_tt_usage(void)
     return nused/TT_BUCKET_SIZE;
 }
 
-void hash_pawntt_create_table(struct search_worker *worker, int size)
-{
-    assert(size >= 0);
-
-    hash_pawntt_destroy_table(worker);
-
-    allocate_pawntt(worker, size);
-    hash_pawntt_clear_table(worker);
-}
-
-void hash_pawntt_destroy_table(struct search_worker *worker)
-{
-    aligned_free(worker->pawntt);
-    worker->pawntt = NULL;
-    worker->pawntt_size = 0;
-}
-
-void hash_pawntt_clear_table(struct search_worker *worker)
-{
-    assert(worker != NULL);
-    assert(worker->pawntt != NULL);
-
-    memset(worker->pawntt, 0, worker->pawntt_size*sizeof(struct pawntt_item));
-}
-
-void hash_pawntt_init_item(struct pawntt_item *item)
-{
-    assert(item != NULL);
-
-    memset(item, 0, sizeof(struct pawntt_item));
-    item->used = true;
-}
-
-void hash_pawntt_store(struct search_worker *worker, struct pawntt_item *item)
-{
-    struct position *pos;
-    uint32_t        idx;
-
-    assert(valid_position(&worker->pos));
-    assert(item != NULL);
-
-    pos = &worker->pos;
-
-    if (worker->pawntt == NULL) {
-        return;
-    }
-
-    /* Find the correct position in the table */
-    idx = (uint32_t)(pos->pawnkey&(worker->pawntt_size-1));
-
-    /*
-     * Insert the item in the table. An always-replace strategy
-     * is used in case the position is already taken.
-     */
-    worker->pawntt[idx] = *item;
-    worker->pawntt[idx].pawnkey = pos->pawnkey;
-}
-
-bool hash_pawntt_lookup(struct search_worker *worker, struct pawntt_item *item)
-{
-    struct position *pos;
-    uint32_t        idx;
-    bool            found;
-
-    assert(valid_position(&worker->pos));
-    assert(item != NULL);
-
-    pos = &worker->pos;
-
-    if (worker->pawntt == NULL) {
-        return false;
-    }
-
-    /*
-     * Find the correct position in the table and check
-     * if it contains an item for this position.
-     */
-    found = false;
-    idx = (uint32_t)(pos->pawnkey&(worker->pawntt_size-1));
-    if (worker->pawntt[idx].pawnkey == pos->pawnkey) {
-        found = true;
-        *item = worker->pawntt[idx];
-    }
-
-    return found && item->used;
-}
-
 void hash_nnue_create_table(struct search_worker *worker, int size)
 {
     assert(size >= 0);
@@ -460,5 +365,4 @@ void hash_prefetch(struct search_worker *worker)
 
     PREFETCH_ADDRESS(&transposition_table[worker->pos.key&(tt_size-1)]);
     PREFETCH_ADDRESS(&worker->nnue_cache[worker->pos.key&(worker->nnue_cache_size-1)]);
-    PREFETCH_ADDRESS(&worker->pawntt[worker->pos.pawnkey&(worker->pawntt_size-1)]);
 }
