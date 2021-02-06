@@ -279,7 +279,7 @@ int hash_tt_usage(void)
     for (k=0;k<1000;k++) {
         bucket = &transposition_table[k];
         for (idx=0;idx<TT_BUCKET_SIZE;idx++) {
-            if (bucket->items[idx].date > 0) {
+            if (bucket->items[idx].date == tt_date) {
                 nused++;
             }
         }
