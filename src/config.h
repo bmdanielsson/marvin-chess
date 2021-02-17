@@ -20,7 +20,7 @@
 
 /* Version information */
 #define APP_NAME "Marvin"
-#define APP_VERSION "5.0.0"
+#define APP_VERSION "5.1.0-a4"
 #define APP_AUTHOR "Martin Danielsson"
 
 /* The name of the log file */
@@ -52,8 +52,8 @@
 
 /*
  * The name of the default net file
- * SHA-1: 3f7389eeaa683a7e0a70898ad989488f0f361d76
+ * SHA-1: ca6610a40413eecd453f241502d1bf03a6a0c3dd
  */
-#define NETFILE_NAME "net-3f7389e.nnue"
+#define NETFILE_NAME "net-ca6610a.nnue"
 
 #endif
