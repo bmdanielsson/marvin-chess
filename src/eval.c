@@ -907,6 +907,9 @@ static void init_attack_tables(struct position *pos, struct eval *eval)
 
 static void do_eval(struct position *pos, struct eval *eval)
 {
+    int k;
+    int l;
+
     /* Initialize eval struct */
     memset(eval, 0, sizeof(struct eval));
 
@@ -914,14 +917,12 @@ static void do_eval(struct position *pos, struct eval *eval)
     init_attack_tables(pos, eval);
 
     /* Add incrementally updated features */
-    eval->score[MIDDLEGAME][WHITE] += pos->material[MIDDLEGAME][WHITE];
-    eval->score[MIDDLEGAME][BLACK] += pos->material[MIDDLEGAME][BLACK];
-    eval->score[ENDGAME][WHITE] += pos->material[ENDGAME][WHITE];
-    eval->score[ENDGAME][BLACK] += pos->material[ENDGAME][BLACK];
-    eval->score[MIDDLEGAME][WHITE] += pos->psq[MIDDLEGAME][WHITE];
-    eval->score[MIDDLEGAME][BLACK] += pos->psq[MIDDLEGAME][BLACK];
-    eval->score[ENDGAME][WHITE] += pos->psq[ENDGAME][WHITE];
-    eval->score[ENDGAME][BLACK] += pos->psq[ENDGAME][BLACK];
+    for (k=0;k<NPHASES;k++) {
+        for (l=0;l<NSIDES;l++) {
+            eval->score[k][l] += pos->material[k][l];
+            eval->score[k][l] += pos->psq[k][l];
+        }
+    }
 
     /* Evaluate the position */
     evaluate_pawn_structure(pos, eval);
@@ -993,18 +994,18 @@ void eval_init_piece_features(struct position *pos)
     int      sq;
     int      piece;
     int      side;
+    int      k;
+    int      l;
 
     assert(valid_position(pos));
 
     /* Reset all feature scores */
-    pos->material[MIDDLEGAME][WHITE] = 0;
-    pos->material[MIDDLEGAME][BLACK] = 0;
-    pos->material[ENDGAME][WHITE] = 0;
-    pos->material[ENDGAME][BLACK] = 0;
-    pos->psq[MIDDLEGAME][WHITE] = 0;
-    pos->psq[MIDDLEGAME][BLACK] = 0;
-    pos->psq[ENDGAME][WHITE] = 0;
-    pos->psq[ENDGAME][BLACK] = 0;
+    for (k=0;k<NPHASES;k++) {
+        for (l=0;l<NSIDES;l++) {
+            pos->material[k][l] = 0;
+            pos->psq[k][l] = 0;
+        }
+    }
 
     /* Iterate over all pieces */
     pieces = pos->bb_all;
