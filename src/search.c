@@ -62,7 +62,7 @@ static int futility_margin[] = {0, 150, 250, 350, 450, 550, 650, 750};
 
 /* Margins used for razoring */
 #define RAZORING_DEPTH 3
-static int razoring_margin[] = {0, 100, 200, 400};
+static int razoring_margin[] = {0, 54, 152, 448};
 
 /*
  * Aspiration window sizes. If the search fails low or high
