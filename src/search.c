@@ -58,7 +58,7 @@
 
 /* Margins used for futility pruning and reverse futility pruning */
 #define FUTILITY_DEPTH 7
-static int futility_margin[] = {0, 150, 250, 350, 450, 550, 650, 750};
+static int futility_margin[] = {0, 104, 205, 339, 437, 520, 667, 785};
 
 /* Margins used for razoring */
 #define RAZORING_DEPTH 3
