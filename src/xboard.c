@@ -301,15 +301,15 @@ static void xboard_cmd_analyze(struct gamestate *state)
         }
 
         /* Process command */
-        if(!strncmp(cmd, "bk", 2)) {
+        if(MATCH(cmd, "bk")) {
             xboard_cmd_bk(state);
-        } else if (!strncmp(cmd, "new", 3)) {
+        } else if (MATCH(cmd, "new")) {
             xboard_cmd_new(state);
-        } else if (!strncmp(cmd, "setboard", 8)) {
+        } else if (MATCH(cmd, "setboard")) {
             xboard_cmd_setboard(cmd, state);
-        } else if (!strncmp(cmd, "undo", 4)) {
+        } else if (MATCH(cmd, "undo")) {
             xboard_cmd_undo(state);
-        } else if (!strncmp(cmd, "usermove", 8)) {
+        } else if (MATCH(cmd, "usermove")) {
             xboard_cmd_usermove(cmd, state, false);
         }
     }
@@ -746,77 +746,77 @@ bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop)
 
     *stop = false;
 
-    if (!strncmp(cmd, "?", 1)) {
+    if (MATCH(cmd, "?")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "accepted", 8)) {
+    } else if (MATCH(cmd, "accepted")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "analyze", 7)) {
+    } else if (MATCH(cmd, "analyze")) {
         xboard_cmd_analyze(state);
-    } else if (!strncmp(cmd, "bk", 2)) {
+    } else if (MATCH(cmd, "bk")) {
         xboard_cmd_bk(state);
-    } else if (!strncmp(cmd, "computer", 8)) {
+    } else if (MATCH(cmd, "computer")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "cores", 5)) {
+    } else if (MATCH(cmd, "cores")) {
         xboard_cmd_cores(cmd);
-    } else if (!strncmp(cmd, "easy", 4)) {
+    } else if (MATCH(cmd, "easy")) {
         xboard_cmd_easy();
-    } else if (!strncmp(cmd, "exit", 4)) {
+    } else if (MATCH(cmd, "exit")) {
         xboard_cmd_exit();
-    } else if (!strncmp(cmd, "egtpath", 7)) {
+    } else if (MATCH(cmd, "egtpath")) {
         xboard_cmd_egtpath(cmd);
-    } else if (!strncmp(cmd, "force", 5)) {
+    } else if (MATCH(cmd, "force")) {
         xboard_cmd_force();
-    } else if (!strncmp(cmd, "go", 2)) {
+    } else if (MATCH(cmd, "go")) {
         xboard_cmd_go(state);
-    } else if (!strncmp(cmd, "hard", 4)) {
+    } else if (MATCH(cmd, "hard")) {
         xboard_cmd_hard();
-    } else if (!strncmp(cmd, "hint", 4)) {
+    } else if (MATCH(cmd, "hint")) {
         xboard_cmd_hint(state);
-    } else if (!strncmp(cmd, "level", 5)) {
+    } else if (MATCH(cmd, "level")) {
         xboard_cmd_level(cmd);
-    } else if (!strncmp(cmd, "memory", 6)) {
+    } else if (MATCH(cmd, "memory")) {
         xboard_cmd_memory(cmd);
-    } else if (!strncmp(cmd, "name", 4)) {
+    } else if (MATCH(cmd, "name")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "new", 3)) {
+    } else if (MATCH(cmd, "new")) {
         xboard_cmd_new(state);
-    } else if (!strncmp(cmd, "nopost", 6)) {
+    } else if (MATCH(cmd, "nopost")) {
         xboard_cmd_nopost();
-    } else if (!strncmp(cmd, "otim", 4)) {
+    } else if (MATCH(cmd, "otim")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "ping", 4)) {
+    } else if (MATCH(cmd, "ping")) {
         xboard_cmd_ping(cmd);
-    } else if (!strncmp(cmd, "playother", 9)) {
+    } else if (MATCH(cmd, "playother")) {
         xboard_cmd_playother(state);
-    } else if (!strncmp(cmd, "post", 4)) {
+    } else if (MATCH(cmd, "post")) {
         xboard_cmd_post();
-    } else if (!strncmp(cmd, "protover", 8)) {
+    } else if (MATCH(cmd, "protover")) {
         xboard_cmd_protover();
-    } else if (!strncmp(cmd, "quit", 4)) {
+    } else if (MATCH(cmd, "quit")) {
         *stop = true;
-    } else if (!strncmp(cmd, "rating", 6)) {
+    } else if (MATCH(cmd, "rating")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "random", 6)) {
+    } else if (MATCH(cmd, "random")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "rejected", 8)) {
+    } else if (MATCH(cmd, "rejected")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "remove", 6)) {
+    } else if (MATCH(cmd, "remove")) {
         xboard_cmd_remove(state);
-    } else if (!strncmp(cmd, "result", 5)) {
+    } else if (MATCH(cmd, "result")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "sd", 2)) {
+    } else if (MATCH(cmd, "sd")) {
         xboard_cmd_sd(cmd);
-    } else if (!strncmp(cmd, "setboard", 8)) {
+    } else if (MATCH(cmd, "setboard")) {
         xboard_cmd_setboard(cmd, state);
-    } else if (!strncmp(cmd, "st", 2)) {
+    } else if (MATCH(cmd, "st")) {
         xboard_cmd_st(cmd);
-    } else if (!strncmp(cmd, "time", 4)) {
+    } else if (MATCH(cmd, "time")) {
         xboard_cmd_time(cmd);
-    } else if (!strncmp(cmd, "undo", 4)) {
+    } else if (MATCH(cmd, "undo")) {
         xboard_cmd_undo(state);
-    } else if (!strncmp(cmd, "usermove", 8)) {
+    } else if (MATCH(cmd, "usermove")) {
         xboard_cmd_usermove(cmd, state, !force_mode);
-    } else if (!strncmp(cmd, "xboard", 5)) {
+    } else if (MATCH(cmd, "xboard")) {
         xboard_cmd_xboard(state);
     } else {
         if (engine_protocol == PROTOCOL_XBOARD) {
@@ -843,39 +843,39 @@ bool xboard_check_input(struct search_worker *worker)
     }
 
     /* Process command */
-    if(!strncmp(cmd, "cores", 5)) {
+    if(MATCH(cmd, "cores")) {
         engine_set_pending_command(cmd);
         if (worker->state->pondering) {
             stop = true;
         }
-    } else if (!strncmp(cmd, "?", 1) ||
-               !strncmp(cmd, "exit", 4)) {
+    } else if (MATCH(cmd, "?") ||
+               MATCH(cmd, "exit")) {
         stop = true;
-    } else if(!strncmp(cmd, "hint", 4)) {
+    } else if(MATCH(cmd, "hint")) {
         /*
          * This only makes sense if the engine is in analyze mode
          * so send the current best move as a hint.
          */
         move2str(worker->mpv_moves[0], movestr);
         engine_write_command("Hint: %s", movestr);
-    } else if (!strncmp(cmd, "easy", 4)) {
+    } else if (MATCH(cmd, "easy")) {
         xboard_cmd_easy();
-    } else if (!strncmp(cmd, "hard", 4)) {
+    } else if (MATCH(cmd, "hard")) {
         xboard_cmd_hard();
-    } else if (!strncmp(cmd, "nopost", 6)) {
+    } else if (MATCH(cmd, "nopost")) {
         xboard_cmd_nopost();
-    } else if (!strncmp(cmd, "otim", 4)) {
+    } else if (MATCH(cmd, "otim")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "ping", 4)) {
+    } else if (MATCH(cmd, "ping")) {
         xboard_cmd_ping(cmd);
-    } else if (!strncmp(cmd, "post", 4)) {
+    } else if (MATCH(cmd, "post")) {
         xboard_cmd_post();
-    } else if (!strncmp(cmd, "time", 4)) {
+    } else if (MATCH(cmd, "time")) {
         xboard_cmd_time(cmd);
         if (worker->state->pondering) {
             tc_update_time(engine_time_left);
         }
-    } else if (!strncmp(cmd, "usermove", 8)) {
+    } else if (MATCH(cmd, "usermove")) {
         if (!worker->state->pondering) {
             engine_set_pending_command(cmd);
             stop = true;
@@ -901,12 +901,12 @@ bool xboard_check_input(struct search_worker *worker)
             tc_allocate_time();
             worker->state->pondering = false;
         }
-    } else if (!strncmp(cmd, "bk", 2) ||
-               !strncmp(cmd, "force", 5) ||
-               !strncmp(cmd, "new", 3) ||
-               !strncmp(cmd, "quit", 4) ||
-               !strncmp(cmd, "setboard", 8) ||
-               !strncmp(cmd, "undo", 4)) {
+    } else if (MATCH(cmd, "bk") ||
+               MATCH(cmd, "force") ||
+               MATCH(cmd, "new") ||
+               MATCH(cmd, "quit") ||
+               MATCH(cmd, "setboard") ||
+               MATCH(cmd, "undo")) {
         engine_set_pending_command(cmd);
         stop = true;
     }

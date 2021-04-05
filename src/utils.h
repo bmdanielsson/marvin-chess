@@ -26,6 +26,7 @@
 #define MIN(a, b)       ((a) < (b))?(a):(b)
 #define MAX(a, b)       ((a) > (b))?(a):(b)
 #define CLAMP(x, a, b)  MAX((a), MIN((x), (b)))
+#define MATCH(s1, s2)   !strncmp((s1), (s2), strlen(s2))
 
 /* The cache line size */
 #define CACHE_LINE_SIZE 64

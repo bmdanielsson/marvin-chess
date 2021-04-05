@@ -85,7 +85,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     iter = strchr(cmd, ' ');
     while ((iter != NULL) && (*iter != '\0')) {
         iter = skip_whitespace(iter);
-        if (!strncmp(iter, "wtime", 5)) {
+        if (MATCH(iter, "wtime")) {
             if (sscanf(iter, "wtime %d", &wtime) != 1) {
                 return;
             }
@@ -94,7 +94,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = strchr(iter, ' ');
             in_movelist = false;
             flags |= TC_TIME_LIMIT;
-        } else if (!strncmp(iter, "btime", 5)) {
+        } else if (MATCH(iter, "btime")) {
             if (sscanf(iter, "btime %d", &btime) != 1) {
                 return;
             }
@@ -103,7 +103,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = strchr(iter, ' ');
             in_movelist = false;
             flags |= TC_TIME_LIMIT;
-        } else if (!strncmp(iter, "winc", 4)) {
+        } else if (MATCH(iter, "winc")) {
             if (sscanf(iter, "winc %d", &winc) != 1) {
                 return;
             }
@@ -112,7 +112,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = strchr(iter, ' ');
             in_movelist = false;
             flags |= TC_TIME_LIMIT;
-        } else if (!strncmp(iter, "binc", 4)) {
+        } else if (MATCH(iter, "binc")) {
             if (sscanf(iter, "binc %d", &binc) != 1) {
                 return;
             }
@@ -121,7 +121,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = strchr(iter, ' ');
             in_movelist = false;
             flags |= TC_TIME_LIMIT;
-        } else if (!strncmp(iter, "movestogo", 9)) {
+        } else if (MATCH(iter, "movestogo")) {
             if (sscanf(iter, "movestogo %d", &movestogo) != 1) {
                 return;
             }
@@ -130,7 +130,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = strchr(iter, ' ');
             in_movelist = false;
             flags |= (TC_REGULAR|TC_TIME_LIMIT);
-        } else if (!strncmp(iter, "movetime", 8)) {
+        } else if (MATCH(iter, "movetime")) {
             if (sscanf(iter, "movetime %d", &movetime) != 1) {
                 return;
             }
@@ -140,7 +140,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             in_movelist = false;
             fixed_time = true;
             flags |= (TC_FIXED_TIME|TC_TIME_LIMIT);
-        } else if (!strncmp(iter, "depth", 5)) {
+        } else if (MATCH(iter, "depth")) {
             if (sscanf(iter, "depth %d", &depth) != 1) {
                 return;
             }
@@ -154,7 +154,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = strchr(iter, ' ');
             in_movelist = false;
             flags |= TC_DEPTH_LIMIT;
-        } else if (!strncmp(iter, "nodes", 5)) {
+        } else if (MATCH(iter, "nodes")) {
             if (sscanf(iter, "nodes %" SCNu64 "", &nodes) != 1) {
                 return;
             }
@@ -164,16 +164,16 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             iter = strchr(iter, ' ');
             in_movelist = false;
             flags |= TC_NODE_LIMIT;
-        } else if (!strncmp(iter, "infinite", 8)) {
+        } else if (MATCH(iter, "infinite")) {
             infinite_time = true;
             iter = strchr(iter, ' ');
             in_movelist = false;
             flags |= TC_INFINITE_TIME;
-        } else if (!strncmp(iter, "ponder", 6)) {
+        } else if (MATCH(iter, "ponder")) {
             ponder = true;
             iter = strchr(iter, ' ');
             in_movelist = false;
-        } else if (!strncmp(iter, "searchmoves", 11)) {
+        } else if (MATCH(iter, "searchmoves")) {
             iter = strchr(iter, ' ');
             in_movelist = true;
         } else if (in_movelist) {
@@ -253,9 +253,9 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
     moves = strstr(cmd, "moves");
 
     /* Check if the parameter is fen or startpos */
-    if (!strncmp(iter, "startpos", 8)) {
+    if (MATCH(iter, "startpos")) {
         board_start_position(&state->pos);
-    } else if (!strncmp(iter, "fen", 3)) {
+    } else if (MATCH(iter, "fen")) {
         /* Find beginning of FEN string */
         iter += strlen("fen");
         iter = skip_whitespace(iter);
@@ -333,7 +333,7 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
         valuestr = iter;
 
         /* Handle option */
-        if (!strncmp(namestr, "Hash", 4)) {
+        if (MATCH(namestr, "Hash")) {
             if (sscanf(valuestr, "%d", &value) == 1) {
                 if (value > hash_tt_max_size()) {
                     value = hash_tt_max_size();
@@ -342,23 +342,23 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
                 }
                 hash_tt_create_table(value);
             }
-        } else if (!strncmp(namestr, "OwnBook", 7)) {
-            if (!strncmp(valuestr, "false", 5)) {
+        } else if (MATCH(namestr, "OwnBook")) {
+            if (MATCH(valuestr, "false")) {
                 own_book_mode = false;
-            } else if (!strncmp(valuestr, "true", 4)) {
+            } else if (MATCH(valuestr, "true")) {
                 own_book_mode = true;
             }
-        } else if (!strncmp(namestr, "Ponder", 6)) {
-            if (!strncmp(valuestr, "false", 5)) {
+        } else if (MATCH(namestr, "Ponder")) {
+            if (MATCH(valuestr, "false")) {
                 ponder_mode = false;
-            } else if (!strncmp(valuestr, "true", 4)) {
+            } else if (MATCH(valuestr, "true")) {
                 ponder_mode = true;
             }
-        } else if (!strncmp(namestr, "SyzygyPath", 10)) {
+        } else if (MATCH(namestr, "SyzygyPath")) {
             strncpy(engine_syzygy_path, valuestr, MAX_PATH_LENGTH);
             tb_init(engine_syzygy_path);
             tablebase_mode = TB_LARGEST > 0;
-        } else if (!strncmp(namestr, "Threads", 7)) {
+        } else if (MATCH(namestr, "Threads")) {
             if (sscanf(valuestr, "%d", &value) == 1) {
                 if (value > MAX_WORKERS) {
                     value = MAX_WORKERS;
@@ -368,7 +368,7 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
                 smp_destroy_workers();
                 smp_create_workers(value);
             }
-        } else if (!strncmp(namestr, "LogLevel", 8)) {
+        } else if (MATCH(namestr, "LogLevel")) {
             if (sscanf(valuestr, "%d", &value) == 1) {
                 if (value > LOG_HIGHEST_LEVEL) {
                     value = LOG_HIGHEST_LEVEL;
@@ -377,7 +377,7 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
                 }
                 dbg_set_log_level(value);
             }
-        } else if (!strncmp(namestr, "MultiPV", 7)) {
+        } else if (MATCH(namestr, "MultiPV")) {
             if (sscanf(valuestr, "%d", &value) == 1) {
                 if (value > MAX_MULTIPV_LINES) {
                     value = MAX_MULTIPV_LINES;
@@ -386,13 +386,13 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
                 }
                 state->multipv = value;
             }
-        } else if (!strncmp(namestr, "UseNNUE", 7)) {
-            if (!strncmp(valuestr, "false", 5)) {
+        } else if (MATCH(namestr, "UseNNUE")) {
+            if (MATCH(valuestr, "false")) {
                 engine_using_nnue = false;
-            } else if (!strncmp(valuestr, "true", 4)) {
+            } else if (MATCH(valuestr, "true")) {
                 engine_using_nnue = true;
             }
-        } else if (!strncmp(namestr, "EvalFile", 8)) {
+        } else if (MATCH(namestr, "EvalFile")) {
             strncpy(engine_eval_file, valuestr, MAX_PATH_LENGTH);
             engine_loaded_net = nnue_load_net(engine_eval_file);
         }
@@ -448,28 +448,28 @@ bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop)
 
     *stop = false;
 
-    if (!strncmp(cmd, "debug", 5)) {
+    if (MATCH(cmd, "debug")) {
         /* Ignore */
-    } else if (!strncmp(cmd, "go", 2)) {
+    } else if (MATCH(cmd, "go")) {
         /* Both UCI and Xboard protocol has a go command */
         if (engine_protocol == PROTOCOL_UCI) {
             uci_cmd_go(cmd, state);
         } else {
             return false;
         }
-    } else if (!strncmp(cmd, "isready", 7)) {
+    } else if (MATCH(cmd, "isready")) {
         uci_cmd_isready();
-    } else if (!strncmp(cmd, "position", 8)) {
+    } else if (MATCH(cmd, "position")) {
         uci_cmd_position(cmd, state);
-    } else if (!strncmp(cmd, "setoption", 9)) {
+    } else if (MATCH(cmd, "setoption")) {
         uci_cmd_setoption(cmd, state);
-	} else if (!strncmp(cmd, "stop", 4)) {
+	} else if (MATCH(cmd, "stop")) {
 		/* Ignore */
-    } else if (!strncmp(cmd, "uci", 3) && (strlen(cmd) == 3)) {
+    } else if (MATCH(cmd, "uci") && (strlen(cmd) == 3)) {
         uci_cmd_uci(state);
-    } else if (!strncmp(cmd, "ucinewgame", 10) && (strlen(cmd) == 10)) {
+    } else if (MATCH(cmd, "ucinewgame") && (strlen(cmd) == 10)) {
         uci_cmd_ucinewgame();
-    } else if (!strncmp(cmd, "quit", 4)) {
+    } else if (MATCH(cmd, "quit")) {
         /* Both UCI and Xboard protocol has a quit command */
         if (engine_protocol == PROTOCOL_UCI) {
             *stop = true;
@@ -496,12 +496,12 @@ bool uci_check_input(struct search_worker *worker)
     }
 
     /* Process command */
-    if (!strncmp(cmd, "isready", 7)) {
+    if (MATCH(cmd, "isready")) {
         uci_cmd_isready();
-    } else if(!strncmp(cmd, "ponderhit", 9)) {
+    } else if(MATCH(cmd, "ponderhit")) {
         tc_allocate_time();
         worker->state->pondering = false;
-    } else if (!strncmp(cmd, "stop", 4)) {
+    } else if (MATCH(cmd, "stop")) {
         worker->state->pondering = false;
         stop = true;
     }

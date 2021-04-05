@@ -206,19 +206,19 @@ void engine_loop(struct gamestate *state)
 
         /* Custom commands */
         handled = true;
-        if (!strncmp(cmd, "browse", 6)) {
+        if (MATCH(cmd, "browse")) {
             cmd_browse(state);
-        } else if (!strncmp(cmd, "display", 7)) {
+        } else if (MATCH(cmd, "display")) {
             cmd_display(state);
-        } else if (!strncmp(cmd, "divide", 6)) {
+        } else if (MATCH(cmd, "divide")) {
             cmd_divide(cmd, state);
-        } else if (!strncmp(cmd, "eval", 4)) {
+        } else if (MATCH(cmd, "eval")) {
             cmd_eval(state);
-        } else if (!strncmp(cmd, "perft", 5)) {
+        } else if (MATCH(cmd, "perft")) {
             cmd_perft(cmd, state);
-        } else if (!strncmp(cmd, "quiet", 5)) {
+        } else if (MATCH(cmd, "quiet")) {
             cmd_quiet(state);
-        } else if (!strncmp(cmd, "bench", 5)) {
+        } else if (MATCH(cmd, "bench")) {
             cmd_bench();
         } else {
             handled = false;
