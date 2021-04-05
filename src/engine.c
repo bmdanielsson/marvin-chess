@@ -173,6 +173,15 @@ static void cmd_quiet(struct gamestate *state)
     printf("\n");
 }
 
+/*
+ * Custom command
+ * Syntax: bench
+ */
+static void cmd_bench(void)
+{
+    test_run_benchmark();
+}
+
 void engine_loop(struct gamestate *state)
 {
     char *cmd;
@@ -209,6 +218,8 @@ void engine_loop(struct gamestate *state)
             cmd_perft(cmd, state);
         } else if (!strncmp(cmd, "quiet", 5)) {
             cmd_quiet(state);
+        } else if (!strncmp(cmd, "bench", 5)) {
+            cmd_bench();
         } else {
             handled = false;
         }

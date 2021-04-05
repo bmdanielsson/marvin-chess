@@ -17,6 +17,12 @@ When started Marvin looks for a configuration file called marvin.ini in the same
 
 Additionally Marvin looks for a file called book.bin in the same directory as the executable. The book.bin file should be an opening book file in Polyglot format.
 
+### Binaries
+
+Pre-built binaries for Windows and Linux are included with each release. A few different builds are provided for each platform. On most computers the -avx2 build will be the fastest followed by -modern. However it may not work on all computers. The -modern build should work on all computers except very old ones.
+
+To compare the builds run Marvin in a terminal (or double-click on the exe-file in Windows) and run the 'bench' command. This will run a single-threaded benchmark and print out some statistics. The benchmark can also be run by starting Marvin with the '-b' option.
+
 ### Building
 
 The easiest way to build Marvin is to use the included Makefile and just run `make`. This should produce a binary that is compatible with most systems. The default compiler is Clang, but if you want to use GCC instead run `make CC=gcc`. However if you plan on using NNUE I highly recommend using Clang since a GCC build will be almost 100 ELO weaker. For more information about available targets and build options run `make help`.

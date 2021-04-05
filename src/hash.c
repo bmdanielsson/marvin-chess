@@ -40,6 +40,7 @@
 
 /* Main transposition table */
 static struct tt_bucket *transposition_table = NULL;
+static int tt_size_in_mb = 0;
 static uint64_t tt_size = 0ULL;
 static uint8_t tt_date = 0;
 
@@ -86,12 +87,18 @@ int hash_tt_max_size(void)
 	return is64bit()?MAX_MAIN_HASH_SIZE_64BIT:MAX_MAIN_HASH_SIZE_32BIT;
 }
 
+int hash_tt_size(void)
+{
+    return tt_size_in_mb;
+}
+
 void hash_tt_create_table(int size)
 {
-	assert((size >= MIN_MAIN_HASH_SIZE) && (size <= hash_tt_max_size()));
+    assert((size >= MIN_MAIN_HASH_SIZE) && (size <= hash_tt_max_size()));
 	
     hash_tt_destroy_table();
 
+    tt_size_in_mb = size;
     allocate_tt(size);
     hash_tt_clear_table();
 }
@@ -100,6 +107,7 @@ void hash_tt_destroy_table(void)
 {
     aligned_free(transposition_table);
     transposition_table = NULL;
+    tt_size_in_mb = 0;
     tt_size = 0ULL;
     tt_date = 0;
 }

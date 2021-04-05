@@ -37,6 +37,13 @@ enum {
 int hash_tt_max_size(void);
 
 /*
+ * Get the size of the transposition table size.
+ *
+ * @return Returns the size (in MB).
+ */
+int hash_tt_size(void);
+
+/*
  * Create the main transposition table.
  *
  * @param size The amount of memory to use for the table (in MB).

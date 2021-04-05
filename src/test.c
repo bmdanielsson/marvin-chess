@@ -150,7 +150,18 @@ void test_run_benchmark(void)
     uint64_t         nodes;
     time_t           start;
     time_t           total;
+    int              nworkers;
+    int              tt_size;
 
+    printf("%s %s (%s)\n", APP_NAME, APP_VERSION, APP_ARCH);
+    if (engine_using_nnue) {
+        printf("Using NNUE evaluation with %s\n", engine_eval_file);
+    } else {
+        printf("Using classic evaluation\n");
+    }
+
+    nworkers = smp_number_of_workers();
+    tt_size = hash_tt_size();
     hash_tt_destroy_table();
     hash_tt_create_table(DEFAULT_MAIN_HASH_SIZE);
     smp_destroy_workers();
@@ -183,4 +194,9 @@ void test_run_benchmark(void)
     printf("Speed: %.2fkN/s\n", ((double)nodes)/(total/1000.0)/1000);
 
     destroy_game_state(state);
+
+    hash_tt_destroy_table();
+    hash_tt_create_table(tt_size);
+    smp_destroy_workers();
+    smp_create_workers(nworkers);
 }
