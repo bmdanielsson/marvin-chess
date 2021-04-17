@@ -246,16 +246,6 @@ static bool probe_wdl_tables(struct search_worker *worker, int alpha, int beta,
     return cutoff;
 }
 
-static void copy_pv(struct movelist *from, struct movelist *to)
-{
-    int k;
-
-    to->size = from->size;
-    for (k=0;k<from->size;k++) {
-        to->moves[k] = from->moves[k];
-    }
-}
-
 static void update_pv(struct search_worker *worker, uint32_t move)
 {
     struct position *pos;

@@ -535,8 +535,8 @@ struct gamestate {
     /* Information about the best move */
     uint32_t best_move;
     uint32_t ponder_move;
-    /* Information about the highest completed depth */
-    int completed_depth;
+    /* PV information for the highest completed depth */
+    struct pvinfo completed;
     /* The number of lines to search */
     int multipv;
 };
@@ -697,5 +697,13 @@ void move2str(uint32_t move, char *str);
  * @return Returns the move in our internal representation.
  */
 uint32_t str2move(char *str, struct position *pos);
+
+/*
+ * Copy a principle variation.
+ *
+ * @param from The source pv.
+ * @param to The destination pv.
+ */
+void copy_pv(struct movelist *from, struct movelist *to);
 
 #endif

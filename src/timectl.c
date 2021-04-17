@@ -149,7 +149,7 @@ bool tc_check_time(struct search_worker *worker)
      * limit in the hope that the iteration can be finished.
      */
     if (worker->resolving_root_fail &&
-        (worker->depth > worker->state->completed_depth)) {
+        (worker->depth > worker->state->completed.depth)) {
         return get_current_time() < hard_time_limit;
     } else {
         return get_current_time() < soft_time_limit;

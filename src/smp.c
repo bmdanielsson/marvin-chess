@@ -281,7 +281,10 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     state->root_tb_score = 0;
     state->pondering = pondering;
     state->pos.sply = 0;
-    state->completed_depth = 0;
+    state->completed.score = -INFINITE_SCORE;
+    state->completed.pv.size = 0;
+    state->completed.depth = 0;
+    state->completed.seldepth = 0;
 
     /* Probe tablebases for the root position */
     if (use_tablebases &&
@@ -431,8 +434,11 @@ int smp_complete_iteration(struct search_worker *worker)
      * If this is the first time completing this depth then
      * update the completed_depth counter.
      */
-    if (worker->depth > worker->state->completed_depth) {
-        worker->state->completed_depth = worker->depth;
+    if (worker->depth > worker->state->completed.depth) {
+        worker->state->completed.depth = worker->depth;
+        worker->state->completed.seldepth = worker->seldepth;
+        worker->state->completed.score = worker->mpv_lines[0].score;
+        copy_pv(&worker->mpv_lines[0].pv, &worker->state->completed.pv);
     }
 
     /*
