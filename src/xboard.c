@@ -914,34 +914,36 @@ bool xboard_check_input(struct search_worker *worker)
     return stop;
 }
 
-void xboard_send_pv_info(struct search_worker *worker,  int score)
+void xboard_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
 {
-	char            buffer[1024];
-	int             k;
-	char            movestr[MAX_MOVESTR_LENGTH];
-	uint32_t        msec;
+    char            buffer[1024];
+    int             k;
+    char            movestr[MAX_MOVESTR_LENGTH];
+    uint32_t        msec;
     struct movelist *pv;
+    int             score;
 
-	/* Only display thinking in post mode */
-	if (!post_mode) {
-		return;
+    /* Only display thinking in post mode */
+    if (!post_mode) {
+        return;
     }
 
     /* Adjust score in case the root position was found in tablebases */
-    if (worker->state->root_in_tb) {
+    score = pvinfo->score;
+    if (state->root_in_tb) {
         score = ((score > FORCED_MATE) || (score < (-FORCED_MATE)))?
-                                            score:worker->state->root_tb_score;
+                                                    score:state->root_tb_score;
     }
 
-	/* Display thinking according to the current output mode */
-	msec = tc_elapsed_time();
-	sprintf(buffer, "%3d %6d %7d %9"PRIu64"", worker->mpv_lines[0].depth,
+    /* Display thinking according to the current output mode */
+    msec = tc_elapsed_time();
+    sprintf(buffer, "%3d %6d %7d %9"PRIu64"", pvinfo->depth,
             score, msec/10, smp_nodes());
-    pv = &worker->pv_table[0];
-	for (k=0;k<pv->size;k++) {
-		strcat(buffer, " ");
+    pv = &pvinfo->pv;
+    for (k=0;k<pv->size;k++) {
+        strcat(buffer, " ");
         move2str(pv->moves[k], movestr);
-		strcat(buffer, movestr);
-	}
-	engine_write_command(buffer);
+        strcat(buffer, movestr);
+    }
+    engine_write_command(buffer);
 }

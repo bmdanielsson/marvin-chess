@@ -43,9 +43,9 @@ bool xboard_check_input(struct search_worker *worker);
 /*
  * Send information about the principle variation.
  *
- * @param worker The worker
- * @param score The PV score.
+ * @param state The game state.
+ * @param pvinfo The pv.
  */
-void xboard_send_pv_info(struct search_worker *worker, int score);
+void xboard_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo);
 
 #endif

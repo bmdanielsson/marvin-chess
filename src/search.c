@@ -1000,7 +1000,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 worker->mpv_lines[worker->mpvidx].depth = worker->depth;
                 worker->mpv_lines[worker->mpvidx].seldepth = worker->seldepth;
                 if ((worker->id == 0) && (worker->multipv == 1)) {
-                    engine_send_pv_info(worker, score);
+                    engine_send_pv_info(worker->state, &worker->mpv_lines[0]);
                 }
             }
         }

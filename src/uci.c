@@ -509,7 +509,7 @@ bool uci_check_input(struct search_worker *worker)
     return stop;
 }
 
-void uci_send_pv_info(struct search_worker *worker, int score)
+void uci_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
 {
     char     movestr[MAX_MOVESTR_LENGTH];
     char     buffer[1024];
@@ -518,27 +518,29 @@ void uci_send_pv_info(struct search_worker *worker, int score)
     int      k;
     uint64_t tbhits;
     uint64_t nodes;
+    int      score;
 
     /* Get information about the search */
     msec = (int)tc_elapsed_time();
     nodes = smp_nodes();
     nps = (msec > 0)?(nodes/msec)*1000:0;
-    tbhits = worker->state->root_in_tb?1:smp_tbhits();
+    tbhits = state->root_in_tb?1:smp_tbhits();
 
     /* Adjust score in case the root position was found in tablebases */
-    if (worker->state->root_in_tb) {
+    score = pvinfo->score;
+    if (state->root_in_tb) {
         score = ((score > FORCED_MATE) || (score < (-FORCED_MATE)))?
-                                            score:worker->state->root_tb_score;
+                                                    score:state->root_tb_score;
     }
 
     /* Build command */
     sprintf(buffer, "info depth %d seldepth %d nodes %"PRIu64" time %d nps %d "
             "tbhits %"PRIu64" hashfull %d score cp %d pv",
-            worker->mpv_lines[0].depth, worker->mpv_lines[0].seldepth,
+            pvinfo->depth, pvinfo->seldepth,
             nodes, msec, nps, tbhits, hash_tt_usage(), score);
-    for (k=0;k<worker->mpv_lines[0].pv.size;k++) {
+    for (k=0;k<pvinfo->pv.size;k++) {
         strcat(buffer, " ");
-        move2str(worker->mpv_lines[0].pv.moves[k], movestr);
+        move2str(pvinfo->pv.moves[k], movestr);
         strcat(buffer, movestr);
     }
 

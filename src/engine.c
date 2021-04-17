@@ -321,16 +321,16 @@ bool engine_wait_for_input(struct search_worker *worker)
     return false;
 }
 
-void engine_send_pv_info(struct search_worker *worker, int score)
+void engine_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
 {
-    if (worker->state->silent) {
+    if (state->silent) {
         return;
     }
 
     if (engine_protocol == PROTOCOL_UCI) {
-        return uci_send_pv_info(worker, score);
+        return uci_send_pv_info(state, pvinfo);
     } else if (engine_protocol == PROTOCOL_XBOARD) {
-        return xboard_send_pv_info(worker, score);
+        return xboard_send_pv_info(state, pvinfo);
     }
 }
 

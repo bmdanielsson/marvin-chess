@@ -43,15 +43,15 @@ bool uci_check_input(struct search_worker *worker);
 /*
  * Send information about the principle variation.
  *
- * @param worker The worker
- * @param score The PV score.
+ * @param state The game state.
+ * @param pvinfo The pv.
  */
-void uci_send_pv_info(struct search_worker *worker, int score);
+void uci_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo);
 
 /*
  * Send information about score bound during search.
  *
- * @param worker The worker
+ * @param worker The worker.
  * @param score The score.
  * @param lower Flag indicating a lower or upper bound.
  */

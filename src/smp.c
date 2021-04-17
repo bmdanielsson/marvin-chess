@@ -366,7 +366,7 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
      * an extra pv line to the GUI.
      */
     if (best->id != 0) {
-        engine_send_pv_info(best, best->mpv_lines[0].score);
+        engine_send_pv_info(best->state, &best->mpv_lines[0]);
     }
 
     /* Copy the best move to the state struct */
