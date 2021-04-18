@@ -247,7 +247,9 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     int                  k;
     struct search_worker *worker;
     struct search_worker *best;
+    struct pvinfo        *best_pv;
     struct movelist      legal;
+    bool                 send_pv;
 
     assert(valid_position(&state->pos));
     assert(number_of_workers > 0);
@@ -353,13 +355,21 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
 
     /* Find the worker with the best move */
     best = &workers[0];
+    best_pv = &best->mpv_lines[0];
+    send_pv = false;
     if (state->multipv == 1) {
-        for (k=1;k<number_of_workers;k++) {
-            worker = &workers[k];
-            if ((worker->mpv_lines[0].depth > best->mpv_lines[0].depth) ||
-                ((worker->mpv_lines[0].depth == best->mpv_lines[0].depth) &&
-                (worker->mpv_lines[0].score > best->mpv_lines[0].score))) {
-                best = worker;
+        if (best->state->completed.depth > best->mpv_lines[0].depth) {
+            best_pv = &best->state->completed;
+            send_pv = true;
+        } else {
+            for (k=1;k<number_of_workers;k++) {
+                worker = &workers[k];
+                if ((worker->mpv_lines[0].depth == best->mpv_lines[0].depth) &&
+                    (worker->mpv_lines[0].score > best->mpv_lines[0].score)) {
+                    best = worker;
+                    best_pv = &best->mpv_lines[0];
+                    send_pv = true;
+                }
             }
         }
     }
@@ -368,15 +378,15 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
      * If the best worker is not the first worker then send
      * an extra pv line to the GUI.
      */
-    if (best->id != 0) {
-        engine_send_pv_info(best->state, &best->mpv_lines[0]);
+    if (send_pv) {
+        engine_send_pv_info(best->state, best_pv);
     }
 
     /* Copy the best move to the state struct */
     if (best->mpv_moves[0] != NOMOVE) {
-        best->state->best_move = best->mpv_moves[0];
-        best->state->ponder_move = (best->mpv_lines[0].pv.size > 1)?
-                                    best->mpv_lines[0].pv.moves[1]:NOMOVE;
+        best->state->best_move = best_pv->pv.moves[0];
+        best->state->ponder_move = (best_pv->pv.size > 1)?
+                                                best_pv->pv.moves[1]:NOMOVE;
     }
 
     /* Reset move filter since it's not needed anymore */
@@ -434,7 +444,8 @@ int smp_complete_iteration(struct search_worker *worker)
      * If this is the first time completing this depth then
      * update the completed_depth counter.
      */
-    if (worker->depth > worker->state->completed.depth) {
+    if ((worker->depth > worker->state->completed.depth) &&
+        (worker->mpv_lines[0].pv.size >= 1)) {
         worker->state->completed.depth = worker->depth;
         worker->state->completed.seldepth = worker->seldepth;
         worker->state->completed.score = worker->mpv_lines[0].score;
