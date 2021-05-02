@@ -30,6 +30,7 @@
 #include "nnue.h"
 #include "utils.h"
 #include "bitboard.h"
+#include "simd.h"
 
 /* Parameters for validating the network file */
 #define NET_VERSION 0x00000001
@@ -98,6 +99,9 @@ static uint32_t piece2index[NSIDES][NPIECES];
 static void layer_propagate(int16_t *input, int32_t *output, int ninputs,
                             int noutputs, int32_t *biases, int16_t *weights)
 {
+#ifdef USE_SIMD
+    simd_layer_propagate(input, output, ninputs, noutputs, biases, weights);
+#else
     int k = 0;
     int l = 0;
 
@@ -112,6 +116,7 @@ static void layer_propagate(int16_t *input, int32_t *output, int ninputs,
             output[k] += (input[l]*weights[k*ninputs+l]);
         }
     }
+#endif
 }
 
 static void layer_activate(int32_t *input, int16_t *output, uint32_t ndims)

@@ -31,6 +31,8 @@ ifeq ($(arch), x86-64-modern)
     popcnt = yes
     openmp = yes
     APP_ARCH = \"x86-64-modern\"
+    CPPFLAGS += -DUSE_SIMD
+    CPPFLAGS += -DUSE_SSE
 else
 ifeq ($(arch), x86-64-avx2)
     sse = yes
@@ -41,6 +43,8 @@ ifeq ($(arch), x86-64-avx2)
     popcnt = yes
     openmp = yes
     APP_ARCH = \"x86-64-avx2\"
+    CPPFLAGS += -DUSE_SIMD
+    CPPFLAGS += -DUSE_AVX2
 endif
 endif
 endif
@@ -153,6 +157,7 @@ SOURCES = src/bitboard.c \
           src/polybook.c \
           src/search.c \
           src/see.c \
+          src/simd.c \
           src/smp.c \
           src/test.c \
           src/thread.c \
@@ -179,6 +184,7 @@ TUNER_SOURCES = src/bitboard.c \
                 src/polybook.c \
                 src/search.c \
                 src/see.c \
+                src/simd.c \
                 src/smp.c \
                 src/test.c \
                 src/thread.c \
