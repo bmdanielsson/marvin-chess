@@ -246,7 +246,6 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
 {
     int                  k;
     struct search_worker *worker;
-    struct search_worker *best;
     struct pvinfo        *best_pv;
     struct movelist      legal;
     bool                 send_pv;
@@ -354,20 +353,20 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     }
 
     /* Find the worker with the best move */
-    best = &workers[0];
-    best_pv = &best->mpv_lines[0];
+    worker = &workers[0];
+    best_pv = &worker->mpv_lines[0];
     send_pv = false;
     if (state->multipv == 1) {
-        if (best->state->completed.depth > best->mpv_lines[0].depth) {
-            best_pv = &best->state->completed;
+        if (state->completed.depth > best_pv->depth) {
+            best_pv = &state->completed;
             send_pv = true;
         } else {
             for (k=1;k<number_of_workers;k++) {
                 worker = &workers[k];
-                if ((worker->mpv_lines[0].depth == best->mpv_lines[0].depth) &&
-                    (worker->mpv_lines[0].score > best->mpv_lines[0].score)) {
-                    best = worker;
-                    best_pv = &best->mpv_lines[0];
+                if ((worker->mpv_lines[0].pv.size >= 1) &&
+                    (worker->mpv_lines[0].depth == best_pv->depth) &&
+                    (worker->mpv_lines[0].score > best_pv->score)) {
+                    best_pv = &worker->mpv_lines[0];
                     send_pv = true;
                 }
             }
@@ -379,13 +378,13 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
      * an extra pv line to the GUI.
      */
     if (send_pv) {
-        engine_send_pv_info(best->state, best_pv);
+        engine_send_pv_info(state, best_pv);
     }
 
     /* Copy the best move to the state struct */
-    if (best->mpv_moves[0] != NOMOVE) {
-        best->state->best_move = best_pv->pv.moves[0];
-        best->state->ponder_move = (best_pv->pv.size > 1)?
+    if (best_pv->pv.size >= 1) {
+        state->best_move = best_pv->pv.moves[0];
+        state->ponder_move = (best_pv->pv.size > 1)?
                                                 best_pv->pv.moves[1]:NOMOVE;
     }
 
