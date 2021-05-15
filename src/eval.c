@@ -950,9 +950,11 @@ int eval_evaluate(struct position *pos)
     /* Check if NNUE or classic eval should be used */
     if (engine_using_nnue) {
         int score = 0;
-        if (!hash_nnue_lookup(pos->worker, &score)) {
+        if ((pos->worker == NULL) || !hash_nnue_lookup(pos->worker, &score)) {
             score = nnue_evaluate(pos);
-            hash_nnue_store(pos->worker, score);
+            if (pos->worker != NULL) {
+                hash_nnue_store(pos->worker, score);
+            }
         }
         pos->eval_stack[pos->sply].score = score;
         return score;
