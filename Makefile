@@ -128,7 +128,7 @@ endif
 CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
 
 # Extra include directories
-CFLAGS += -Iimport/cfish -Iimport/fathom -Isrc
+CFLAGS += -Iimport/fathom -Isrc
 
 # Enable evaluation tracing for tuner
 ifeq ($(MAKECMDGOALS), tuner)
