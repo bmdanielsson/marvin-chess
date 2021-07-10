@@ -937,7 +937,7 @@ static void do_eval(struct position *pos, struct eval *eval)
     evaluate_threats(pos, eval, BLACK);
 }
 
-int eval_evaluate(struct position *pos)
+int eval_evaluate(struct position *pos, bool force_hce)
 {
     struct eval eval;
     int         k;
@@ -948,7 +948,7 @@ int eval_evaluate(struct position *pos)
     assert(valid_position(pos));
 
     /* Check if NNUE or classic eval should be used */
-    if (engine_using_nnue) {
+    if (engine_using_nnue && !force_hce) {
         int nnue_score = 0;
         if ((pos->worker == NULL) ||
             !hash_nnue_lookup(pos->worker, &nnue_score)) {

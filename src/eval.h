@@ -25,10 +25,11 @@
  * Evaluate the position and assign a static score to it.
  *
  * @param pos The position.
+ * @param force_hce Force evaluation using HCE.
  * @return Returns the score assigned to the position from the side
  *         to move point of view.
  */
-int eval_evaluate(struct position *pos);
+int eval_evaluate(struct position *pos, bool force_hce);
 
 /*
  * Initialize incrementally updated features that only depend on pieces

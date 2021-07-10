@@ -354,7 +354,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     }
 
     /* Evaluate the position */
-    static_score = eval_evaluate(pos);
+    static_score = eval_evaluate(pos, false);
 
     /* If we have reached the maximum depth then we stop */
     if (pos->sply >= (MAX_PLY-1)) {
@@ -544,7 +544,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * Evaluate the position in order to get a score
      * to use for pruning decisions.
      */
-    static_score = tt_found?tt_item.eval_score:eval_evaluate(pos);
+    static_score = tt_found?tt_item.eval_score:eval_evaluate(pos, false);
     pos->eval_stack[pos->sply].score = static_score;
     bool improving = (pos->sply >= 2 &&
                     static_score > pos->eval_stack[pos->sply-2].score);
@@ -903,7 +903,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     in_check = board_in_check(pos, pos->stm);
 
     /* Trigger an update of the evaluation stack */
-    (void)eval_evaluate(pos);
+    (void)eval_evaluate(pos, false);
 
     /* Search all moves */
     quiets.size = 0;
@@ -1003,7 +1003,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
 
     /* Store the result for this node in the transposition table */
     hash_tt_store(pos, best_move, depth, best_score, tt_flag,
-                  eval_evaluate(pos));
+                  eval_evaluate(pos, false));
 
     return best_score;
 }
