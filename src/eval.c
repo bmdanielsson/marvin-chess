@@ -947,6 +947,14 @@ int eval_evaluate(struct position *pos, bool force_hce)
 
     assert(valid_position(pos));
 
+    /*
+     * If no player have enough material left
+     * to checkmate then it's a draw.
+     */
+    if (eval_is_material_draw(pos)) {
+        return 0;
+    }
+
     /* Check if NNUE or classic eval should be used */
     if (engine_using_nnue && !force_hce) {
         int nnue_score = 0;
@@ -959,14 +967,6 @@ int eval_evaluate(struct position *pos, bool force_hce)
         }
         pos->eval_stack[pos->sply].score = nnue_score;
         return nnue_score;
-    }
-
-    /*
-     * If no player have enough material left
-     * to checkmate then it's a draw.
-     */
-    if (eval_is_material_draw(pos)) {
-        return 0;
     }
 
     /* Evaluate the position */
