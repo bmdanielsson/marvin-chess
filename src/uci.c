@@ -428,7 +428,7 @@ static void uci_cmd_uci(struct gamestate *state)
                        "option name LogLevel type spin default %d min 0 max %d",
                         dbg_get_log_level(), LOG_HIGHEST_LEVEL);
     engine_write_command("option name UseNNUE type check default %s",
-                         engine_using_nnue?"true":"false");
+                         engine_using_nnue && engine_loaded_net?"true":"false");
     engine_write_command("option name EvalFile type string default %s",
                          engine_eval_file[0] != '\0'?
                                                 engine_eval_file:"<empty>");
@@ -658,7 +658,7 @@ void uci_send_multipv_info(struct search_worker *worker)
 
 void uci_send_eval_info(void)
 {
-    if (!engine_using_nnue) {
+    if (!engine_using_nnue || !engine_loaded_net) {
         engine_write_command("info string Using classic evaluation");
     } else {
         engine_write_command("info string Using NNUE evaluation with %s",

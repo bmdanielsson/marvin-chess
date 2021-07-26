@@ -120,7 +120,7 @@ static void cmd_eval(struct gamestate *state)
     phase = eval_game_phase(&state->pos);
     hce_score = eval_evaluate(&state->pos, true);
 
-    if (engine_using_nnue) {
+    if (engine_using_nnue && engine_loaded_net) {
         nnue_score = eval_evaluate(&state->pos, false);
         printf("Phase: %d, HCE: %d, NNUE: %d\n", phase,
                state->pos.stm == WHITE?hce_score:-hce_score,
