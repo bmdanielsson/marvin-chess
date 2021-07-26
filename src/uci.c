@@ -639,6 +639,9 @@ void uci_send_multipv_info(struct search_worker *worker)
 
     /* Write one info command for each pv line */
     for (k=0;k<worker->multipv;k++) {
+        if (sorted_mpv_lines[k].depth == 0) {
+            continue;
+        }
         sprintf(buffer, "info multipv %d depth %d seldepth %d nodes %"PRIu64" "
                 "time %d nps %d tbhits %"PRIu64" hashfull %d score cp %d pv",
                 k+1, sorted_mpv_lines[k].depth, sorted_mpv_lines[k].seldepth,
