@@ -33,7 +33,7 @@
 #include "simd.h"
 
 /* Parameters for validating the network file */
-#define NET_VERSION 0x00000001
+#define NET_VERSION 0x00000002
 #define NET_SIZE \
     (                                                           \
     4                   +                                       \
@@ -45,7 +45,7 @@
 
 /* Parameters describing the network architecture */
 #define HALF_DIMS 128
-#define FEATURE_IN_DIMS 64*(64*10 + 1)
+#define FEATURE_IN_DIMS 64*64*10
 #define FEATURE_OUT_DIMS HALF_DIMS*2
 #define MAX_ACTIVE_FEATURES 30
 #define HIDDEN_LAYER_SIZE 32
@@ -132,9 +132,8 @@ static void layer_activate(int32_t *input, int16_t *output, uint32_t ndims)
 
 static int transform_square(int sq, int side)
 {
-    /* For black the board is rotated 180 degrees */
     if (side == BLACK) {
-        sq = SQUARE(7-FILENR(sq), 7-RANKNR(sq));
+        sq = MIRROR(sq);
     }
     return sq;
 }
@@ -142,7 +141,7 @@ static int transform_square(int sq, int side)
 static int calculate_feature_index(int sq, int piece, int king_sq, int side)
 {
     sq = transform_square(sq, side);
-    return sq + piece2index[side][piece] + (KING*NSQUARES+1)*king_sq;
+    return sq + piece2index[side][piece] + KING*NSQUARES*king_sq;
 }
 
 static void find_active_features(struct position *pos, int side,
@@ -469,10 +468,10 @@ void nnue_init(void)
     int piece;
 
     for (piece=0;piece<KING;piece+=2) {
-        piece2index[WHITE][piece] = piece*NSQUARES + 1;
-        piece2index[WHITE][piece+1] = (piece+1)*NSQUARES + 1;
-        piece2index[BLACK][piece] = (piece+1)*NSQUARES + 1;
-        piece2index[BLACK][piece+1] = piece*NSQUARES + 1;
+        piece2index[WHITE][piece] = piece*NSQUARES;
+        piece2index[WHITE][piece+1] = (piece+1)*NSQUARES;
+        piece2index[BLACK][piece] = (piece+1)*NSQUARES;
+        piece2index[BLACK][piece+1] = piece*NSQUARES;
     }
 }
 

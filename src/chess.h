@@ -143,7 +143,7 @@ enum {
  * Calculate the mirrored version of a square. For instance the
  * mirrored version of A1 is A8.
  */
-#define MIRROR(sq) mirror_table[(sq)]
+#define MIRROR(sq) ((sq)^56)
 
 /* The rank of the square */
 #define RANKNR(sq) ((sq)>>3)
@@ -640,9 +640,6 @@ extern int sq2diag_a1h8[NSQUARES];
 
 /* Table mapping a square to an A8H1 diagonal index */
 extern int sq2diag_a8h1[NSQUARES];
-
-/* Table used for mirroring squares */
-extern int mirror_table[NSQUARES];
 
 /* Table containing the square color for all squares on the chess table */
 extern int sq_color[NSQUARES];

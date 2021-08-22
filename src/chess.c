@@ -80,8 +80,6 @@ int sq2diag_a8h1[NSQUARES] = {
     7, 8, 9, 10, 11, 12, 13, 14
 };
 
-int mirror_table[NSQUARES];
-
 int sq_color[NSQUARES] = {
     BLACK, WHITE, BLACK, WHITE, BLACK, WHITE, BLACK, WHITE,
     WHITE, BLACK, WHITE, BLACK, WHITE, BLACK, WHITE, BLACK,
@@ -198,13 +196,6 @@ void chess_data_init(void)
         for (l=0;l<NRANKS;l++) {
             file_mask[k] |= sq_mask[SQUARE(k, l)];
         }
-    }
-
-    /* Initialize mirror table */
-    for(k=0;k<NSQUARES;k++) {
-        rank = RANKNR(k);
-        file = FILENR(k);
-        mirror_table[k] = SQUARE(file, 7-rank);
     }
 
     /* Initialize the A1H8 diagonal masks */
