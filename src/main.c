@@ -72,13 +72,6 @@ static void read_config_file(void)
             tb_init(engine_syzygy_path);
         } else if (sscanf(line, "NUM_THREADS=%d", &int_val) == 1) {
             engine_default_num_threads = CLAMP(int_val, 1, MAX_WORKERS);
-        } else if (strstr(line, "EVAL_FILE=") != NULL) {
-            engine_using_nnue = false;
-            engine_eval_file[0] = '\0';
-            if (sscanf(line, "EVAL_FILE=%s", engine_eval_file) == 1) {
-                engine_loaded_net = nnue_load_net(engine_eval_file);
-                engine_using_nnue = engine_loaded_net;
-            }
         }
 
         /* Next line */

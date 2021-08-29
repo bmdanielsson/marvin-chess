@@ -13,7 +13,6 @@ When started Marvin looks for a configuration file called marvin.ini in the same
 * LOG_LEVEL: The log level. If set to 2 the engine will log all commands that are sent and received.
 * SYZYGY_PATH: Path to where the Syzygy tablebases are located.
 * NUM_THREADS: The number of threads to use for searching.
-* EVAL_FILE: Path to network for NNUE evaluation.
 
 Additionally Marvin looks for a file called book.bin in the same directory as the executable. The book.bin file should be an opening book file in Polyglot format.
 
