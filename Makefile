@@ -234,6 +234,7 @@ help :
 	@echo "Supported targets:"
 	@echo "  marvin: Build the engine (default target)."
 	@echo "  tuner: Build the tuner program."
+	@echo "  net: Fetch the default NNUE net."
 	@echo "  help: Display this message."
 	@echo "  clean: Remove all intermediate files."
 	@echo ""
@@ -250,3 +251,6 @@ marvin : $(OBJECTS)
 
 tuner : $(TUNER_OBJECTS)
 	$(CC) $(TUNER_OBJECTS) $(LDFLAGS) -o tuner
+
+net :
+	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v2/$(nnuenet)
