@@ -1,7 +1,9 @@
-# Default configuration
+# Default build configuration
 arch = x86-64-modern
 trace = no
 variant = release
+version = 5.1.0
+nnuenet = net-f2a8e0f.nnue
 
 # Default options
 sse = no
@@ -53,6 +55,8 @@ endif
 # Common flags
 ARCH += -m64
 CPPFLAGS += -DAPP_ARCH=$(APP_ARCH)
+CPPFLAGS += -DNETFILE_NAME=\"$(nnuenet)\"
+CPPFLAGS += -DAPP_VERSION=\"$(version)\"
 CFLAGS += -m64 -DIS_64BIT
 LDFLAGS += -m64
 
@@ -234,9 +238,11 @@ help :
 	@echo "  clean: Remove all intermediate files."
 	@echo ""
 	@echo "Supported options:"
-	@echo "  arch=[generic-64|x86-64|x86-64-modern|x86-64-avx2]: The architecture to build for."
-	@echo "  trace=[yes|no]: Include support for tracing the evaluation (default no)."
+	@echo "  arch=[generic-64|x86-64|x86-64-modern|x86-64-avx2]: The architecture to build."
+	@echo "  trace=[yes|no]: Include support for tracing the evaluation."
 	@echo "  variant=[release|debug|profile]: The variant to build."
+	@echo "  version=<version>: Override the default version number."
+	@echo "  nnuenet=<file>: Override the default NNUE net."
 .PHONY : help
 
 marvin : $(OBJECTS)

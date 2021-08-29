@@ -20,7 +20,6 @@
 
 /* Version information */
 #define APP_NAME "Marvin"
-#define APP_VERSION "5.1.0"
 #define APP_AUTHOR "Martin Danielsson"
 
 /* The name of the log file */
@@ -49,11 +48,5 @@
 
 /* The name of the configuration file */
 #define CONFIGFILE_NAME "marvin.ini"
-
-/*
- * The name of the default net file
- * SHA-1: f2a8e0fcf797b85a7d8c568e5d9a71034aebc371
- */
-#define NETFILE_NAME "net-f2a8e0f.nnue"
 
 #endif
