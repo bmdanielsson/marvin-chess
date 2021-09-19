@@ -20,6 +20,8 @@
 #include <stdalign.h>
 #ifdef USE_SSE
 #include <emmintrin.h>
+#include <tmmintrin.h>
+#include <smmintrin.h>
 #endif
 #ifdef USE_AVX2
 #include <immintrin.h>
@@ -35,12 +37,14 @@ static int32_t hsum_4x32(__m128i v)
     return _mm_cvtsi128_si32(v);
 }
 
-void simd_layer_propagate(int16_t *input, int32_t *output, int ninputs,
-                          int noutputs, int32_t *biases, int16_t *weights)
+void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
+                         int noutputs, int32_t *biases, int8_t *weights)
 {
     int k;
     int l;
-    int niterations = ninputs/8;
+    int niterations = ninputs/16;
+
+    __m128i c1 = _mm_set1_epi16(1);
 
     for (k=0;k<noutputs;k++) {
         output[k] = biases[k];
@@ -52,7 +56,9 @@ void simd_layer_propagate(int16_t *input, int32_t *output, int ninputs,
         for (l=0;l<niterations;l++) {
             __m128i v1 = _mm_load_si128(p1);
             __m128i v2 = _mm_load_si128(p2);
-            __m128i temp = _mm_madd_epi16(v1, v2);
+
+            __m128i temp = _mm_maddubs_epi16(v1, v2);
+            temp = _mm_madd_epi16(temp, c1);
             vsum = _mm_add_epi32(vsum, temp);
 
             p1++;
@@ -72,28 +78,33 @@ static int32_t hsum_8x32(__m256i v)
     return _mm256_extract_epi32(v, 0) + _mm256_extract_epi32(v, 4);
 }
 
-void simd_layer_propagate(int16_t *input, int32_t *output, int ninputs,
-                          int noutputs, int32_t *biases, int16_t *weights)
+void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
+                         int noutputs, int32_t *biases, int8_t *weights)
 {
     int k;
     int l;
-    int niterations = ninputs/16;
+    int niterations = ninputs/32;
+
+    __m256i c1 = _mm256_set1_epi16(1);
 
     for (k=0;k<noutputs;k++) {
         output[k] = biases[k];
 
         __m256i vsum = _mm256_setzero_si256();
-        __m256i *p1 = (__m256i*)input;
-        __m256i *p2 = (__m256i*)&weights[k*ninputs];
+        __m256i *pi = (__m256i*)input;
+        __m256i *pw = (__m256i*)&weights[k*ninputs];
 
         for (l=0;l<niterations;l++) {
-            __m256i v1 = _mm256_load_si256(p1);
-            __m256i v2 = _mm256_load_si256(p2);
-            __m256i temp = _mm256_madd_epi16(v1, v2);
-            vsum = _mm256_add_epi32(vsum, temp);
+            __m256i v1 = _mm256_load_si256(pi);
+            __m256i v2 = _mm256_load_si256(pw);
 
-            p1++;
-            p2++;
+            __m256i t1 = _mm256_maddubs_epi16(v1, v2);
+            __m256i t2 = _mm256_madd_epi16(t1, c1);
+
+            vsum = _mm256_add_epi32(vsum, t2);
+
+            pi++;
+            pw++;
         }
 
         output[k] += hsum_8x32(vsum);

@@ -62,9 +62,9 @@
  * The network consists of a set of hidden layers and an output layer with
  * a single neuron.
  */
-static alignas(64) int16_t hidden1_weights[HIDDEN_LAYER_SIZE*FEATURE_OUT_DIMS];
-static alignas(64) int16_t hidden2_weights[HIDDEN_LAYER_SIZE*HIDDEN_LAYER_SIZE];
-static alignas(64) int16_t output_weights[HIDDEN_LAYER_SIZE];
+static alignas(64) int8_t hidden1_weights[HIDDEN_LAYER_SIZE*FEATURE_OUT_DIMS];
+static alignas(64) int8_t hidden2_weights[HIDDEN_LAYER_SIZE*HIDDEN_LAYER_SIZE];
+static alignas(64) int8_t output_weights[HIDDEN_LAYER_SIZE];
 static alignas(64) int32_t hidden1_biases[HIDDEN_LAYER_SIZE];
 static alignas(64) int32_t hidden2_biases[HIDDEN_LAYER_SIZE];
 static alignas(64) int32_t output_biases[OUTPUT_LAYER_SIZE];
@@ -76,11 +76,11 @@ static alignas(64) int16_t feature_weights[HALF_DIMS*FEATURE_IN_DIMS];
  * calculations in a forward propagation pass.
  */
 struct net_data {
-    alignas(64) int16_t input[FEATURE_OUT_DIMS];
+    alignas(64) uint8_t input[FEATURE_OUT_DIMS];
     alignas(64) int32_t hidden1_values[HIDDEN_LAYER_SIZE];
     alignas(64) int32_t hidden2_values[HIDDEN_LAYER_SIZE];
-    alignas(64) int16_t hidden1_output[HIDDEN_LAYER_SIZE];
-    alignas(64) int16_t hidden2_output[HIDDEN_LAYER_SIZE];
+    alignas(64) uint8_t hidden1_output[HIDDEN_LAYER_SIZE];
+    alignas(64) uint8_t hidden2_output[HIDDEN_LAYER_SIZE];
     alignas(64) int32_t output;
 };
 
@@ -96,14 +96,14 @@ struct feature_list {
 /* Table mapping piece to piece index */
 static uint32_t piece2index[NSIDES][NPIECES];
 
-static void layer_propagate(int16_t *input, int32_t *output, int ninputs,
-                            int noutputs, int32_t *biases, int16_t *weights)
+static void linear_forward(uint8_t *input, int32_t *output, int ninputs,
+                           int noutputs, int32_t *biases, int8_t *weights)
 {
 #ifdef USE_SIMD
-    simd_layer_propagate(input, output, ninputs, noutputs, biases, weights);
+    simd_linear_forward(input, output, ninputs, noutputs, biases, weights);
 #else
-    int k = 0;
-    int l = 0;
+    int k;
+    int l;
 
     /*
      * Perform neuron calculations. Multiply each input with the
@@ -119,9 +119,9 @@ static void layer_propagate(int16_t *input, int32_t *output, int ninputs,
 #endif
 }
 
-static void layer_activate(int32_t *input, int16_t *output, uint32_t ndims)
+static void activate(int32_t *input, uint8_t *output, int ndims)
 {
-    uint32_t k = 0;
+    int k;
 
     /* Apply activation function */
     #pragma omp simd aligned(input,output:64)
@@ -338,7 +338,7 @@ static void transformer_propagate(struct position *pos, struct net_data *data)
     int      side = 0;
     int      k = 0;
     uint32_t offset;
-    int16_t  *temp;
+    uint8_t  *temp;
     int16_t  *features;
     int16_t  value;
 
@@ -380,21 +380,19 @@ static void transformer_propagate(struct position *pos, struct net_data *data)
 static void network_propagate(struct net_data *data)
 {
     /* First hidden layer */
-    layer_propagate(data->input, data->hidden1_values, FEATURE_OUT_DIMS,
-                    HIDDEN_LAYER_SIZE, hidden1_biases, hidden1_weights);
-    layer_activate(data->hidden1_values, data->hidden1_output,
-                   HIDDEN_LAYER_SIZE);
+    linear_forward(data->input, data->hidden1_values, FEATURE_OUT_DIMS,
+                   HIDDEN_LAYER_SIZE, hidden1_biases, hidden1_weights);
+    activate(data->hidden1_values, data->hidden1_output, HIDDEN_LAYER_SIZE);
 
     /* Second hidden layer */
-    layer_propagate(data->hidden1_output, data->hidden2_values,
-                    HIDDEN_LAYER_SIZE, HIDDEN_LAYER_SIZE, hidden2_biases,
-                    hidden2_weights);
-    layer_activate(data->hidden2_values, data->hidden2_output,
-                   HIDDEN_LAYER_SIZE);
+    linear_forward(data->hidden1_output, data->hidden2_values,
+                   HIDDEN_LAYER_SIZE, HIDDEN_LAYER_SIZE, hidden2_biases,
+                   hidden2_weights);
+    activate(data->hidden2_values, data->hidden2_output, HIDDEN_LAYER_SIZE);
 
     /* Output layer */
-    layer_propagate(data->hidden2_output, &data->output, HIDDEN_LAYER_SIZE,
-                    OUTPUT_LAYER_SIZE, output_biases, output_weights);
+    linear_forward(data->hidden2_output, &data->output, HIDDEN_LAYER_SIZE,
+                   OUTPUT_LAYER_SIZE, output_biases, output_weights);
 }
 
 static bool parse_header(uint8_t **data)

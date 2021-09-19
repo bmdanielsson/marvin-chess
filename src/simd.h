@@ -21,7 +21,7 @@
 #include <stdint.h>
 
 /*
- * SIMD implementation of function for performing layer propagation.
+ * SIMD implementation of a forward pass of a linear layer.
  * 
  * @param input The layer input. 
  * @param output The layer output. 
@@ -30,7 +30,7 @@
  * @param biases Layer biases.
  * @param weights Layer weights.
  */
-void simd_layer_propagate(int16_t *input, int32_t *output, int ninputs,
-                          int noutputs, int32_t *biases, int16_t *weights);
+void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
+                         int noutputs, int32_t *biases, int8_t *weights);
 
 #endif
