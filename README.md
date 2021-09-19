@@ -28,7 +28,7 @@ Starting from version 5.0.0 Marvin uses a neural network for evaluation. A netwo
 
 # Building
 
-The easiest way to build Marvin is to use the included Makefile and just run `make`. This should produce a binary that is compatible with most systems. The default compiler is Clang, but if you want to use GCC instead run `make CC=gcc`. However if you plan on using NNUE I highly recommend using Clang since a GCC build will be almost 100 ELO weaker. For more information about available targets and build options run `make help`.
+The easiest way to build Marvin is to use the included Makefile and just run `make`. This should produce a binary that is compatible with most systems. The default compiler is Clang, but if you want to use GCC instead run `make CC=gcc`. For more information about available targets and build options run `make help`.
 
 # License
 

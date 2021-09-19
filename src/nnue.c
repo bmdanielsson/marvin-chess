@@ -99,35 +99,12 @@ static uint32_t piece2index[NSIDES][NPIECES];
 static void linear_forward(uint8_t *input, int32_t *output, int ninputs,
                            int noutputs, int32_t *biases, int8_t *weights)
 {
-#ifdef USE_SIMD
     simd_linear_forward(input, output, ninputs, noutputs, biases, weights);
-#else
-    int k;
-    int l;
-
-    /*
-     * Perform neuron calculations. Multiply each input with the
-     * corresponding weight, summarize and add the bias.
-     */
-    for (k=0;k<noutputs;k++) {
-        output[k] = biases[k];
-        #pragma omp simd aligned(weights,output,input:64)
-        for (l=0;l<ninputs;l++) {
-            output[k] += (input[l]*weights[k*ninputs+l]);
-        }
-    }
-#endif
 }
 
 static void activate(int32_t *input, uint8_t *output, int ndims)
 {
-    int k;
-
-    /* Apply activation function */
-    #pragma omp simd aligned(input,output:64)
-    for (k=0;k<ndims;k++) {
-        output[k] = CLAMP((input[k]>>6), 0, 127);
-    }
+    simd_scale_and_clamp(input, output, 6, ndims);
 }
 
 static int transform_square(int sq, int side)
@@ -231,8 +208,7 @@ static void perform_full_update(struct position *pos, int side)
     uint32_t            offset;
     uint32_t            index;
     int16_t             *data;
-    int                 k = 0;
-    int                 l = 0;
+    int                 k;
 
     /* Find all active features */
     find_active_features(pos, side, &active_features);
@@ -241,19 +217,13 @@ static void perform_full_update(struct position *pos, int side)
     data = &pos->eval_stack[pos->sply].state.data[side][0];
 
     /* Add biases */
-    #pragma omp simd aligned(data,feature_biases:64)
-    for (k=0;k<HALF_DIMS;k++) {
-        data[k] = feature_biases[k];
-    }
+    simd_copy(feature_biases, data, HALF_DIMS);
 
     /* Summarize the weights for all active features */
     for (k=0;k<active_features.size;k++) {
         index = active_features.features[k];
         offset = HALF_DIMS*index;
-        #pragma omp simd aligned(data,feature_weights:64)
-        for (l=0;l<HALF_DIMS;l++) {
-            data[l] += feature_weights[offset+l];
-        }
+        simd_add(&feature_weights[offset], data, HALF_DIMS);
     }
 }
 
@@ -263,8 +233,7 @@ static void perform_incremental_update(struct position *pos, int side)
     struct feature_list removed;
     uint32_t            offset;
     uint32_t            index;
-    int                 k = 0;
-    int                 l = 0;
+    int                 k;
     int16_t             *data;
     int16_t             *prev_data;
 
@@ -276,29 +245,20 @@ static void perform_incremental_update(struct position *pos, int side)
     prev_data = &pos->eval_stack[pos->sply-1].state.data[side][0];
 
     /* Copy the state from previous position */
-    #pragma omp simd aligned(data,prev_data:64)
-    for (k=0;k<HALF_DIMS;k++) {
-        data[k] = prev_data[k];
-    }
+    simd_copy(prev_data, data, HALF_DIMS);
 
     /* Subtract weights for removed features */
     for (k=0;k<removed.size;k++) {
         index = removed.features[k];
         offset = HALF_DIMS*index;
-        #pragma omp simd aligned(data,feature_weights:64)
-        for (l=0;l<HALF_DIMS;l++) {
-            data[l] -= feature_weights[offset+l];
-        }
+        simd_sub(&feature_weights[offset], data, HALF_DIMS);
     }
 
     /* Add weights for added features */
     for (k=0;k<added.size;k++) {
         index = added.features[k];
         offset = HALF_DIMS*index;
-        #pragma omp simd aligned(data,feature_weights:64)
-        for (l=0;l<HALF_DIMS;l++) {
-            data[l] += feature_weights[offset+l];
-        }
+        simd_add(&feature_weights[offset], data, HALF_DIMS);
     }
 }
 
@@ -335,12 +295,10 @@ static bool incremental_update_possible(struct position *pos, int side)
 static void transformer_propagate(struct position *pos, struct net_data *data)
 {
     int      perspectives[NSIDES];
-    int      side = 0;
-    int      k = 0;
+    int      side;
     uint32_t offset;
     uint8_t  *temp;
     int16_t  *features;
-    int16_t  value;
 
     /*
      * Check if the state is up to date. If it's
@@ -369,11 +327,7 @@ static void transformer_propagate(struct position *pos, struct net_data *data)
         offset = HALF_DIMS*side;
         temp = &data->input[offset];
         features = pos->eval_stack[pos->sply].state.data[perspectives[side]];
-        #pragma omp simd aligned(features,temp:64)
-        for (k=0;k<HALF_DIMS;k++) {
-            value = features[k];
-            temp[k] = CLAMP(value, 0, 127);
-        }
+        simd_clamp(features, temp, HALF_DIMS);
     }
 }
 
