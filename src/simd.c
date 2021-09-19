@@ -71,11 +71,18 @@ void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
 #endif
 
 #ifdef USE_AVX2
+static int32_t hsum_4x32(__m128i v)
+{
+    v = _mm_add_epi32(v, _mm_srli_si128(v, 8));
+    v = _mm_add_epi32(v, _mm_srli_si128(v, 4));
+    return _mm_cvtsi128_si32(v);
+}
+
 static int32_t hsum_8x32(__m256i v)
 {
-    v = _mm256_add_epi32(v, _mm256_srli_si256(v, 8));
-    v = _mm256_add_epi32(v, _mm256_srli_si256(v, 4));
-    return _mm256_extract_epi32(v, 0) + _mm256_extract_epi32(v, 4);
+    __m128i sum128 = _mm_add_epi32(_mm256_castsi256_si128(v),
+                                   _mm256_extracti128_si256(v, 1));
+    return hsum_4x32(sum128);
 }
 
 void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
