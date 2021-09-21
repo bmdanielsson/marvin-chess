@@ -395,7 +395,6 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
 {
     uint64_t pieces;
     int      sq;
-    int      index;
     int      file;
     int      rank;
     int      rel_rank;
@@ -424,8 +423,8 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
         TRACE_CONST(PAWN_BASE_VALUE);
 
         /* Piece/square tables */
-        index = (side == BLACK)?MIRROR(sq):sq;
-        TRACE_OM(PSQ_TABLE_PAWN_MG, PSQ_TABLE_PAWN_EG, index, 1);
+        TRACE_OM(PSQ_TABLE_PAWN_MG, PSQ_TABLE_PAWN_EG,
+                 (side == BLACK)?MIRROR(sq):sq, 1);
 
         /* Look for isolated pawns */
         if ((attackspan&pos->bb_pieces[side+PAWN]) == 0ULL) {
@@ -575,7 +574,6 @@ static void evaluate_knights(struct position *pos, struct eval *eval)
     uint64_t safe_moves;
     uint64_t attacks;
     int      sq;
-    int      index;
     int      king_sq;
     int      side;
     int      opp_side;
@@ -594,8 +592,8 @@ static void evaluate_knights(struct position *pos, struct eval *eval)
         TRACE_M(KNIGHT_MATERIAL_VALUE_MG, KNIGHT_MATERIAL_VALUE_EG, 1);
 
         /* Piece/square tables */
-        index = (side == BLACK)?MIRROR(sq):sq;
-        TRACE_OM(PSQ_TABLE_KNIGHT_MG, PSQ_TABLE_KNIGHT_EG, index, 1);
+        TRACE_OM(PSQ_TABLE_KNIGHT_MG, PSQ_TABLE_KNIGHT_EG,
+                 (side == BLACK)?MIRROR(sq):sq, 1);
 
         /* Mobility */
         safe_moves = moves&(~eval->attacked_by[PAWN+FLIP_COLOR(side)]);
@@ -635,7 +633,6 @@ static void evaluate_bishops(struct position *pos, struct eval *eval)
     uint64_t safe_moves;
     uint64_t attacks;
     int      sq;
-    int      index;
     int      king_sq;
     int      side;
     int      opp_side;
@@ -670,8 +667,8 @@ static void evaluate_bishops(struct position *pos, struct eval *eval)
         TRACE_M(BISHOP_MATERIAL_VALUE_MG, BISHOP_MATERIAL_VALUE_EG, 1);
 
         /* Piece/square tables */
-        index = (side == BLACK)?MIRROR(sq):sq;
-        TRACE_OM(PSQ_TABLE_BISHOP_MG, PSQ_TABLE_BISHOP_EG, index, 1);
+        TRACE_OM(PSQ_TABLE_BISHOP_MG, PSQ_TABLE_BISHOP_EG,
+                 (side == BLACK)?MIRROR(sq):sq, 1);
 
         /* Mobility */
         safe_moves = moves&(~eval->attacked_by[PAWN+FLIP_COLOR(side)]);
@@ -703,7 +700,6 @@ static void evaluate_rooks(struct position *pos, struct eval *eval)
     uint64_t safe_moves;
     uint64_t attacks;
     int      sq;
-    int      index;
     int      file;
     int      king_sq;
     int      side;
@@ -725,8 +721,8 @@ static void evaluate_rooks(struct position *pos, struct eval *eval)
         TRACE_M(ROOK_MATERIAL_VALUE_MG, ROOK_MATERIAL_VALUE_EG, 1);
 
         /* Piece/square tables */
-        index = (side == BLACK)?MIRROR(sq):sq;
-        TRACE_OM(PSQ_TABLE_ROOK_MG, PSQ_TABLE_ROOK_EG, index, 1);
+        TRACE_OM(PSQ_TABLE_ROOK_MG, PSQ_TABLE_ROOK_EG,
+                 (side == BLACK)?MIRROR(sq):sq, 1);
 
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
@@ -782,7 +778,6 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
     uint64_t unsafe;
     int      opp_side;
     int      sq;
-    int      index;
     int      file;
     int      king_sq;
     int      side;
@@ -807,8 +802,8 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
         TRACE_M(QUEEN_MATERIAL_VALUE_MG, QUEEN_MATERIAL_VALUE_EG, 1);
 
         /* Piece/square tables */
-        index = (side == BLACK)?MIRROR(sq):sq;
-        TRACE_OM(PSQ_TABLE_QUEEN_MG, PSQ_TABLE_QUEEN_EG, index, 1);
+        TRACE_OM(PSQ_TABLE_QUEEN_MG, PSQ_TABLE_QUEEN_EG,
+                 (side == BLACK)?MIRROR(sq):sq, 1);
 
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
@@ -846,7 +841,6 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
     int      nattackers;
     int      score;
     int      sq;
-    int      index;
     int      side;
     uint64_t pieces;
 
@@ -856,8 +850,8 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
         side = COLOR(pos->pieces[sq]);
 
         /* Piece/square tables */
-        index = (side == BLACK)?MIRROR(sq):sq;
-        TRACE_OM(PSQ_TABLE_KING_MG, PSQ_TABLE_KING_EG, index, 1);
+        TRACE_OM(PSQ_TABLE_KING_MG, PSQ_TABLE_KING_EG,
+                 (side == BLACK)?MIRROR(sq):sq, 1);
 
         /* Calculate preassure on the enemy king */
         nattackers = 0;
@@ -1235,14 +1229,7 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
     init_attack_tables(pos, &eval);
 
     /* Trace pawn structure evaluation */
-    hash_pawntt_init_item(&eval.pawntt);
     evaluate_pawn_structure(pos, &eval);
-    eval.attacked_by[WHITE_PAWN] |= eval.pawntt.attacked[WHITE];
-    eval.attacked_by[BLACK_PAWN] |= eval.pawntt.attacked[BLACK];
-    eval.attacked[WHITE] |= eval.pawntt.attacked[WHITE];
-    eval.attacked[BLACK] |= eval.pawntt.attacked[BLACK];
-    eval.attacked2[WHITE] |= eval.pawntt.attacked2[WHITE];
-    eval.attacked2[BLACK] |= eval.pawntt.attacked2[BLACK];
 
     /* Trace piece evaluation */
     evaluate_knights(pos, &eval);

@@ -1047,7 +1047,7 @@ static void verify_trace(char *training_file)
         (void)fen_setup_board(&state->pos, trainingset->positions[k].epd);
 
         /* Evaluate the position */
-        score = eval_evaluate(&state->pos);
+        score = eval_evaluate(&state->pos, true);
 
         /* Generate a trace for this function */
         trace = malloc(sizeof(struct eval_trace));
