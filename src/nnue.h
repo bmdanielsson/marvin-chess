@@ -25,6 +25,9 @@
 /* Initialize the NNUE component */
 void nnue_init(void);
 
+/* Destroy the NNUE component */
+void nnue_destroy(void);
+
 /*
  * Reset the NNUE state for a position.
  *

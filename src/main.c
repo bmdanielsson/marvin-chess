@@ -150,6 +150,7 @@ int main(int argc, char *argv[])
     destroy_game_state(state);
     smp_destroy_workers();
     smp_destroy();
+    nnue_destroy();
 
     return 0;
 }

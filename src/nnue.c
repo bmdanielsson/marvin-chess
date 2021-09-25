@@ -32,56 +32,36 @@
 #include "bitboard.h"
 #include "simd.h"
 
-/* Parameters for validating the network file */
+/* Struct holding information about a layer in the network */
+struct layer {
+    union {
+        int8_t  *i8;
+        int16_t *i16;
+    }                   weights;
+    union {
+        int32_t *i32;
+        int16_t *i16;
+    }                   biases;
+};
+
+/* Definition of the network architcechure */
 #define NET_VERSION 0x00000002
-#define NET_SIZE \
-    (                                                           \
-    4                   +                                       \
-    2*HALF_DIMS         + 2*HALF_DIMS*FEATURE_IN_DIMS         + \
-    4*HIDDEN_LAYER_SIZE + HIDDEN_LAYER_SIZE*FEATURE_OUT_DIMS  + \
-    4*HIDDEN_LAYER_SIZE + HIDDEN_LAYER_SIZE*HIDDEN_LAYER_SIZE + \
-    4*OUTPUT_LAYER_SIZE + HIDDEN_LAYER_SIZE*OUTPUT_LAYER_SIZE   \
-    )
-
-/* Parameters describing the network architecture */
-#define HALF_DIMS 128
-#define FEATURE_IN_DIMS 64*64*10
-#define FEATURE_OUT_DIMS HALF_DIMS*2
+#define NET_HEADER_SIZE 4
+#define NUM_INPUT_FEATURES 64*64*10
 #define MAX_ACTIVE_FEATURES 30
-#define HIDDEN_LAYER_SIZE 32
-#define OUTPUT_LAYER_SIZE 1
+#define ACTIVATION_SCALE_BITS 6
+#define OUTPUT_SCALE_FACTOR 16
 
-/*
- * Parameters that makes up the net. A net consists of two parts,
- * a transformer and a network.
- *
- * The transformer is a combination of the input layer and the first
- * hidden layer in a traditional neural network. It consists of two
- * halves, one for each king. The halves use the same weights and biases.
- *
- * The network consists of a set of hidden layers and an output layer with
- * a single neuron.
- */
-static alignas(64) int8_t hidden1_weights[HIDDEN_LAYER_SIZE*FEATURE_OUT_DIMS];
-static alignas(64) int8_t hidden2_weights[HIDDEN_LAYER_SIZE*HIDDEN_LAYER_SIZE];
-static alignas(64) int8_t output_weights[HIDDEN_LAYER_SIZE];
-static alignas(64) int32_t hidden1_biases[HIDDEN_LAYER_SIZE];
-static alignas(64) int32_t hidden2_biases[HIDDEN_LAYER_SIZE];
-static alignas(64) int32_t output_biases[OUTPUT_LAYER_SIZE];
-static alignas(64) int16_t feature_biases[HALF_DIMS];
-static alignas(64) int16_t feature_weights[HALF_DIMS*FEATURE_IN_DIMS];
+/* Definition of the network */
+#define NUM_LAYERS 4
+#define HALFKX_LAYER_SIZE 128
+static struct layer layers[NUM_LAYERS];
+static int layer_sizes[NUM_LAYERS] = {HALFKX_LAYER_SIZE*2, 32, 32, 1};
 
-/*
- * Struct holding the data of all the layer
- * calculations in a forward propagation pass.
- */
+/* Struct for holding data during a forward pass */
 struct net_data {
-    alignas(64) uint8_t input[FEATURE_OUT_DIMS];
-    alignas(64) int32_t hidden1_values[HIDDEN_LAYER_SIZE];
-    alignas(64) int32_t hidden2_values[HIDDEN_LAYER_SIZE];
-    alignas(64) uint8_t hidden1_output[HIDDEN_LAYER_SIZE];
-    alignas(64) uint8_t hidden2_output[HIDDEN_LAYER_SIZE];
-    alignas(64) int32_t output;
+    alignas(64) int32_t intermediate[HALFKX_LAYER_SIZE*2];
+    alignas(64) uint8_t output[HALFKX_LAYER_SIZE*2];
 };
 
 /*
@@ -96,23 +76,9 @@ struct feature_list {
 /* Table mapping piece to piece index */
 static uint32_t piece2index[NSIDES][NPIECES];
 
-static void linear_forward(uint8_t *input, int32_t *output, int ninputs,
-                           int noutputs, int32_t *biases, int8_t *weights)
-{
-    simd_linear_forward(input, output, ninputs, noutputs, biases, weights);
-}
-
-static void activate(int32_t *input, uint8_t *output, int ndims)
-{
-    simd_scale_and_clamp(input, output, 6, ndims);
-}
-
 static int transform_square(int sq, int side)
 {
-    if (side == BLACK) {
-        sq = MIRROR(sq);
-    }
-    return sq;
+    return (side == BLACK)?MIRROR(sq):sq;
 }
 
 static int calculate_feature_index(int sq, int piece, int king_sq, int side)
@@ -217,13 +183,13 @@ static void perform_full_update(struct position *pos, int side)
     data = &pos->eval_stack[pos->sply].state.data[side][0];
 
     /* Add biases */
-    simd_copy(feature_biases, data, HALF_DIMS);
+    simd_copy(layers[0].biases.i16, data, HALFKX_LAYER_SIZE);
 
     /* Summarize the weights for all active features */
     for (k=0;k<active_features.size;k++) {
         index = active_features.features[k];
-        offset = HALF_DIMS*index;
-        simd_add(&feature_weights[offset], data, HALF_DIMS);
+        offset = HALFKX_LAYER_SIZE*index;
+        simd_add(&layers[0].weights.i16[offset], data, HALFKX_LAYER_SIZE);
     }
 }
 
@@ -245,20 +211,20 @@ static void perform_incremental_update(struct position *pos, int side)
     prev_data = &pos->eval_stack[pos->sply-1].state.data[side][0];
 
     /* Copy the state from previous position */
-    simd_copy(prev_data, data, HALF_DIMS);
+    simd_copy(prev_data, data, HALFKX_LAYER_SIZE);
 
     /* Subtract weights for removed features */
     for (k=0;k<removed.size;k++) {
         index = removed.features[k];
-        offset = HALF_DIMS*index;
-        simd_sub(&feature_weights[offset], data, HALF_DIMS);
+        offset = HALFKX_LAYER_SIZE*index;
+        simd_sub(&layers[0].weights.i16[offset], data, HALFKX_LAYER_SIZE);
     }
 
     /* Add weights for added features */
     for (k=0;k<added.size;k++) {
         index = added.features[k];
-        offset = HALF_DIMS*index;
-        simd_add(&feature_weights[offset], data, HALF_DIMS);
+        offset = HALFKX_LAYER_SIZE*index;
+        simd_add(&layers[0].weights.i16[offset], data, HALFKX_LAYER_SIZE);
     }
 }
 
@@ -292,7 +258,7 @@ static bool incremental_update_possible(struct position *pos, int side)
     return true;
 }
 
-static void transformer_propagate(struct position *pos, struct net_data *data)
+static void halfkx_layer_forward(struct position *pos, struct net_data *data)
 {
     int      perspectives[NSIDES];
     int      side;
@@ -324,29 +290,33 @@ static void transformer_propagate(struct position *pos, struct net_data *data)
     perspectives[0] = pos->stm;
     perspectives[1] = FLIP_COLOR(pos->stm);
     for (side=0;side<NSIDES;side++) {
-        offset = HALF_DIMS*side;
-        temp = &data->input[offset];
+        offset = HALFKX_LAYER_SIZE*side;
+        temp = &data->output[offset];
         features = pos->eval_stack[pos->sply].state.data[perspectives[side]];
-        simd_clamp(features, temp, HALF_DIMS);
+        simd_clamp(features, temp, HALFKX_LAYER_SIZE);
     }
 }
 
-static void network_propagate(struct net_data *data)
+static void linear_layer_forward(int idx, struct net_data *data, bool output)
 {
-    /* First hidden layer */
-    linear_forward(data->input, data->hidden1_values, FEATURE_OUT_DIMS,
-                   HIDDEN_LAYER_SIZE, hidden1_biases, hidden1_weights);
-    activate(data->hidden1_values, data->hidden1_output, HIDDEN_LAYER_SIZE);
+    simd_linear_forward(data->output, data->intermediate, layer_sizes[idx-1],
+                        layer_sizes[idx], layers[idx].biases.i32,
+                        layers[idx].weights.i8);
+    if (!output) {
+        simd_scale_and_clamp(data->intermediate, data->output,
+                             ACTIVATION_SCALE_BITS, layer_sizes[idx]);
+    }
+}
 
-    /* Second hidden layer */
-    linear_forward(data->hidden1_output, data->hidden2_values,
-                   HIDDEN_LAYER_SIZE, HIDDEN_LAYER_SIZE, hidden2_biases,
-                   hidden2_weights);
-    activate(data->hidden2_values, data->hidden2_output, HIDDEN_LAYER_SIZE);
+static void network_forward(struct position *pos, struct net_data *data)
+{
+    int k;
 
-    /* Output layer */
-    linear_forward(data->hidden2_output, &data->output, HIDDEN_LAYER_SIZE,
-                   OUTPUT_LAYER_SIZE, output_biases, output_weights);
+    halfkx_layer_forward(pos, data);
+    for (k=1;k<NUM_LAYERS-1;k++) {
+        linear_layer_forward(k, data, false);
+    }
+    linear_layer_forward(k, data, true);
 }
 
 static bool parse_header(uint8_t **data)
@@ -363,17 +333,28 @@ static bool parse_header(uint8_t **data)
     return version == NET_VERSION;
 }
 
-static bool parse_transformer(uint8_t **data)
+static bool parse_network(uint8_t **data)
 {
-    uint8_t  *iter = *data;
-    int      k;
+    uint8_t *iter = *data;
+    int     k;
+    int     l;
 
-    /* Read biases and weights */
-    for (k=0;k<HALF_DIMS;k++,iter+=2) {
-        feature_biases[k] = read_uint16_le(iter);
+    /* Read biases and weights for the HalfKX layer */
+    for (k=0;k<HALFKX_LAYER_SIZE;k++,iter+=2) {
+        layers[0].biases.i16[k] = read_uint16_le(iter);
     }
-    for (k=0;k<HALF_DIMS*FEATURE_IN_DIMS;k++,iter+=2) {
-        feature_weights[k] = read_uint16_le(iter);
+    for (k=0;k<HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES;k++,iter+=2) {
+        layers[0].weights.i16[k] = read_uint16_le(iter);
+    }
+
+    /* Read biases and weights for each linear layer */
+    for (k=1;k<NUM_LAYERS;k++) {
+        for (l=0;l<layer_sizes[k];l++,iter+=4) {
+            layers[k].biases.i32[l] = read_uint32_le(iter);
+        }
+        for (l=0;l<layer_sizes[k]*layer_sizes[k-1];l++,iter++) {
+            layers[k].weights.i8[l] = (int8_t)*iter;
+        }
     }
 
     *data = iter;
@@ -381,49 +362,59 @@ static bool parse_transformer(uint8_t **data)
     return true;
 }
 
-static bool parse_network(uint8_t **data)
+static uint32_t calculate_net_size(void)
 {
-    uint8_t *iter = *data;
-    int     k;
+    uint32_t size = 0;
+    int      k;
 
-    /* Read biases and weights of the first hidden layer */
-    for (k=0;k<HIDDEN_LAYER_SIZE;k++,iter+=4) {
-        hidden1_biases[k] = read_uint32_le(iter);
-    }
-    for (k=0;k<HIDDEN_LAYER_SIZE*FEATURE_OUT_DIMS;k++,iter++) {
-        hidden1_weights[k] = (int8_t)*iter;
-    }
+    size += NET_HEADER_SIZE;
 
-    /* Read biases and weights of the second hidden layer */
-    for (k=0;k<HIDDEN_LAYER_SIZE;k++,iter+=4) {
-        hidden2_biases[k] = read_uint32_le(iter);
-    }
-    for (k=0;k<HIDDEN_LAYER_SIZE*HIDDEN_LAYER_SIZE;k++,iter++) {
-        hidden2_weights[k] = (int8_t)*iter;
+    size += HALFKX_LAYER_SIZE*sizeof(int16_t);
+    size += HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES*sizeof(int16_t);
+
+    for (k=1;k<NUM_LAYERS;k++) {
+        size += layer_sizes[k]*sizeof(int32_t);
+        size += layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t);
     }
 
-    /* Read biases and weights of the output layer */
-    for (k=0;k<OUTPUT_LAYER_SIZE;k++,iter+=4) {
-        output_biases[k] = read_uint32_le(iter);
-    }
-    for (k=0;k<HIDDEN_LAYER_SIZE*OUTPUT_LAYER_SIZE;k++,iter++) {
-        output_weights[k] = (int8_t)*iter;
-    }
-
-    *data = iter;
-
-    return true;
+    return size;
 }
 
 void nnue_init(void)
 {
     int piece;
+    int k;
 
+    /* Initialize piece index table */
     for (piece=0;piece<KING;piece+=2) {
         piece2index[WHITE][piece] = piece*NSQUARES;
         piece2index[WHITE][piece+1] = (piece+1)*NSQUARES;
         piece2index[BLACK][piece] = (piece+1)*NSQUARES;
         piece2index[BLACK][piece+1] = piece*NSQUARES;
+    }
+
+    /* Allocate space for layers */
+    layers[0].weights.i16 = aligned_malloc(64,
+                        HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES*sizeof(int16_t));
+    layers[0].biases.i16 = aligned_malloc(64,
+                        HALFKX_LAYER_SIZE*sizeof(int16_t));
+    for (k=1;k<NUM_LAYERS;k++) {
+        layers[k].weights.i8 = aligned_malloc(64,
+                              layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t));
+        layers[k].biases.i32 = aligned_malloc(64,
+                              layer_sizes[k]*sizeof(int32_t));
+    }
+}
+
+void nnue_destroy(void)
+{
+    int k;
+
+    aligned_free(layers[0].weights.i16);
+    aligned_free(layers[0].biases.i16);
+    for (k=0;k<NUM_LAYERS;k++) {
+        aligned_free(layers[k].weights.i8);
+        aligned_free(layers[k].biases.i32);
     }
 }
 
@@ -449,7 +440,7 @@ bool nnue_load_net(char *path)
 
     /* Read the complete file */
     size = get_file_size(path);
-    if (size != NET_SIZE) {
+    if (size != calculate_net_size()) {
         ret = false;
         goto exit;
     }
@@ -465,20 +456,14 @@ bool nnue_load_net(char *path)
         goto exit;
     }
 
-    /* Parse header */
+    /* Parse network header */
     iter = data;
     if (!parse_header(&iter)) {
         ret = false;
         goto exit;
     }
 
-    /* Parse transformer section */
-    if (!parse_transformer(&iter)) {
-        ret = false;
-        goto exit;
-    }
-
-    /* Parse network section */
+    /* Parse network */
     if (!parse_network(&iter)) {
         ret = false;
         goto exit;
@@ -496,10 +481,8 @@ int16_t nnue_evaluate(struct position *pos)
 {
     struct net_data data;
 
-    transformer_propagate(pos, &data);
-    network_propagate(&data);
-
-    return data.output/16;
+    network_forward(pos, &data);
+    return data.intermediate[0]/OUTPUT_SCALE_FACTOR;
 }
 
 void nnue_make_move(struct position *pos, uint32_t move)
