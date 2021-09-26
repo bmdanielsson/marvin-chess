@@ -412,7 +412,7 @@ void nnue_destroy(void)
 
     aligned_free(layers[0].weights.i16);
     aligned_free(layers[0].biases.i16);
-    for (k=0;k<NUM_LAYERS;k++) {
+    for (k=1;k<NUM_LAYERS;k++) {
         aligned_free(layers[k].weights.i8);
         aligned_free(layers[k].biases.i32);
     }
