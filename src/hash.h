@@ -73,10 +73,9 @@ void hash_tt_age_table(void);
  * @param depth The depth to which the position was searched.
  * @param score The score for the position.
  * @param type The type of the score.
- * @param eval_score The static evaluation of the position.
  */
 void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
-                   int type, int eval_score);
+                   int type);
 
 /*
  * Lookup the current position in the main transposition table.

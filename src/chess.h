@@ -333,8 +333,6 @@ struct tt_item {
      * the score is determined by the flags parameter.
      */
     int16_t score;
-    /* The static evaluation of the position */
-    int16_t eval_score;
     /* The depth to which the position was searched */
     uint8_t depth;
     /*

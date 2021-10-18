@@ -126,7 +126,7 @@ void hash_tt_age_table(void)
 }
 
 void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
-                   int type, int eval_score)
+                   int type)
 {
     uint64_t         idx;
     struct tt_bucket *bucket;
@@ -228,7 +228,6 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
     worst_item->key_low = KEY_LOW(pos->key);
     worst_item->move = move;
     worst_item->score = (int16_t)score;
-    worst_item->eval_score = (int16_t)eval_score;
     worst_item->depth = depth;
     worst_item->type = type;
     worst_item->date = tt_date;

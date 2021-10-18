@@ -544,7 +544,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * Evaluate the position in order to get a score
      * to use for pruning decisions.
      */
-    static_score = tt_found?tt_item.eval_score:eval_evaluate(pos, false);
+    static_score = eval_evaluate(pos, false);
     pos->eval_stack[pos->sply].score = static_score;
     bool improving = (pos->sply >= 2 &&
                     static_score > pos->eval_stack[pos->sply-2].score);
@@ -870,7 +870,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Store the result for this node in the transposition table */
-    hash_tt_store(pos, best_move, depth, best_score, tt_flag, static_score);
+    hash_tt_store(pos, best_move, depth, best_score, tt_flag);
 
     return best_score;
 }
@@ -1002,8 +1002,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     }
 
     /* Store the result for this node in the transposition table */
-    hash_tt_store(pos, best_move, depth, best_score, tt_flag,
-                  eval_evaluate(pos, false));
+    hash_tt_store(pos, best_move, depth, best_score, tt_flag);
 
     return best_score;
 }
