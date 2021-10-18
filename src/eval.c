@@ -80,12 +80,30 @@ static int nbr_attackers_weight[6] = {
     0, 0, 45, 100, 100, 100
 };
 
+static int material_phase_value[NPIECES] = {
+    0, 0, 1, 1, 1, 1, 2, 2, 4, 4, 0, 0
+};
+
 /*
  * Calculate a score that is an interpolation of the middlegame and endgame
- * based on the current phase of the game.
+ * based on the current phase of the game. The formula is taken from
+ * https://chessprogramming.wikispaces.com/Tapered+Eval
  */
-static int calculate_tapered_eval(int phase, int score_mg, int score_eg)
+static int calculate_tapered_eval(struct position *pos, int score_mg,
+                                  int score_eg)
 {
+    int total_phase;
+    int phase;
+
+    total_phase = 24;
+    phase = ((24-pos->matphase)*256 + (total_phase/2))/total_phase;
+
+    /*
+     * Guard against negative phase values. The phase value might
+     * become negative in case of promotion.
+     */
+    phase = MAX(phase, 0);
+
     return ((score_mg*(256 - phase)) + (score_eg*phase))/256;
 }
 
@@ -924,7 +942,6 @@ int eval_evaluate(struct position *pos, bool force_hce)
 {
     struct eval eval;
     int         k;
-    int         phase;
     int         score[NPHASES];
     int         tapered_score;
 
@@ -963,8 +980,7 @@ int eval_evaluate(struct position *pos, bool force_hce)
     }
 
     /* Return score adjusted for game phase */
-    phase = eval_game_phase(pos);
-    tapered_score = calculate_tapered_eval(phase, score[MIDDLEGAME],
+    tapered_score = calculate_tapered_eval(pos, score[MIDDLEGAME],
                                            score[ENDGAME]);
 
     pos->eval_stack[pos->sply].score = tapered_score + TEMPO_BONUS;
@@ -985,6 +1001,7 @@ void eval_init_piece_features(struct position *pos)
         pos->material[k] = 0;
         pos->psq[k] = 0;
     }
+    pos->matphase = 0;
 
     /* Iterate over all pieces */
     pieces = pos->bb_all;
@@ -999,6 +1016,7 @@ void eval_update_piece_features(struct position *pos, int piece, int sq,
                                 bool added)
 {
     int delta;
+    int pdelta;
     int side;
 
     assert(valid_position(pos));
@@ -1006,11 +1024,14 @@ void eval_update_piece_features(struct position *pos, int piece, int sq,
     assert(valid_square(sq));
 
     delta = added?1:-1;
+    pdelta = delta;
     side = COLOR(piece);
     if (side == BLACK) {
         sq = MIRROR(sq);
         delta *= -1;
     }
+
+    pos->matphase += pdelta*material_phase_value[piece];
     switch (piece) {
     case WHITE_PAWN:
     case BLACK_PAWN:
@@ -1056,7 +1077,6 @@ void eval_update_piece_features(struct position *pos, int piece, int sq,
         assert(false);
         break;
     }
-
 }
 
 /*
@@ -1112,38 +1132,11 @@ bool eval_is_material_draw(struct position *pos)
     return false;
 }
 
-/*
- * The formula is taken from
- * https://chessprogramming.wikispaces.com/Tapered+Eval
- */
-int eval_game_phase(struct position *pos)
-{
-    int total_phase;
-    int phase;
-
-    total_phase = 24;
-    phase = total_phase;
-    phase -= BITCOUNT(pos->bb_pieces[WHITE_KNIGHT]);
-    phase -= BITCOUNT(pos->bb_pieces[BLACK_KNIGHT]);
-    phase -= BITCOUNT(pos->bb_pieces[WHITE_BISHOP]);
-    phase -= BITCOUNT(pos->bb_pieces[BLACK_BISHOP]);
-    phase -= 2*BITCOUNT(pos->bb_pieces[WHITE_ROOK]);
-    phase -= 2*BITCOUNT(pos->bb_pieces[BLACK_ROOK]);
-    phase -= 4*BITCOUNT(pos->bb_pieces[WHITE_QUEEN]);
-    phase -= 4*BITCOUNT(pos->bb_pieces[BLACK_QUEEN]);
-    phase = (phase*256 + (total_phase/2))/total_phase;
-
-    /*
-     * Guard against negative phase values. The phase value might
-     * become negative in case of promotion.
-     */
-    return MAX(phase, 0);
-}
-
 #ifdef TRACE
 void eval_generate_trace(struct position *pos, struct eval_trace *trace)
 {
     struct eval eval;
+    int         phase;
 
     assert(valid_position(pos));
     assert(trace != NULL);
@@ -1154,7 +1147,8 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
     eval.trace = trace;
 
     /* Calculate game phase */
-    trace->phase_factor = eval_game_phase(pos);
+    phase = ((24-pos->matphase)*256 + (total_phase/2))/total_phase;
+    trace->phase_factor = MAX(phasae, 0);
 
     /* If there is insufficiernt mating material there is nothing to do */
     if (eval_is_material_draw(pos)) {

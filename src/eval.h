@@ -59,14 +59,6 @@ void eval_update_piece_features(struct position *pos, int piece, int sq,
  */
 bool eval_is_material_draw(struct position *pos);
 
-/*
- * Calculate a numerical game phase value for the given poition.
- *
- * @param pos The board structure.
- * @return Returns a game phase value between 0 and 256.
- */
-int eval_game_phase(struct position *pos);
-
 #ifdef TRACE
 /*
  * Generate a trace for the evaluation function.

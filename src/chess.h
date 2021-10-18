@@ -435,11 +435,13 @@ struct position {
     /* Stack used to keep track of evaluation information */
     struct eval_item eval_stack[MAX_PLY];
     /*
-     * The material score and piece/square table score from white's point
-     * of view. These values are incrementally updated during the search.
+     * The material score, piece/square table score from white's point
+     * of view and the material phase value. These values are incrementally
+     * updated during the search.
      */
     int material[NPHASES];
     int psq[NPHASES];
+    int matphase;
 
     /* Pointers to the owning worker and the active game state */
     struct search_worker *worker;

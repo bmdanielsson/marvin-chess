@@ -113,21 +113,17 @@ static void cmd_divide(char *cmd, struct gamestate *state)
  */
 static void cmd_eval(struct gamestate *state)
 {
-    int phase;
     int nnue_score;
     int hce_score;
 
-    phase = eval_game_phase(&state->pos);
     hce_score = eval_evaluate(&state->pos, true);
-
     if (engine_using_nnue && engine_loaded_net) {
         nnue_score = eval_evaluate(&state->pos, false);
-        printf("Phase: %d, HCE: %d, NNUE: %d\n", phase,
+        printf("HCE: %d, NNUE: %d\n",
                state->pos.stm == WHITE?hce_score:-hce_score,
                state->pos.stm == WHITE?nnue_score:-nnue_score);
     } else {
-        printf("Phase: %d, HCE: %d\n", phase,
-               state->pos.stm == WHITE?hce_score:-hce_score);
+        printf("HCE: %d\n", state->pos.stm == WHITE?hce_score:-hce_score);
     }
 }
 
