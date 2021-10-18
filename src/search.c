@@ -476,6 +476,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     int                 chist;
     int                 fhist;
     struct moveselector ms;
+    bool                improving;
 
     /* Set node type */
     pv_node = (beta-alpha) > 1;
@@ -546,8 +547,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      */
     static_score = eval_evaluate(pos, false);
     pos->eval_stack[pos->sply].score = static_score;
-    bool improving = (pos->sply >= 2 &&
-                    static_score > pos->eval_stack[pos->sply-2].score);
+    improving = (pos->sply >= 2 &&
+                        static_score > pos->eval_stack[pos->sply-2].score);
 
     /* Reverse futility pruning */
     in_check = board_in_check(pos, pos->stm);
