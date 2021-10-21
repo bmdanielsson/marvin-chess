@@ -546,7 +546,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * to use for pruning decisions.
      */
     static_score = eval_evaluate(pos, false);
-    pos->eval_stack[pos->sply].score = static_score;
     improving = (pos->sply >= 2 &&
                         static_score > pos->eval_stack[pos->sply-2].score);
 

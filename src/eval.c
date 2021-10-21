@@ -944,6 +944,7 @@ int eval_evaluate(struct position *pos, bool force_hce)
     int         k;
     int         score[NPHASES];
     int         tapered_score;
+    int         nnue_score;
 
     assert(valid_position(pos));
 
@@ -957,7 +958,6 @@ int eval_evaluate(struct position *pos, bool force_hce)
 
     /* Check if NNUE or classic eval should be used */
     if (engine_using_nnue && engine_loaded_net && !force_hce) {
-        int nnue_score = 0;
         if ((pos->worker == NULL) ||
             !hash_nnue_lookup(pos->worker, &nnue_score)) {
             nnue_score = nnue_evaluate(pos);
