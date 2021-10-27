@@ -340,12 +340,10 @@ struct tt_item {
      * values are: EXACT, ALPHA, BETA and PV.
      */
     uint8_t type;
-    /* The time when the position was stored */
-    uint8_t date;
 };
 
 /* The number of items stored in each transposition table bucket */
-#define TT_BUCKET_SIZE 3
+#define TT_BUCKET_SIZE 2
 
 /*
  * Transposition table bucket. The size should be a
@@ -354,11 +352,6 @@ struct tt_item {
 struct tt_bucket {
     /* Items stored in this bucket */
     struct tt_item items[TT_BUCKET_SIZE];
-    /*
-     * Padding added to make sure that the
-     * size of the struct is a power-of-2.
-     */
-    uint32_t padding;
 };
 
 /*

@@ -38,6 +38,14 @@
                 (k) == ((((uint64_t)(i)->key_high)<<32)|(uint64_t)(i)->key_low)
 #define KEY_IS_ZERO(i) ((i)->key_low == 0ULL) && ((i)->key_high == 0ULL)
 
+/*
+ * Since a move only uses 22 out of 32 bits the
+ * upper 10 bits are used to store the date.
+ */
+#define GETMOVE(v)      ((v)&0x003FFFFF)
+#define GETDATE(v)      (((v)&0xFFC00000)>>22)
+#define MOVEDATE(m, d)  ((m)|((d)<<22))
+
 /* Main transposition table */
 static struct tt_bucket *transposition_table = NULL;
 static int tt_size_in_mb = 0;
@@ -192,7 +200,7 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
          * depth or if the item have an older date.
          */
         if (KEY_EQUALS(pos->key, item)) {
-            if ((depth >= item->depth) || (tt_date != item->date)) {
+            if ((depth >= item->depth) || (tt_date != GETDATE(item->move))) {
                 worst_item = item;
                 break;
             }
@@ -212,7 +220,7 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
          * prefer searches to a higher depth and to prefer
          * newer searches before older ones.
          */
-        age = tt_date - item->date;
+        age = tt_date - GETDATE(item->move);
         item_score = (256 - age - 1) + item->depth*256;
 
         /* Remeber the item with the worst score */
@@ -226,11 +234,10 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
     /* Replace the worst item */
     worst_item->key_high = KEY_HIGH(pos->key);
     worst_item->key_low = KEY_LOW(pos->key);
-    worst_item->move = move;
+    worst_item->move = MOVEDATE(move, tt_date);
     worst_item->score = (int16_t)score;
     worst_item->depth = depth;
     worst_item->type = type;
-    worst_item->date = tt_date;
 }
 
 bool hash_tt_lookup(struct position *pos, struct tt_item *item)
@@ -259,6 +266,9 @@ bool hash_tt_lookup(struct position *pos, struct tt_item *item)
         tmp = &bucket->items[k];
         if (KEY_EQUALS(pos->key, tmp)) {
             memcpy(item, tmp, sizeof(struct tt_item));
+
+            /* Mask of the date from the move */
+            item->move = GETMOVE(item->move);
             return true;
         }
     }
@@ -278,7 +288,7 @@ int hash_tt_usage(void)
     for (k=0;k<1000;k++) {
         bucket = &transposition_table[k];
         for (idx=0;idx<TT_BUCKET_SIZE;idx++) {
-            if (bucket->items[idx].date == tt_date) {
+            if (GETDATE(bucket->items[idx].move) == tt_date) {
                 nused++;
             }
         }
