@@ -320,12 +320,8 @@ struct book_entry {
  * which represents a single position.
  */
 struct tt_item {
-    /*
-     * The key of this position. It is split into two parts in order to
-     * avoid the need for 8-byte alignment of the struct.
-     */
-    uint32_t key_low;
-    uint32_t key_high;
+    /* The key of this position */
+    uint64_t key;
     /* The best move found */
     uint32_t move;
     /*

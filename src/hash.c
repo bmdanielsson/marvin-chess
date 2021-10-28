@@ -31,13 +31,6 @@
 #include "config.h"
 #include "engine.h"
 
-/* Macros for managing the hash key stored in struct tt_item */
-#define KEY_LOW(k)  ((uint32_t)((k)&0x00000000FFFFFFFF))
-#define KEY_HIGH(k) ((uint32_t)(((k)>>32)&0x00000000FFFFFFFF))
-#define KEY_EQUALS(k, i) \
-                (k) == ((((uint64_t)(i)->key_high)<<32)|(uint64_t)(i)->key_low)
-#define KEY_IS_ZERO(i) ((i)->key_low == 0ULL) && ((i)->key_high == 0ULL)
-
 /*
  * Since a move only uses 22 out of 32 bits the
  * upper 10 bits are used to store the date.
@@ -199,7 +192,7 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
          * replace it if the new search is to a greater
          * depth or if the item have an older date.
          */
-        if (KEY_EQUALS(pos->key, item)) {
+        if (pos->key == item->key) {
             if ((depth >= item->depth) || (tt_date != GETDATE(item->move))) {
                 worst_item = item;
                 break;
@@ -210,7 +203,7 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
              * the current position.
              */
             return;
-        } else if (KEY_IS_ZERO(item)) {
+        } else if (item->key == 0ULL) {
             worst_item = item;
             break;
         }
@@ -232,8 +225,7 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
     assert(worst_item != NULL);
 
     /* Replace the worst item */
-    worst_item->key_high = KEY_HIGH(pos->key);
-    worst_item->key_low = KEY_LOW(pos->key);
+    worst_item->key = pos->key;
     worst_item->move = MOVEDATE(move, tt_date);
     worst_item->score = (int16_t)score;
     worst_item->depth = depth;
@@ -264,7 +256,7 @@ bool hash_tt_lookup(struct position *pos, struct tt_item *item)
      */
     for (k=0;k<TT_BUCKET_SIZE;k++) {
         tmp = &bucket->items[k];
-        if (KEY_EQUALS(pos->key, tmp)) {
+        if (pos->key == tmp->key) {
             memcpy(item, tmp, sizeof(struct tt_item));
 
             /* Mask of the date from the move */
