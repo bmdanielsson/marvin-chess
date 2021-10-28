@@ -202,7 +202,6 @@ void board_reset(struct position *pos)
     pos->bb_all = 0ULL;
 
     pos->key = 0ULL;
-    pos->pawnkey = 0ULL;
 
     pos->ep_sq = NO_SQUARE;
     pos->castle = 0;
@@ -272,7 +271,6 @@ bool board_make_move(struct position *pos, uint32_t move)
     elem->ep_sq = pos->ep_sq;
     elem->fifty = pos->fifty;
     elem->key = pos->key;
-    elem->pawnkey = pos->pawnkey;
 
     /* Update NNUE */
     nnue_make_move(pos, move);
@@ -293,24 +291,15 @@ bool board_make_move(struct position *pos, uint32_t move)
     /* Remove piece from current position */
     remove_piece(pos, piece, from);
     pos->key = key_update_piece(pos->key, piece, from);
-    if (VALUE(piece) == PAWN) {
-        pos->pawnkey = key_update_piece(pos->pawnkey, piece, from);
-    }
 
     /* If necessary remove captured piece */
     if (ISCAPTURE(move)) {
         remove_piece(pos, capture, to);
         pos->key = key_update_piece(pos->key, capture, to);
-        if (VALUE(capture) == PAWN) {
-            pos->pawnkey = key_update_piece(pos->pawnkey, capture, to);
-        }
     } else if (ISENPASSANT(move)) {
         ep = (pos->stm == WHITE)?to-8:to+8;
         remove_piece(pos, PAWN+FLIP_COLOR(pos->stm), ep);
         pos->key = key_update_piece(pos->key, PAWN+FLIP_COLOR(pos->stm), ep);
-        pos->pawnkey = key_update_piece(pos->pawnkey,
-                                        PAWN+FLIP_COLOR(pos->stm),
-                                        ep);
     }
 
     /* Add piece to new position */
@@ -320,9 +309,6 @@ bool board_make_move(struct position *pos, uint32_t move)
     } else {
         add_piece(pos, piece, to);
         pos->key = key_update_piece(pos->key, piece, to);
-        if (VALUE(piece) == PAWN) {
-            pos->pawnkey = key_update_piece(pos->pawnkey, piece, to);
-        }
     }
 
     /* If this is a castling we have to move the rook */
@@ -367,7 +353,6 @@ bool board_make_move(struct position *pos, uint32_t move)
     }
 
     assert(pos->key == key_generate(pos));
-    assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
 
     return true;
@@ -392,7 +377,6 @@ void board_unmake_move(struct position *pos)
     pos->ep_sq = elem->ep_sq;
     pos->fifty = elem->fifty;
     pos->key = elem->key;
-    pos->pawnkey = elem->pawnkey;
 
     /* Extract some information for later use */
     to = TO(move);
@@ -440,7 +424,6 @@ void board_unmake_move(struct position *pos)
     pos->stm = move_color;
 
     assert(pos->key == key_generate(pos));
-    assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
 }
 
@@ -460,7 +443,6 @@ void board_make_null_move(struct position *pos)
     elem->ep_sq = pos->ep_sq;
     elem->fifty = pos->fifty;
     elem->key = pos->key;
-    elem->pawnkey = pos->pawnkey;
 
     /* Update NNUE */
     nnue_make_null_move(pos);
@@ -481,7 +463,6 @@ void board_make_null_move(struct position *pos)
     }
 
     assert(pos->key == key_generate(pos));
-    assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
 }
 
@@ -498,7 +479,6 @@ void board_unmake_null_move(struct position *pos)
     pos->ep_sq = elem->ep_sq;
     pos->fifty = elem->fifty;
     pos->key = elem->key;
-    pos->pawnkey = elem->pawnkey;
 
     /* Update the state structure */
     if (pos->stm == WHITE) {
@@ -507,7 +487,6 @@ void board_unmake_null_move(struct position *pos)
     pos->stm = FLIP_COLOR(pos->stm);
 
     assert(pos->key == key_generate(pos));
-    assert(pos->pawnkey == key_generate_pawnkey(pos));
     assert(valid_position(pos));
 }
 

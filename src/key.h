@@ -31,14 +31,6 @@
 uint64_t key_generate(struct position *pos);
 
 /*
- * Generate a unique key for a the pawns of a chess position.
- *
- * @param pos A chess position.
- * @return Returns a unique key for the pawns.
- */
-uint64_t key_generate_pawnkey(struct position *pos);
-
-/*
  * Update a piece in the key.
  *
  * @param key The key to update.

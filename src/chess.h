@@ -305,8 +305,6 @@ struct unmake {
     int fifty;
     /* The unique position key before the move was made */
     uint64_t key;
-    /* The unique pawn key before the move was made */
-    uint64_t pawnkey;
 };
 
 /* An opening book entry */
@@ -400,11 +398,6 @@ struct position {
     uint64_t bb_all;
     /* Key that uniquely identifies the current position */
     uint64_t key;
-    /*
-     * Key that uniquely identifies the location of
-     * the pawns in the current position.
-     */
-    uint64_t pawnkey;
     /* The en-passant target square */
     int ep_sq;
     /* Castling availability for both sides */

@@ -494,29 +494,6 @@ uint64_t key_generate(struct position *pos)
     return key;
 }
 
-uint64_t key_generate_pawnkey(struct position *pos)
-{
-    uint64_t pawns;
-    uint64_t key;
-    int      sq;
-
-    assert(valid_position(pos));
-
-    key = 0ULL;
-    pawns = pos->bb_pieces[WHITE_PAWN];
-    while (pawns != 0ULL) {
-        sq = POPBIT(&pawns);
-        key ^= piece_values[WHITE_PAWN][sq];
-    }
-    pawns = pos->bb_pieces[BLACK_PAWN];
-    while (pawns != 0ULL) {
-        sq = POPBIT(&pawns);
-        key ^= piece_values[BLACK_PAWN][sq];
-    }
-
-    return key;
-}
-
 uint64_t key_update_piece(uint64_t key, int piece, int sq)
 {
     key ^= piece_values[piece][sq];
