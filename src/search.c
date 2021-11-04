@@ -64,13 +64,9 @@ static int futility_margin[] = {0, 104, 205, 339, 437, 520, 667, 785};
 #define RAZORING_DEPTH 3
 static int razoring_margin[] = {0, 54, 152, 448};
 
-/*
- * Aspiration window sizes. If the search fails low or high
- * then the window is set to the next size in order. The
- * last entry in the array should always be INFINITE_SCORE.
- */
-static int aspiration_window[] = {10, 20, 40, 80, 160, 320, 640,
-                                  INFINITE_SCORE};
+/* Aspiration window constants */
+#define INITIAL_ASPIRATION_WINDOW 10
+#define MAX_ASPIRATION_WINDOW 700
 
 /* Move counts for the different depths to use for late move pruning */
 #define LMP_DEPTH 10
@@ -1012,8 +1008,8 @@ static void search_aspiration_window(struct search_worker *worker, int depth,
 {
     int alpha;
     int beta;
-    int awindex;
-    int bwindex;
+    int awindow;
+    int bwindow;
     int score;
 
     /*
@@ -1021,11 +1017,11 @@ static void search_aspiration_window(struct search_worker *worker, int depth,
      * from having an aspiration window for the first few
      * iterations so an infinite window is used to start with.
      */
-    awindex = 0;
-    bwindex = 0;
+    awindow = INITIAL_ASPIRATION_WINDOW;
+    bwindow = INITIAL_ASPIRATION_WINDOW;
     if (depth > 5) {
-        alpha = prev_score - aspiration_window[awindex];
-        beta = prev_score + aspiration_window[bwindex];
+        alpha = prev_score - awindow;
+        beta = prev_score + bwindow;
     } else {
         alpha = -INFINITE_SCORE;
         beta = INFINITE_SCORE;
@@ -1045,8 +1041,11 @@ static void search_aspiration_window(struct search_worker *worker, int depth,
          * increase the window and re-search.
          */
         if (score <= alpha) {
-            awindex++;
-            alpha = score - aspiration_window[awindex];
+            awindow *= 2;
+            if (awindow > MAX_ASPIRATION_WINDOW) {
+                awindow = INFINITE_SCORE;
+            }
+            alpha = score - awindow;
             worker->resolving_root_fail = true;
             if ((worker->id == 0) && (worker->multipv == 1)) {
                 engine_send_bound_info(worker, score, false);
@@ -1054,8 +1053,11 @@ static void search_aspiration_window(struct search_worker *worker, int depth,
             continue;
         }
         if (score >= beta) {
-            bwindex++;
-            beta = score + aspiration_window[bwindex];
+            bwindow *= 2;
+            if (bwindow > MAX_ASPIRATION_WINDOW) {
+                bwindow = INFINITE_SCORE;
+            }
+            beta = score + bwindow;
             if (worker->id == 0) {
                 engine_send_bound_info(worker, score, true);
             }

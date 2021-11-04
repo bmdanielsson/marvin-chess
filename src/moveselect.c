@@ -94,7 +94,7 @@ static void add_moves(struct search_worker *worker, struct moveselector *ms,
         /*
          * If the SEE score is positive (normal moves or good captures) then
          * the move is added to the moveinfo list. If the SEE score is
-         * negative (bad captures) then the move is added to be bad tacticals
+         * negative (bad captures) then the move is added to the bad tacticals
          * list.
          */
         if (ISTACTICAL(move) && !see_ge(pos, move, 0)) {

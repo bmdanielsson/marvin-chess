@@ -667,14 +667,13 @@ uint64_t bb_king_moves(int from)
 
 uint64_t bb_attacks_to(struct position *pos, uint64_t occ, int to, int side)
 {
-    uint64_t attacks;
+    uint64_t attacks = 0ULL;
 
     assert(valid_position(pos));
     assert(valid_square(to));
     assert(valid_side(side));
 
     /* Generate attacks */
-    attacks = 0ULL;
     attacks |= king_moves_table[to]&(pos->bb_pieces[side+KING]);
     attacks |= bb_rook_moves(occ, to)&
                     (pos->bb_pieces[side+ROOK]|pos->bb_pieces[side+QUEEN]);
