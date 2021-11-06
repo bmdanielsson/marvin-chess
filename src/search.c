@@ -1011,12 +1011,14 @@ static void search_aspiration_window(struct search_worker *worker, int depth,
     int awindow;
     int bwindow;
     int score;
+    int reduce;
 
     /*
      * Setup the next iteration. There is not much to gain
      * from having an aspiration window for the first few
      * iterations so an infinite window is used to start with.
      */
+    reduce = 0;
     awindow = INITIAL_ASPIRATION_WINDOW;
     bwindow = INITIAL_ASPIRATION_WINDOW;
     if (depth > 5) {
@@ -1030,17 +1032,19 @@ static void search_aspiration_window(struct search_worker *worker, int depth,
     /* Main iterative deepening loop */
     while (true) {
 		/* Search */
+        reduce = MIN(reduce, 3);
         worker->depth = depth;
         worker->seldepth = 0;
         alpha = MAX(alpha, -INFINITE_SCORE);
         beta = MIN(beta, INFINITE_SCORE);
-        score = search_root(worker, depth, alpha, beta);
+        score = search_root(worker, depth-reduce, alpha, beta);
 
         /*
          * If the score is outside of the alpha/beta bounds then
          * increase the window and re-search.
          */
         if (score <= alpha) {
+            reduce = 0;
             awindow *= 2;
             if (awindow > MAX_ASPIRATION_WINDOW) {
                 awindow = INFINITE_SCORE;
@@ -1053,6 +1057,7 @@ static void search_aspiration_window(struct search_worker *worker, int depth,
             continue;
         }
         if (score >= beta) {
+            reduce++;
             bwindow *= 2;
             if (bwindow > MAX_ASPIRATION_WINDOW) {
                 bwindow = INFINITE_SCORE;
