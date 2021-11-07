@@ -45,7 +45,7 @@ static int tt_size_in_mb = 0;
 static uint64_t tt_size = 0ULL;
 static uint8_t tt_date = 0;
 
-static int largest_power_of_2(uint64_t size, int item_size)
+static uint64_t largest_power_of_2(uint64_t size, int item_size)
 {
     uint64_t largest;
     uint64_t nitems;
