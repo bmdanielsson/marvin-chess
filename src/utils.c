@@ -49,7 +49,7 @@ static thread_retval_t memset_func(void *data)
     return (thread_retval_t)0;
 }
 
-#if USE_POPCNT && __GNUC__
+#if USE_POPCNT
 int pop_count (uint64_t v)
 {
     return __builtin_popcountll(v);
@@ -73,75 +73,19 @@ int pop_count (uint64_t v)
 }
 #endif
 
-#ifdef __GNUC__
 int bitscan_forward(uint64_t v)
 {
     assert(v != 0);
 
     return __builtin_ctzll(v);
 }
-#else
-/*
- * This function is taken from https://chessprogramming.wikispaces.com/BitScan.
- * Implementation by Charles E. Leiserson, Harald Prokop and Keith H. Randall.
- */
-const int index64[64] = {
-    63,  0, 58,  1, 59, 47, 53,  2,
-    60, 39, 48, 27, 54, 33, 42,  3,
-    61, 51, 37, 40, 49, 18, 28, 20,
-    55, 30, 34, 11, 43, 14, 22,  4,
-    62, 57, 46, 52, 38, 26, 32, 41,
-    50, 36, 17, 19, 29, 10, 13, 21,
-    56, 45, 25, 31, 35, 16,  9, 12,
-    44, 24, 15,  8, 23,  7,  6,  5
-};
-int bitscan_forward(uint64_t v)
-{
-    const uint64_t debruijn64 = 0x07EDD5E59A4E28C2ULL;
 
-    assert(v != 0);
-
-    return index64[((v&-v)*debruijn64)>>58];
-}
-#endif
-
-#ifdef __GNUC__
 int bitscan_reverse(uint64_t v)
 {
     assert(v != 0);
 
     return 63 - __builtin_clzll(v);
 }
-#else
-/*
- * This function is taken from http://chessprogramming.net . Initial
- * implementation by Gerd Isenberg.
- */
-int bitscan_reverse(uint64_t v)
-{
-    unsigned int l;
-    unsigned int h;
-    unsigned int i;
-    unsigned int m;
-
-    assert(v != 0);
-
-    h = (unsigned int)(v >> 32);
-    l = (unsigned int)v;
-    m = h != 0;
-    i = m << 5;
-    l = (h & -m) | (l & (m-1));
-    m = (l > 0xffff) << 4;
-    i += m;
-    l >>= m;
-    m = ((0xff-l)>>16) & 8;
-    i += m;
-    l >>= m;
-    m = ((0x0f-l)>> 8) & 4;
-    l >>= m;
-    return (int)(i + m + ((0xffffaa50U >> (2*l)) & 3));
-}
-#endif
 
 int pop_bit(uint64_t *v)
 {
@@ -360,7 +304,6 @@ char* skip_whitespace(char *str)
 
 void* aligned_malloc(int alignment, uint64_t size)
 {
-#ifdef __GNUC__
 #ifdef WINDOWS
     return _aligned_malloc(size, alignment);
 #else
@@ -370,20 +313,12 @@ void* aligned_malloc(int alignment, uint64_t size)
     }
     return ptr;
 #endif
-#else
-    (void)alignment;
-    return malloc(size);
-#endif
 }
 
 void aligned_free(void *ptr)
 {
-#ifdef __GNUC__
 #ifdef WINDOWS
     _aligned_free(ptr);
-#else
-    free(ptr);
-#endif
 #else
     free(ptr);
 #endif
