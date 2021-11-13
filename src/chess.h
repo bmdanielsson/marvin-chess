@@ -337,7 +337,7 @@ struct tt_item {
 };
 
 /* The number of items stored in each transposition table bucket */
-#define TT_BUCKET_SIZE 2
+#define TT_BUCKET_SIZE 3
 
 /*
  * Transposition table bucket. The size should be a
@@ -346,6 +346,7 @@ struct tt_item {
 struct tt_bucket {
     /* Items stored in this bucket */
     struct tt_item items[TT_BUCKET_SIZE];
+    uint8_t pad[16];
 };
 
 /*
