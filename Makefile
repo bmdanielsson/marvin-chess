@@ -148,7 +148,6 @@ SOURCES = src/bitboard.c \
           src/hash.c \
           src/history.c \
           src/key.c \
-          src/main.c \
           src/movegen.c \
           src/moveselect.c \
           src/nnue.c \
@@ -165,36 +164,10 @@ SOURCES = src/bitboard.c \
           src/validation.c \
           src/xboard.c \
           import/fathom/tbprobe.c
-TUNER_SOURCES = src/bitboard.c \
-                src/board.c \
-                src/chess.c \
-                src/debug.c \
-                src/engine.c \
-                src/eval.c \
-                src/evalparams.c \
-                src/fen.c \
-                src/hash.c \
-                src/history.c \
-                src/key.c \
-                src/movegen.c \
-                src/moveselect.c \
-                src/nnue.c \
-                src/polybook.c \
-                src/search.c \
-                src/see.c \
-                src/simd.c \
-                src/smp.c \
-                src/test.c \
-                src/thread.c \
-                src/timectl.c \
-                src/trace.c \
+ENGINE_SOURCES = src/main.c
+TUNER_SOURCES = src/trace.c \
                 src/tuner.c \
-                src/tuningparam.c \
-                src/uci.c \
-                src/utils.c \
-                src/validation.c \
-                src/xboard.c \
-                import/fathom/tbprobe.c
+                src/tuningparam.c
 .PHONY : trace
 ifeq ($(trace), yes)
     SOURCES += src/trace.c src/tuningparam.c
@@ -203,13 +176,17 @@ endif
 # Intermediate files
 OBJECTS = $(SOURCES:%.c=%.o)
 DEPS = $(SOURCES:%.c=%.d)
+ENGINE_OBJECTS = $(ENGINE_SOURCES:%.c=%.o)
+ENGINE_DEPS = $(ENGINE_SOURCES:%.c=%.d)
 TUNER_OBJECTS = $(TUNER_SOURCES:%.c=%.o)
 TUNER_DEPS = $(TUNER_SOURCES:%.c=%.d)
 INTERMEDIATES = $(OBJECTS) $(DEPS)
+ENGINE_INTERMEDIATES = $(ENGINE_OBJECTS) $(ENGINE_DEPS)
 TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
 
 # Include depencies
 -include $(SOURCES:.c=.d)
+-include $(ENGINE_SOURCES:.c=.d)
 -include $(TUNER_SOURCES:.c=.d)
 
 # Targets
@@ -219,7 +196,8 @@ TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
 	$(COMPILE.c) -MD -o $@ $<
 
 clean :
-	rm -f $(EXEFILE) tuner $(INTERMEDIATES) $(TUNER_INTERMEDIATES)
+	rm -f $(EXEFILE) tuner $(INTERMEDIATES) $(ENGINE_INTERMEDIATES) $(TUNER_INTERMEDIATES)
+
 .PHONY : clean
 
 help :
@@ -240,11 +218,11 @@ help :
 	@echo "  nnuenet=<file>: Override the default NNUE net."
 .PHONY : help
 
-marvin : $(OBJECTS)
-	$(CC) $(OBJECTS) $(LDFLAGS) -o $(EXEFILE)
+marvin : $(OBJECTS) $(ENGINE_OBJECTS)
+	$(CC) $(OBJECTS) $(ENGINE_OBJECTS) $(LDFLAGS) -o $(EXEFILE)
 
-tuner : $(TUNER_OBJECTS)
-	$(CC) $(TUNER_OBJECTS) $(LDFLAGS) -o tuner
+tuner : $(OBJECTS) $(TUNER_OBJECTS)
+	$(CC) $(OBJECTS) $(TUNER_OBJECTS) $(LDFLAGS) -o tuner
 
 net :
 	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v2/$(nnuenet)
