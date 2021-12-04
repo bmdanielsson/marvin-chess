@@ -28,10 +28,12 @@ Starting from version 5.0.0 Marvin uses a neural network for evaluation. A netwo
 
 # Building
 
-The easiest way to build Marvin is to use the included Makefile and just run `make`. This should produce a binary that is compatible with most systems. The default compiler is Clang, but if you want to use GCC instead run `make CC=gcc`. For more information about available targets and build options run `make help`.
+The easiest way to build Marvin is to use the included Makefile and just run `make`. This should produce a binary that is compatible with most systems. For more information about available targets and build options run `make help`.
 
 # License
 
 The source code is provided under the GPLv3 license. For details see the LICENSE file.
 
 Marvin uses the Fathom library (https://github.com/jdart1/Fathom) for probing Syzygy tablebases. The Fathom library is licensed under the MIT license. For details see the LICENSE file in the import/fathom folder.
+
+Marvin uses incbin (https://github.com/graphitemaster/incbin) for including binary files. For license information see the UNLICENSE file in the import/incbin folder.

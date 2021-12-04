@@ -122,7 +122,7 @@ endif
 CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
 
 # Extra include directories
-CFLAGS += -Iimport/fathom -Isrc
+CFLAGS += -Iimport/fathom -Iimport/incbin -Isrc
 
 # Enable evaluation tracing for tuner
 ifeq ($(MAKECMDGOALS), tuner)
@@ -130,7 +130,11 @@ ifeq ($(MAKECMDGOALS), tuner)
 endif
 
 # Compiler
-CC = clang
+ifeq ($(OS), Windows_NT)
+    CC = gcc
+else
+    CC = clang
+endif
 
 # Sources
 SOURCES = src/bitboard.c \

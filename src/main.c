@@ -103,9 +103,9 @@ int main(int argc, char *argv[])
     srand((unsigned int)time(NULL));
 
     /* Setup the default NNUE net */
-    nnue_init();
     strcpy(engine_eval_file, NETFILE_NAME);
-    engine_loaded_net = nnue_load_net(engine_eval_file);
+    nnue_init();
+    engine_loaded_net = nnue_load_net(NULL);
     engine_using_nnue = engine_loaded_net;
 
     /* Read configuration file */

@@ -32,6 +32,11 @@
 #include "bitboard.h"
 #include "simd.h"
 
+#define INCBIN_PREFIX
+#define INCBIN_STYLE INCBIN_STYLE_SNAKE
+#include "incbin.h"
+INCBIN(nnue_net, NETFILE_NAME);
+
 /* Struct holding information about a layer in the network */
 struct layer {
     union {
@@ -438,22 +443,27 @@ bool nnue_load_net(char *path)
 
     assert(path != NULL);
 
-    /* Read the complete file */
-    size = get_file_size(path);
-    if (size != calculate_net_size()) {
-        ret = false;
-        goto exit;
-    }
-    fh = fopen(path, "rb");
-    if (fh == NULL) {
-        ret = false;
-        goto exit;
-    }
-    data = malloc(size);
-    count = fread(data, 1, size, fh);
-    if (count != size) {
-        ret = false;
-        goto exit;
+    /* If an external net is specified then read the complete file */
+    if (path != NULL) {
+        size = get_file_size(path);
+        if (size != calculate_net_size()) {
+            ret = false;
+            goto exit;
+        }
+        fh = fopen(path, "rb");
+        if (fh == NULL) {
+            ret = false;
+            goto exit;
+        }
+        data = malloc(size);
+        count = fread(data, 1, size, fh);
+        if (count != size) {
+            ret = false;
+            goto exit;
+        }
+    } else {
+        data = (uint8_t*)nnue_net_data;
+        size = (uint32_t)nnue_net_size;
     }
 
     /* Parse network header */
@@ -470,9 +480,11 @@ bool nnue_load_net(char *path)
     }
 
 exit:
-    free(data);
-    if (fh != NULL) {
-        fclose(fh);
+    if (path != NULL) {
+        free(data);
+        if (fh != NULL) {
+            fclose(fh);
+        }
     }
     return ret;
 }
