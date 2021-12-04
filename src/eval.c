@@ -1136,6 +1136,7 @@ bool eval_is_material_draw(struct position *pos)
 void eval_generate_trace(struct position *pos, struct eval_trace *trace)
 {
     struct eval eval;
+    int         total_phase;
     int         phase;
 
     assert(valid_position(pos));
@@ -1147,8 +1148,9 @@ void eval_generate_trace(struct position *pos, struct eval_trace *trace)
     eval.trace = trace;
 
     /* Calculate game phase */
+    total_phase = 24;
     phase = ((24-pos->matphase)*256 + (total_phase/2))/total_phase;
-    trace->phase_factor = MAX(phasae, 0);
+    trace->phase_factor = MAX(phase, 0);
 
     /* If there is insufficiernt mating material there is nothing to do */
     if (eval_is_material_draw(pos)) {
