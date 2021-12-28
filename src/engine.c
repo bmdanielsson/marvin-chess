@@ -45,6 +45,7 @@
 
 /* Global engine variables */
 enum protocol engine_protocol = PROTOCOL_UNSPECIFIED;
+enum variant engine_variant = VARIANT_STANDARD;
 char engine_syzygy_path[MAX_PATH_LENGTH+1] = {'\0'};
 int engine_default_hash_size = DEFAULT_MAIN_HASH_SIZE;
 int engine_default_num_threads = 1;

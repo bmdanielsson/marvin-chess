@@ -32,8 +32,16 @@ enum protocol {
     PROTOCOL_XBOARD
 };
 
+/* Enum for different chess variants */
+enum variant {
+    VARIANT_UNSPECIFIED,
+    VARIANT_STANDARD,
+    VARIANT_FRC
+};
+
 /* Global engine variables */
 extern enum protocol engine_protocol;
+extern enum variant engine_variant;
 extern char engine_syzygy_path[MAX_PATH_LENGTH+1];
 extern int engine_default_hash_size;
 extern int engine_default_num_threads;

@@ -594,7 +594,7 @@ static void xboard_cmd_protover(void)
 	engine_write_command("feature sigint=0");
 	engine_write_command("feature sigterm=0");
 	engine_write_command("feature myname=\"%s %s\"", APP_NAME, APP_VERSION);
-	engine_write_command("feature variants=\"normal\"");
+	engine_write_command("feature variants=\"normal,fischerandom\"");
 	engine_write_command("feature colors=0");
 	engine_write_command("feature name=1");
 	engine_write_command("feature nps=0");
@@ -724,9 +724,31 @@ static void xboard_cmd_usermove(char *cmd, struct gamestate *state,
     }
 }
 
+static void xboard_cmd_variant(char *cmd)
+{
+    char *iter;
+    char *variant;
+
+    iter = strchr(cmd, ' ');
+    if (iter == NULL) {
+        engine_write_command("Error (malformed command): %s", cmd);
+        return;
+    }
+    variant = iter+1;
+
+    if (MATCH(variant, "normal")) {
+        engine_variant = VARIANT_STANDARD;
+    } else if (MATCH(variant, "fischerandom")) {
+        engine_variant = VARIANT_FRC;
+    } else {
+        engine_write_command("Error (malformed command): %s", cmd);
+    }
+}
+
 static void xboard_cmd_xboard(struct gamestate *state)
 {
     engine_protocol = PROTOCOL_XBOARD;
+    engine_variant = VARIANT_STANDARD;
 
     ponder_mode = false;
     tablebase_mode = TB_LARGEST > 0;
@@ -816,6 +838,8 @@ bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop)
         xboard_cmd_undo(state);
     } else if (MATCH(cmd, "usermove")) {
         xboard_cmd_usermove(cmd, state, !force_mode);
+    } else if (MATCH(cmd, "variant")) {
+        xboard_cmd_variant(cmd);
     } else if (MATCH(cmd, "xboard")) {
         xboard_cmd_xboard(state);
     } else {

@@ -32,25 +32,55 @@
 #include "engine.h"
 #include "nnue.h"
 
-/*
- * Array of masks for updating castling permissions. For instance
- * a mask of 13 on A1 means that if a piece is moved to/from this
- * square then WHITE can still castle king side and black can still
- * castle both king side and queen side.
- */
-static int castling_permission_masks[NSQUARES] = {
-    13, 15, 15, 15, 12, 15, 15, 14,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
-    15, 15, 15, 15, 15, 15, 15, 15,
-     7, 15, 15, 15,  3, 15, 15, 11
-};
-
 /* Point value for the different pieces */
 static int point_values[NPIECES] = {1, 1, 3, 3, 3, 3, 5, 5, 9, 9, 0, 0};
+
+static void update_castling_availability(struct position *pos, int from, int to)
+{
+    /* If the king moves castling becomes unavailable for both directions */
+    if (pos->pieces[from] == (pos->stm+KING)) {
+        if (pos->stm == WHITE) {
+            pos->castle &= ~WHITE_KINGSIDE;
+            pos->castle &= ~WHITE_QUEENSIDE;
+        } else {
+            pos->castle &= ~BLACK_KINGSIDE;
+            pos->castle &= ~BLACK_QUEENSIDE;
+        }
+    }
+
+    /* If a rook moves castling becomes unavailable for that direction */
+    if ((pos->stm == WHITE) && (pos->pieces[from] == WHITE_ROOK)) {
+        if (from == pos->castle_wk) {
+            pos->castle &= ~WHITE_KINGSIDE;
+        } else if (from == pos->castle_wq) {
+            pos->castle &= ~WHITE_QUEENSIDE;
+        }
+    } else if ((pos->stm == BLACK) && (pos->pieces[from] == BLACK_ROOK)) {
+        if (from == pos->castle_bk) {
+            pos->castle &= ~BLACK_KINGSIDE;
+        } else if (from == pos->castle_bq) {
+            pos->castle &= ~BLACK_QUEENSIDE;
+        }
+    }
+
+    /*
+     * If an opponent rook is captured castling becomes
+     * unavailable for that direction.
+     */
+    if (pos->stm == WHITE) {
+        if (to == pos->castle_bk) {
+            pos->castle &= ~BLACK_KINGSIDE;
+        } else if (to == pos->castle_bq) {
+            pos->castle &= ~BLACK_QUEENSIDE;
+        }
+    } else if (pos->stm == BLACK) {
+        if (to == pos->castle_wk) {
+            pos->castle &= ~WHITE_KINGSIDE;
+        } else if (to == pos->castle_wq) {
+            pos->castle &= ~WHITE_QUEENSIDE;
+        }
+    }
+}
 
 static int point_value(struct position *pos)
 {
@@ -151,12 +181,6 @@ static void remove_piece(struct position *pos, int piece, int square)
     CLEARBIT(pos->bb_all, square);
     pos->pieces[square] = NO_PIECE;
     eval_update_piece_features(pos, piece, square, false);
-}
-
-static void move_piece(struct position *pos, int piece, int from, int to)
-{
-    remove_piece(pos, piece, from);
-    add_piece(pos, piece, to);
 }
 
 static struct unmake* push_history(struct position *pos)
@@ -284,8 +308,7 @@ bool board_make_move(struct position *pos, uint32_t move)
     pos->key = key_update_ep_square(pos->key, elem->ep_sq, pos->ep_sq);
 
     /* Update castling availability */
-    pos->castle &= castling_permission_masks[from];
-    pos->castle &= castling_permission_masks[to];
+    update_castling_availability(pos, from, to);
     pos->key = key_update_castling(pos->key, elem->castle, pos->castle);
 
     /* Remove piece from current position */
@@ -302,6 +325,12 @@ bool board_make_move(struct position *pos, uint32_t move)
         pos->key = key_update_piece(pos->key, PAWN+FLIP_COLOR(pos->stm), ep);
     }
 
+    /* If this is a castling we have to remove the rook as well */
+    if (ISKINGSIDECASTLE(move) || ISQUEENSIDECASTLE(move)) {
+        remove_piece(pos, pos->stm+ROOK, TO(move));
+        pos->key = key_update_piece(pos->key, pos->stm+ROOK, TO(move));
+    }
+
     /* Add piece to new position */
     if (ISPROMOTION(move)) {
         add_piece(pos, promotion, to);
@@ -311,15 +340,15 @@ bool board_make_move(struct position *pos, uint32_t move)
         pos->key = key_update_piece(pos->key, piece, to);
     }
 
-    /* If this is a castling we have to move the rook */
+    /* If this is a castling we have to add the rook */
     if (ISKINGSIDECASTLE(move)) {
-        move_piece(pos, pos->stm+ROOK, to+1, to-1);
-        pos->key = key_update_piece(pos->key, pos->stm+ROOK, to+1);
-        pos->key = key_update_piece(pos->key, pos->stm+ROOK, to-1);
+        add_piece(pos, pos->stm+ROOK, (pos->stm==WHITE)?F1:F8);
+        pos->key = key_update_piece(pos->key, pos->stm+ROOK,
+                                    (pos->stm==WHITE)?F1:F8);
     } else if (ISQUEENSIDECASTLE(move)) {
-        move_piece(pos, pos->stm+ROOK, to-2, to+1);
-        pos->key = key_update_piece(pos->key, pos->stm+ROOK, to-2);
-        pos->key = key_update_piece(pos->key, pos->stm+ROOK, to+1);
+        add_piece(pos, pos->stm+ROOK, (pos->stm==WHITE)?D1:D8);
+        pos->key = key_update_piece(pos->key, pos->stm+ROOK,
+                                    (pos->stm==WHITE)?D1:D8);
     }
 
     /* Update the fifty move draw counter */
@@ -395,6 +424,16 @@ void board_unmake_move(struct position *pos)
         remove_piece(pos, piece, to);
     }
 
+    /*
+     * If this a castling then remove the rook
+     * from it's current position.
+     */
+    if (ISKINGSIDECASTLE(move)) {
+        remove_piece(pos, move_color+ROOK, (move_color==WHITE)?F1:F8);
+    } else if (ISQUEENSIDECASTLE(move)) {
+        remove_piece(pos, move_color+ROOK, (move_color==WHITE)?D1:D8);
+    }
+
     /* Add piece to previous position */
     add_piece(pos, piece, from);
 
@@ -406,15 +445,11 @@ void board_unmake_move(struct position *pos)
     }
 
     /*
-     * If this a castling then move the rook
-     * back to it's original position.
+     * If this a castling then put the rook
+     * back on it's original position.
      */
-    if (ISKINGSIDECASTLE(move)) {
-        remove_piece(pos, move_color+ROOK, to-1);
-        add_piece(pos, move_color+ROOK, to+1);
-    } else if (ISQUEENSIDECASTLE(move)) {
-        remove_piece(pos, move_color+ROOK, to+1);
-        add_piece(pos, move_color+ROOK, to-2);
+    if (ISKINGSIDECASTLE(move) || ISQUEENSIDECASTLE(move)) {
+        add_piece(pos, move_color+ROOK, TO(move));
     }
 
     /* Update fullmove counter */
@@ -596,43 +631,25 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
 
         return true;
     } else if (ISKINGSIDECASTLE(move)) {
-        const int emptysq1[2] = {6, 62};
-        const int emptysq2[2] = {5, 61};
-        const int kingsq[2] = {4, 60};
-        const int rooksq[2] = {7, 63};
-        const int availability[2] = {WHITE_KINGSIDE, BLACK_KINGSIDE};
+        const int kingsq[NSIDES] = {LSB(pos->bb_pieces[WHITE_KING]),
+                                    LSB(pos->bb_pieces[BLACK_KING])};
+        const int rooksq[NSIDES] = {pos->castle_wk, pos->castle_bk};
 
-        /* Check castling */
-        to = KINGCASTLE_KINGMOVE(to);
-        return ((pos->castle&availability[pos->stm]) &&
-                (pos->pieces[emptysq2[pos->stm]] == NO_PIECE) &&
-                (pos->pieces[emptysq1[pos->stm]] == NO_PIECE) &&
+        return ((from == kingsq[pos->stm]) &&
+                (to == rooksq[pos->stm]) &&
                 (pos->pieces[kingsq[pos->stm]] == (KING+pos->stm)) &&
                 (pos->pieces[rooksq[pos->stm]] == (ROOK+pos->stm)) &&
-                (!bb_is_attacked(pos, kingsq[pos->stm], opp)) &&
-                (!bb_is_attacked(pos, emptysq2[pos->stm], opp)) &&
-                (from == kingsq[pos->stm]) &&
-                (to == emptysq1[pos->stm]));
+                board_is_castling_allowed(pos, KINGSIDE_CASTLE));
     } else if (ISQUEENSIDECASTLE(move)) {
-        const int emptysq1[2] = {1, 57};
-        const int emptysq2[2] = {2, 58};
-        const int emptysq3[2] = {3, 59};
-        const int kingsq[2] = {4, 60};
-        const int rooksq[2] = {0, 56};
-        const int availability[2] = {WHITE_QUEENSIDE, BLACK_QUEENSIDE};
+        const int kingsq[NSIDES] = {LSB(pos->bb_pieces[WHITE_KING]),
+                                    LSB(pos->bb_pieces[BLACK_KING])};
+        const int rooksq[NSIDES] = {pos->castle_wq, pos->castle_bq};
 
-        /* Check castling */
-        to = QUEENCASTLE_KINGMOVE(to);
-        return ((pos->castle&availability[pos->stm]) &&
-                (pos->pieces[emptysq3[pos->stm]] == NO_PIECE) &&
-                (pos->pieces[emptysq2[pos->stm]] == NO_PIECE) &&
-                (pos->pieces[emptysq1[pos->stm]] == NO_PIECE) &&
+        return ((from == kingsq[pos->stm]) &&
+                (to == rooksq[pos->stm]) &&
                 (pos->pieces[kingsq[pos->stm]] == (KING+pos->stm)) &&
                 (pos->pieces[rooksq[pos->stm]] == (ROOK+pos->stm)) &&
-                (!bb_is_attacked(pos, kingsq[pos->stm], opp)) &&
-                (!bb_is_attacked(pos, emptysq3[pos->stm], opp)) &&
-                (from == kingsq[pos->stm]) &&
-                (to == emptysq2[pos->stm]));
+                board_is_castling_allowed(pos, QUEENSIDE_CASTLE));
     }
 
     /*
@@ -778,4 +795,120 @@ void board_quiet(struct position *pos, struct movelist *pv)
 {
     pv->size = 0;
     (void)quiet(pos, -INFINITE_SCORE, INFINITE_SCORE, pv);
+}
+
+bool board_is_castling_allowed(struct position *pos, int type)
+{
+    int      king_start;
+    int      king_stop;
+    int      rook_start;
+    int      rook_stop;
+    int      sq;
+    int      delta;
+    int      flag;
+    uint64_t occ;
+
+    /* Check castling availability flag */
+    if (pos->stm == WHITE) {
+        flag = (type == KINGSIDE_CASTLE)?WHITE_KINGSIDE:WHITE_QUEENSIDE;
+    } else {
+        flag = (type == KINGSIDE_CASTLE)?BLACK_KINGSIDE:BLACK_QUEENSIDE;
+    }
+    if ((pos->castle&flag) == 0) {
+        return false;
+    }
+
+    /*
+     * Special case handling for standard chess. This is much faster
+     * than the more general handling necessary for FRC.
+     */
+    if (engine_variant == VARIANT_STANDARD) {
+        if (type == KINGSIDE_CASTLE) {
+            if (pos->stm == WHITE) {
+                return ((pos->castle&WHITE_KINGSIDE) &&
+                    (pos->pieces[F1] == NO_PIECE) &&
+                    (pos->pieces[G1] == NO_PIECE) &&
+                    (!bb_is_attacked(pos, E1, BLACK)) &&
+                    (!bb_is_attacked(pos, F1, BLACK)));
+            } else {
+                return ((pos->castle&BLACK_KINGSIDE) &&
+                    (pos->pieces[F8] == NO_PIECE) &&
+                    (pos->pieces[G8] == NO_PIECE) &&
+                    (!bb_is_attacked(pos, E8, WHITE)) &&
+                    (!bb_is_attacked(pos, F8, WHITE)));
+            }
+        } else {
+            if (pos->stm == WHITE) {
+                return ((pos->castle&WHITE_QUEENSIDE) &&
+                        (pos->pieces[B1] == NO_PIECE) &&
+                        (pos->pieces[C1] == NO_PIECE) &&
+                        (pos->pieces[D1] == NO_PIECE) &&
+                        (!bb_is_attacked(pos, D1, BLACK)) &&
+                        (!bb_is_attacked(pos, E1, BLACK)));
+            } else {
+                return ((pos->castle&BLACK_QUEENSIDE) &&
+                        (pos->pieces[B8] == NO_PIECE) &&
+                        (pos->pieces[C8] == NO_PIECE) &&
+                        (pos->pieces[D8] == NO_PIECE) &&
+                        (!bb_is_attacked(pos, D8, WHITE)) &&
+                        (!bb_is_attacked(pos, E8, WHITE)));
+            }
+        }
+    }
+
+    /* Figure out start and stop squares for the king and rook */
+    king_start = LSB(pos->bb_pieces[KING+pos->stm]);
+    if (type == KINGSIDE_CASTLE) {
+        rook_start = (pos->stm == WHITE)?pos->castle_wk:pos->castle_bk;
+        king_stop = (pos->stm == WHITE)?G1:G8;
+        rook_stop = (pos->stm == WHITE)?F1:F8;
+    } else if (type == QUEENSIDE_CASTLE) {
+        rook_start = (pos->stm == WHITE)?pos->castle_wq:pos->castle_bq;
+        king_stop = (pos->stm == WHITE)?C1:C8;
+        rook_stop = (pos->stm == WHITE)?D1:D8;
+    } else {
+        return false;
+    }
+
+    /* Mask of the king and rook from the occupancy bitboard */
+    occ = pos->bb_all;
+    CLEARBIT(occ, king_start);
+    CLEARBIT(occ, rook_start);
+
+    /*
+     * Check that the squares between the start and stop squares
+     * if the king are unoccupied and not under attack. There is
+     * no need to check if there is a king on the starting square
+     * since if there isn't the castling flag would not be set.
+     */
+    delta = (king_start < king_stop)?1:-1;
+    for (sq=king_start;sq!=king_stop;sq+=delta) {
+        if (ISBITSET(occ, sq)) {
+            return false;
+        }
+        if (bb_is_attacked(pos, sq, FLIP_COLOR(pos->stm))) {
+            return false;
+        }
+    }
+    if (ISBITSET(occ, king_stop)) {
+        return false;
+    }
+
+    /*
+     * Check that the squares between the start and stop squares
+     * if the rook are unoccupied and not under attack. There is
+     * no need to check if there is a rook on the starting square
+     * since if there isn't the castling flag would not be set.
+     */
+    delta = (rook_start < rook_stop)?1:-1;
+    for (sq=rook_start;sq!=rook_stop;sq+=delta) {
+        if (ISBITSET(occ, sq)) {
+            return false;
+        }
+    }
+    if (ISBITSET(occ, rook_stop)) {
+        return false;
+    }
+
+    return true;
 }

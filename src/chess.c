@@ -95,6 +95,10 @@ uint64_t outpost_squares[NSIDES];
 
 uint64_t space_eval_squares[NSIDES];
 
+int kingside_castle_to[NSIDES] = {G1, G8};
+
+int queenside_castle_to[NSIDES] = {C1, C8};
+
 static void init_king_zones(void)
 {
     int sq;
@@ -378,12 +382,23 @@ void move2str(uint32_t move, char *str)
     /*
      * Internally castling is represented as king-captures-rook so
      * for standard chess it needs to be converted to a king move.
+     * Additionally when using the Xboard protocol when playing an
+     * FRC game castling is represented with O-O or O-O-O.
      */
     if (engine_variant == VARIANT_STANDARD) {
         if (ISKINGSIDECASTLE(move)) {
             to = KINGCASTLE_KINGMOVE(to);
         } else if (ISQUEENSIDECASTLE(move)) {
             to = QUEENCASTLE_KINGMOVE(to);
+        }
+    } else if ((engine_variant == VARIANT_FRC) &&
+               (engine_protocol == PROTOCOL_XBOARD)) {
+        if (ISKINGSIDECASTLE(move)) {
+            strcpy(str, "O-O");
+            return;
+        } else if (ISQUEENSIDECASTLE(move)) {
+            strcpy(str, "O-O-O");
+            return;
         }
     }
 
@@ -428,8 +443,27 @@ uint32_t str2move(char *str, struct position *pos)
     assert(valid_position(pos));
 
     /* Make sure that the string is at least 4 characters long */
-    if (strlen(str) < 4) {
+    if (strlen(str) < 3) {
         return NOMOVE;
+    }
+
+    /*
+     * When using Xboard protocol and playing an FRC game castling is
+     * is represented using O-O or O-O-O.
+     */
+    if ((engine_variant == VARIANT_FRC) &&
+        (engine_protocol == PROTOCOL_XBOARD)) {
+        if (!strcmp(str, "O-O")) {
+            from = LSB(pos->bb_pieces[KING+pos->stm]);
+            to = (pos->stm == WHITE)?pos->castle_wk:pos->castle_bk;
+            promotion = NO_PIECE;
+            goto check_move;
+        } else if (!strcmp(str, "O-O-O")) {
+            from = LSB(pos->bb_pieces[KING+pos->stm]);
+            to = (pos->stm == WHITE)?pos->castle_wq:pos->castle_bq;
+            promotion = NO_PIECE;
+            goto check_move;
+        }
     }
 
     /* Get from/to squares and a potential promotion piece */
@@ -461,12 +495,13 @@ uint32_t str2move(char *str, struct position *pos)
         (pos->pieces[from] == (pos->stm+KING)) &&
         (abs(to-from) == 2)) {
         if (to < from) {
-            to = QUEENCASTLE_ROOKCAPTURE(to);
+            to = (pos->stm == WHITE)?pos->castle_wq:pos->castle_bq;
         } else if (to > from) {
-            to = KINGCASTLE_ROOKCAPTURE(to);
+            to = (pos->stm == WHITE)?pos->castle_wk:pos->castle_bk;
         }
     }
 
+check_move:
     /*
      * Generate all moves for the currect position and make sure
      * that the move is among them.

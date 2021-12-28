@@ -135,4 +135,13 @@ int board_point_value(struct position *pos);
  */
 void board_quiet(struct position *pos, struct movelist *pv);
 
+/*
+ * Check if castling is allowed in a given position.
+ *
+ * @param pos The position.
+ * @param type The type of castling to check.
+ * @return Returns true if castling is allowed, false otherwise.
+ */
+bool board_is_castling_allowed(struct position *pos, int type);
+
 #endif

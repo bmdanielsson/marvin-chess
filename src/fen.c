@@ -44,6 +44,82 @@
                      (c=='n')||(c=='p')) \
                     ?true:false
 
+static uint8_t outer_rook(struct position *pos, int castle)
+{
+    uint8_t sq;
+    uint8_t start;
+    uint8_t stop;
+    int     target;
+    int     blocker;
+    int     delta;
+
+    if (castle == WHITE_KINGSIDE) {
+        start = H1;
+        stop = A1;
+        delta = -1;
+        target = WHITE_ROOK;
+        blocker = WHITE_KING;
+    } else if (castle == WHITE_QUEENSIDE) {
+        start = A1;
+        stop = H1;
+        delta = 1;
+        target = WHITE_ROOK;
+        blocker = WHITE_KING;
+    } else if (castle == BLACK_KINGSIDE) {
+        start = H8;
+        stop = A8;
+        delta = -1;
+        target = BLACK_ROOK;
+        blocker = BLACK_KING;
+    } else if (castle == BLACK_QUEENSIDE) {
+        start = A8;
+        stop = H8;
+        delta = 1;
+        target = BLACK_ROOK;
+        blocker = BLACK_KING;
+    } else {
+        return NO_SQUARE;
+    }
+
+    for (sq=start;sq!=stop;sq+=delta) {
+        if (pos->pieces[sq] == target) {
+            return sq;
+        } else if (pos->pieces[sq] == blocker) {
+            return NO_SQUARE;
+        }
+    }
+
+    return NO_SQUARE;
+}
+
+static void set_castle_from_file(struct position *pos, char file_char)
+{
+    int king_sq;
+    int rook_sq;
+
+    if ((file_char >= 'A') && (file_char <= 'H')) {
+        rook_sq = SQUARE(file_char-'A', RANK_1);
+        king_sq = LSB(pos->bb_pieces[WHITE_KING]);
+        if (king_sq < rook_sq) {
+            pos->castle |= WHITE_KINGSIDE;
+            pos->castle_wk = rook_sq;
+        } else if (king_sq > rook_sq) {
+            pos->castle |= WHITE_QUEENSIDE;
+            pos->castle_wq = rook_sq;
+        }
+    } else if ((file_char >= 'a') && (file_char <= 'h')) {
+        rook_sq = SQUARE(file_char-'a', RANK_8);
+        king_sq = LSB(pos->bb_pieces[BLACK_KING]);
+        if (king_sq < rook_sq) {
+            pos->castle |= BLACK_KINGSIDE;
+            pos->castle_bk = rook_sq;
+        } else if (king_sq > rook_sq) {
+            pos->castle |= BLACK_QUEENSIDE;
+            pos->castle_bq = rook_sq;
+        }
+    }
+}
+
 static int char2piece(char piece)
 {
     switch (piece) {
@@ -108,6 +184,15 @@ bool fen_setup_board(struct position *pos, char *fenstr)
         iter++;
     }
 
+    /* Update bitboards */
+    for (sq=0;sq<NSQUARES;sq++) {
+        if (pos->pieces[sq] != NO_PIECE) {
+            SETBIT(pos->bb_pieces[pos->pieces[sq]], sq);
+            SETBIT(pos->bb_sides[COLOR(pos->pieces[sq])], sq);
+            SETBIT(pos->bb_all, sq);
+        }
+    }
+
     /* Active color field */
     switch (*iter) {
     case 'w':
@@ -127,6 +212,10 @@ bool fen_setup_board(struct position *pos, char *fenstr)
     /* Castling availability field */
     iter++;
     pos->castle = 0;
+    pos->castle_wk = NO_SQUARE;
+    pos->castle_wq = NO_SQUARE;
+    pos->castle_bk = NO_SQUARE;
+    pos->castle_bq = NO_SQUARE;
     for (k=0;k<4;k++) {
         if (*iter == '-') {
             iter++;
@@ -138,15 +227,38 @@ bool fen_setup_board(struct position *pos, char *fenstr)
         switch (*iter) {
         case 'K':
             pos->castle |= WHITE_KINGSIDE;
+            pos->castle_wk = outer_rook(pos, WHITE_KINGSIDE);
             break;
         case 'Q':
             pos->castle |= WHITE_QUEENSIDE;
+            pos->castle_wq = outer_rook(pos, WHITE_QUEENSIDE);
             break;
         case 'k':
             pos->castle |= BLACK_KINGSIDE;
+            pos->castle_bk = outer_rook(pos, BLACK_KINGSIDE);
             break;
         case 'q':
             pos->castle |= BLACK_QUEENSIDE;
+            pos->castle_bq = outer_rook(pos, BLACK_QUEENSIDE);
+            break;
+        /* FRC extension */
+        case 'A':
+        case 'B':
+        case 'C':
+        case 'D':
+        case 'E':
+        case 'F':
+        case 'G':
+        case 'H':
+        case 'a':
+        case 'b':
+        case 'c':
+        case 'd':
+        case 'e':
+        case 'f':
+        case 'g':
+        case 'h':
+            set_castle_from_file(pos, *iter);
             break;
         default:
             return false;
@@ -213,15 +325,6 @@ bool fen_setup_board(struct position *pos, char *fenstr)
     } else {
         pos->fifty = 0;
         pos->fullmove = 1;
-    }
-
-    /* Update bitboards */
-    for (sq=0;sq<NSQUARES;sq++) {
-        if (pos->pieces[sq] != NO_PIECE) {
-            SETBIT(pos->bb_pieces[pos->pieces[sq]], sq);
-            SETBIT(pos->bb_sides[COLOR(pos->pieces[sq])], sq);
-            SETBIT(pos->bb_all, sq);
-        }
     }
 
     /* Generate a key for the position */

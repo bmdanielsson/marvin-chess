@@ -64,69 +64,27 @@ static void gen_en_passant_moves(struct position *pos, struct movelist *list)
 static void gen_kingside_castling_moves(struct position *pos,
                                         struct movelist *list)
 {
-    /*
-     * There is no need to check if the kings destination square
-     * is attacked or not since pseudo-legal moves are generated.
-     * If the square is attacked then the king moves in to check and
-     * the move will be rejected later.
-     *
-     * Also there is no need to check that there is a king and a rook in the
-     * correct squares because if there aren't then the corresponding
-     * castling permission bit will not be set.
-     */
+    int king_start = LSB(pos->bb_pieces[KING+pos->stm]);
+    int rook_start = (pos->stm == WHITE)?pos->castle_wk:pos->castle_bk;
 
-    if (pos->stm == WHITE) {
-        if ((pos->castle&WHITE_KINGSIDE) &&
-            (pos->pieces[F1] == NO_PIECE) &&
-            (pos->pieces[G1] == NO_PIECE) &&
-            (!bb_is_attacked(pos, E1, BLACK)) &&
-            (!bb_is_attacked(pos, F1, BLACK))) {
-            ADD_MOVE(list, E1, H1, NO_PIECE, KINGSIDE_CASTLE);
-        }
-    } else {
-        if ((pos->castle&BLACK_KINGSIDE) &&
-            (pos->pieces[F8] == NO_PIECE) &&
-            (pos->pieces[G8] == NO_PIECE) &&
-            (!bb_is_attacked(pos, E8, WHITE)) &&
-            (!bb_is_attacked(pos, F8, WHITE))) {
-            ADD_MOVE(list, E8, H8, NO_PIECE, KINGSIDE_CASTLE);
-        }
+    if (!board_is_castling_allowed(pos, KINGSIDE_CASTLE)) {
+        return;
     }
+
+    ADD_MOVE(list, king_start, rook_start, NO_PIECE, KINGSIDE_CASTLE);
 }
 
 static void gen_queenside_castling_moves(struct position *pos,
                                          struct movelist *list)
 {
-    /*
-     * There is no need to check if the kings destination square
-     * is attacked or not since pseudo-legal moves are generated.
-     * If the square is attacked then the king moves in to check and
-     * the move will be rejected later.
-     *
-     * Also there is no need to check that there is a king and a rook in the
-     * correct squares because if there aren't then the corresponding
-     * castling permission bit will not be set.
-     */
+    int king_start = LSB(pos->bb_pieces[KING+pos->stm]);
+    int rook_start = (pos->stm == WHITE)?pos->castle_wq:pos->castle_bq;
 
-    if (pos->stm == WHITE) {
-        if ((pos->castle&WHITE_QUEENSIDE) &&
-            (pos->pieces[B1] == NO_PIECE) &&
-            (pos->pieces[C1] == NO_PIECE) &&
-            (pos->pieces[D1] == NO_PIECE) &&
-            (!bb_is_attacked(pos, D1, BLACK)) &&
-            (!bb_is_attacked(pos, E1, BLACK))) {
-            ADD_MOVE(list, E1, A1, NO_PIECE, QUEENSIDE_CASTLE);
-        }
-    } else {
-        if ((pos->castle&BLACK_QUEENSIDE) &&
-            (pos->pieces[B8] == NO_PIECE) &&
-            (pos->pieces[C8] == NO_PIECE) &&
-            (pos->pieces[D8] == NO_PIECE) &&
-            (!bb_is_attacked(pos, D8, WHITE)) &&
-            (!bb_is_attacked(pos, E8, WHITE))) {
-            ADD_MOVE(list, E8, A8, NO_PIECE, QUEENSIDE_CASTLE);
-        }
+    if (!board_is_castling_allowed(pos, QUEENSIDE_CASTLE)) {
+        return;
     }
+
+    ADD_MOVE(list, king_start, rook_start, NO_PIECE, QUEENSIDE_CASTLE);
 }
 
 static void add_promotion_moves(struct position *pos, struct movelist *list,

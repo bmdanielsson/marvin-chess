@@ -354,6 +354,12 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
             } else if (MATCH(valuestr, "true")) {
                 ponder_mode = true;
             }
+        } else if (MATCH(namestr, "UCI_Chess960")) {
+            if (MATCH(valuestr, "false")) {
+                engine_variant = VARIANT_STANDARD;
+            } else if (MATCH(valuestr, "true")) {
+                engine_variant = VARIANT_FRC;
+            }
         } else if (MATCH(namestr, "SyzygyPath")) {
             strncpy(engine_syzygy_path, valuestr, MAX_PATH_LENGTH);
             tb_init(engine_syzygy_path);
@@ -403,6 +409,7 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
 static void uci_cmd_uci(struct gamestate *state)
 {
     engine_protocol = PROTOCOL_UCI;
+    engine_variant = VARIANT_STANDARD;
 
     tablebase_mode = TB_LARGEST > 0;
 
@@ -415,6 +422,7 @@ static void uci_cmd_uci(struct gamestate *state)
 						 hash_tt_max_size());
     engine_write_command("option name OwnBook type check default true");
     engine_write_command("option name Ponder type check default false");
+    engine_write_command("option name UCI_Chess960 type check default false");
     engine_write_command("option name SyzygyPath type string default %s",
                          engine_syzygy_path[0] != '\0'?
                                                 engine_syzygy_path:"");

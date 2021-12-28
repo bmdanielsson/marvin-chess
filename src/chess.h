@@ -209,13 +209,11 @@ enum {
 #define NOMOVE                  0
 
 /*
- * Macros for converting betweeen king-move and
- * king-captures-rook represention for castling.
+ * Macros for extracting the to square of a move and if necessary converts
+ * from king-captures-rook to king-move reepresentaion of castling moves.
  */
-#define KINGCASTLE_KINGMOVE(s)      ((s) - 1)
-#define QUEENCASTLE_KINGMOVE(s)     ((s) + 2)
-#define KINGCASTLE_ROOKCAPTURE(s)   ((s) + 1)
-#define QUEENCASTLE_ROOKCAPTURE(s)  ((s) - 2)
+#define KINGCASTLE_KINGMOVE(s)      (kingside_castle_to[(s)>=A8])
+#define QUEENCASTLE_KINGMOVE(s)     (queenside_castle_to[(s)>=A8])
 #define TO_CASTLE(move)                                                 \
                 ISKINGSIDECASTLE(move)?KINGCASTLE_KINGMOVE(TO(move)):   \
                 ISQUEENSIDECASTLE(move)?QUEENCASTLE_KINGMOVE(TO(move)): \
@@ -416,6 +414,10 @@ struct position {
     int ep_sq;
     /* Castling availability for both sides */
     int castle;
+    uint8_t castle_wk;
+    uint8_t castle_wq;
+    uint8_t castle_bk;
+    uint8_t castle_bq;
     /* The side to move */
     int stm;
     /* Halfmove counter */
@@ -656,6 +658,12 @@ extern uint64_t outpost_squares[NSIDES];
  * ........
  */
 extern uint64_t space_eval_squares[NSIDES];
+
+/* Destination square for the king when doing king side castling */
+extern int kingside_castle_to[NSIDES];
+
+/* Destination square for the king when doing queen side castling */
+extern int queenside_castle_to[NSIDES];
 
 /* Initialize chess data */
 void chess_data_init(void);
