@@ -417,7 +417,7 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command("option name Ponder type check default false");
     engine_write_command("option name SyzygyPath type string default %s",
                          engine_syzygy_path[0] != '\0'?
-                                                engine_syzygy_path:"<empty>");
+                                                engine_syzygy_path:"");
     engine_write_command(
                         "option name Threads type spin default %d min 1 max %d",
                         engine_default_num_threads, MAX_WORKERS);
@@ -429,9 +429,7 @@ static void uci_cmd_uci(struct gamestate *state)
                         dbg_get_log_level(), LOG_HIGHEST_LEVEL);
     engine_write_command("option name UseNNUE type check default %s",
                          engine_using_nnue && engine_loaded_net?"true":"false");
-    engine_write_command("option name EvalFile type string default %s",
-                         engine_eval_file[0] != '\0'?
-                                                engine_eval_file:"<empty>");
+    engine_write_command("option name EvalFile type string default ");
     engine_write_command("uciok");
 }
 
