@@ -85,7 +85,7 @@ void history_update_tables(struct search_worker *worker, struct movelist *list,
     for (k=0;k<list->size;k++) {
         move = list->moves[k];
         piece = pos->pieces[FROM(move)];
-        to = TO(move);
+        to = TO_CASTLE(move);
 
         /* Calculate the bonus to apply */
         delta = (move != best_move)?-(depth*depth):depth*depth;
@@ -97,7 +97,7 @@ void history_update_tables(struct search_worker *worker, struct movelist *list,
 
         /* Update counter history table */
         if (move_c != NOMOVE) {
-            prev_to = TO(move_c);
+            prev_to = TO_CASTLE(move_c);
             prev_piece = pos->history[pos->ply-1].piece;
             score = worker->counter_history[prev_piece][prev_to][piece][to];
             score += UP*delta - score*abs(delta)/DOWN;
@@ -107,7 +107,7 @@ void history_update_tables(struct search_worker *worker, struct movelist *list,
 
         /* Update follow up history table */
         if (move_f != NOMOVE) {
-            prev_to = TO(move_f);
+            prev_to = TO_CASTLE(move_f);
             prev_piece = pos->history[pos->ply-2].piece;
             score = worker->follow_history[prev_piece][prev_to][piece][to];
             score += UP*delta - score*abs(delta)/DOWN;
@@ -131,7 +131,7 @@ int history_get_score(struct search_worker *worker, uint32_t move)
 
     pos = &worker->pos;
     piece = pos->pieces[FROM(move)];
-    to = TO(move);
+    to = TO_CASTLE(move);
 
     /* Add score from history table */
     score = worker->history_table[piece][to];
@@ -141,7 +141,7 @@ int history_get_score(struct search_worker *worker, uint32_t move)
                 !ISNULLMOVE(pos->history[pos->ply-1].move))?
                 pos->history[pos->ply-1].move:NOMOVE;
     if (prev_move != NOMOVE) {
-        prev_to = TO(prev_move);
+        prev_to = TO_CASTLE(prev_move);
         prev_piece = pos->history[pos->ply-1].piece;
         score += worker->counter_history[prev_piece][prev_to][piece][to];
     }
@@ -152,7 +152,7 @@ int history_get_score(struct search_worker *worker, uint32_t move)
                 !ISNULLMOVE(pos->history[pos->ply-2].move))?
                 pos->history[pos->ply-2].move:NOMOVE;
     if (prev_move != NOMOVE) {
-        prev_to = TO(prev_move);
+        prev_to = TO_CASTLE(prev_move);
         prev_piece = pos->history[pos->ply-2].piece;
         score += worker->follow_history[prev_piece][prev_to][piece][to];
     }
@@ -174,7 +174,7 @@ void history_get_scores(struct search_worker *worker, uint32_t move,
 
     pos = &worker->pos;
     piece = pos->pieces[FROM(move)];
-    to = TO(move);
+    to = TO_CASTLE(move);
 
     /* Initialize history values */
     *hist = 0;
@@ -189,7 +189,7 @@ void history_get_scores(struct search_worker *worker, uint32_t move,
                 !ISNULLMOVE(pos->history[pos->ply-1].move))?
                 pos->history[pos->ply-1].move:NOMOVE;
     if (prev_move != NOMOVE) {
-        prev_to = TO(prev_move);
+        prev_to = TO_CASTLE(prev_move);
         prev_piece = pos->history[pos->ply-1].piece;
         *chist = worker->counter_history[prev_piece][prev_to][piece][to];
     }
@@ -200,7 +200,7 @@ void history_get_scores(struct search_worker *worker, uint32_t move,
                 !ISNULLMOVE(pos->history[pos->ply-2].move))?
                 pos->history[pos->ply-2].move:NOMOVE;
     if (prev_move != NOMOVE) {
-        prev_to = TO(prev_move);
+        prev_to = TO_CASTLE(prev_move);
         prev_piece = pos->history[pos->ply-2].piece;
         *fhist = worker->follow_history[prev_piece][prev_to][piece][to];
     }
@@ -244,7 +244,8 @@ void counter_clear_table(struct search_worker *worker)
 void counter_add_move(struct search_worker *worker, uint32_t move)
 {
     struct position *pos;
-    uint32_t prev_move;
+    uint32_t        prev_move;
+    int             prev_to;
 
     assert(worker->pos.sply > 0);
 
@@ -254,7 +255,8 @@ void counter_add_move(struct search_worker *worker, uint32_t move)
         return;
     }
 
-    worker->countermove_table[pos->pieces[TO(prev_move)]][TO(prev_move)] = move;
+    prev_to = TO_CASTLE(prev_move);
+    worker->countermove_table[pos->pieces[prev_to]][prev_to] = move;
 }
 
 uint32_t counter_get_move(struct search_worker *worker)
@@ -275,6 +277,6 @@ uint32_t counter_get_move(struct search_worker *worker)
         return NOMOVE;
     }
 
-    prev_to = TO(prev_move);
+    prev_to = TO_CASTLE(prev_move);
     return worker->countermove_table[pos->pieces[prev_to]][prev_to];
 }

@@ -81,7 +81,7 @@ static void gen_kingside_castling_moves(struct position *pos,
             (pos->pieces[G1] == NO_PIECE) &&
             (!bb_is_attacked(pos, E1, BLACK)) &&
             (!bb_is_attacked(pos, F1, BLACK))) {
-            ADD_MOVE(list, E1, G1, NO_PIECE, KINGSIDE_CASTLE);
+            ADD_MOVE(list, E1, H1, NO_PIECE, KINGSIDE_CASTLE);
         }
     } else {
         if ((pos->castle&BLACK_KINGSIDE) &&
@@ -89,7 +89,7 @@ static void gen_kingside_castling_moves(struct position *pos,
             (pos->pieces[G8] == NO_PIECE) &&
             (!bb_is_attacked(pos, E8, WHITE)) &&
             (!bb_is_attacked(pos, F8, WHITE))) {
-            ADD_MOVE(list, E8, G8, NO_PIECE, KINGSIDE_CASTLE);
+            ADD_MOVE(list, E8, H8, NO_PIECE, KINGSIDE_CASTLE);
         }
     }
 }
@@ -115,7 +115,7 @@ static void gen_queenside_castling_moves(struct position *pos,
             (pos->pieces[D1] == NO_PIECE) &&
             (!bb_is_attacked(pos, D1, BLACK)) &&
             (!bb_is_attacked(pos, E1, BLACK))) {
-            ADD_MOVE(list, E1, C1, NO_PIECE, QUEENSIDE_CASTLE);
+            ADD_MOVE(list, E1, A1, NO_PIECE, QUEENSIDE_CASTLE);
         }
     } else {
         if ((pos->castle&BLACK_QUEENSIDE) &&
@@ -124,7 +124,7 @@ static void gen_queenside_castling_moves(struct position *pos,
             (pos->pieces[D8] == NO_PIECE) &&
             (!bb_is_attacked(pos, D8, WHITE)) &&
             (!bb_is_attacked(pos, E8, WHITE))) {
-            ADD_MOVE(list, E8, C8, NO_PIECE, QUEENSIDE_CASTLE);
+            ADD_MOVE(list, E8, A8, NO_PIECE, QUEENSIDE_CASTLE);
         }
     }
 }

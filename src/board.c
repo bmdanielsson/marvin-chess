@@ -255,7 +255,7 @@ bool board_make_move(struct position *pos, uint32_t move)
     assert(pos->ply < MAX_MOVES);
 
     from = FROM(move);
-    to = TO(move);
+    to = TO_CASTLE(move);
     promotion = PROMOTION(move);
 
     /* Find the pieces involved in the move */
@@ -379,11 +379,13 @@ void board_unmake_move(struct position *pos)
     pos->key = elem->key;
 
     /* Extract some information for later use */
-    to = TO(move);
+    to = TO_CASTLE(move);
     from = FROM(move);
-    piece = pos->pieces[to];
     color = pos->stm;
     move_color = FLIP_COLOR(color);
+
+    /* Find the moving piece */
+    piece = pos->pieces[to];
 
     /* Remove piece from current position */
     if (ISPROMOTION(move)) {
@@ -601,6 +603,7 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
         const int availability[2] = {WHITE_KINGSIDE, BLACK_KINGSIDE};
 
         /* Check castling */
+        to = KINGCASTLE_KINGMOVE(to);
         return ((pos->castle&availability[pos->stm]) &&
                 (pos->pieces[emptysq2[pos->stm]] == NO_PIECE) &&
                 (pos->pieces[emptysq1[pos->stm]] == NO_PIECE) &&
@@ -619,6 +622,7 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
         const int availability[2] = {WHITE_QUEENSIDE, BLACK_QUEENSIDE};
 
         /* Check castling */
+        to = QUEENCASTLE_KINGMOVE(to);
         return ((pos->castle&availability[pos->stm]) &&
                 (pos->pieces[emptysq3[pos->stm]] == NO_PIECE) &&
                 (pos->pieces[emptysq2[pos->stm]] == NO_PIECE) &&

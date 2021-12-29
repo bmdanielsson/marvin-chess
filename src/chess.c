@@ -375,6 +375,18 @@ void move2str(uint32_t move, char *str)
         return;
     }
 
+    /*
+     * Internally castling is represented as king-captures-rook so
+     * for standard chess it needs to be converted to a king move.
+     */
+    if (engine_variant == VARIANT_STANDARD) {
+        if (ISKINGSIDECASTLE(move)) {
+            to = KINGCASTLE_KINGMOVE(to);
+        } else if (ISQUEENSIDECASTLE(move)) {
+            to = QUEENCASTLE_KINGMOVE(to);
+        }
+    }
+
     str[0] = FILENR(from) + 'a';
     str[1] = RANKNR(from) + '1';
     str[2] = FILENR(to) + 'a';
@@ -439,6 +451,20 @@ uint32_t str2move(char *str, struct position *pos)
     default:
         promotion = NO_PIECE;
         break;
+    }
+
+     /*
+      * Internally castling is represented as king-captures-rook so
+      * for standard chess it needs to be converted from a king move.
+      */
+    if ((engine_variant == VARIANT_STANDARD) &&
+        (pos->pieces[from] == (pos->stm+KING)) &&
+        (abs(to-from) == 2)) {
+        if (to < from) {
+            to = QUEENCASTLE_ROOKCAPTURE(to);
+        } else if (to > from) {
+            to = KINGCASTLE_ROOKCAPTURE(to);
+        }
     }
 
     /*

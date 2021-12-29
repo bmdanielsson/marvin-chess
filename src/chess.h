@@ -208,6 +208,19 @@ enum {
 #define ISTACTICAL(m)           (ISCAPTURE(m)||ISENPASSANT(m)||ISPROMOTION(m))
 #define NOMOVE                  0
 
+/*
+ * Macros for converting betweeen king-move and
+ * king-captures-rook represention for castling.
+ */
+#define KINGCASTLE_KINGMOVE(s)      ((s) - 1)
+#define QUEENCASTLE_KINGMOVE(s)     ((s) + 2)
+#define KINGCASTLE_ROOKCAPTURE(s)   ((s) + 1)
+#define QUEENCASTLE_ROOKCAPTURE(s)  ((s) - 2)
+#define TO_CASTLE(move)                                                 \
+                ISKINGSIDECASTLE(move)?KINGCASTLE_KINGMOVE(TO(move)):   \
+                ISQUEENSIDECASTLE(move)?QUEENCASTLE_KINGMOVE(TO(move)): \
+                TO(move)
+
 /* The maximum number of legal moves for a chess moves position */
 #define MAX_MOVES 256
 

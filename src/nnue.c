@@ -441,8 +441,6 @@ bool nnue_load_net(char *path)
     FILE     *fh = NULL;
     bool     ret = true;
 
-    assert(path != NULL);
-
     /* If an external net is specified then read the complete file */
     if (path != NULL) {
         size = get_file_size(path);
@@ -521,21 +519,21 @@ void nnue_make_move(struct position *pos, uint32_t move)
 
         dp->piece[0] = KING + pos->stm;
         dp->from[0] = from;
-        dp->to[0] = to;
+        dp->to[0] = KINGCASTLE_KINGMOVE(to);
 
         dp->piece[1] = ROOK + pos->stm;
-        dp->from[1] = to + 1;
-        dp->to[1] = to - 1;
+        dp->from[1] = to;
+        dp->to[1] = KINGCASTLE_KINGMOVE(to) - 1;
     } else if (ISQUEENSIDECASTLE(move)) {
         dp->ndirty = 2;
 
         dp->piece[0] = KING + pos->stm;
         dp->from[0] = from;
-        dp->to[0] = to;
+        dp->to[0] = QUEENCASTLE_KINGMOVE(to);
 
         dp->piece[1] = ROOK + pos->stm;
-        dp->from[1] = to - 2;
-        dp->to[1] = to + 1;
+        dp->from[1] = to;
+        dp->to[1] = QUEENCASTLE_KINGMOVE(to) + 1;
     } else if (ISENPASSANT(move)) {
         dp->ndirty = 2;
 

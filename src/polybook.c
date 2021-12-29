@@ -373,20 +373,11 @@ static uint32_t poly2engine_move(struct position *pos, struct movelist *list,
     from = SQUARE((polymove>>6)&0x0007, (polymove>>9)&0x0007);
     promotion = ((polymove>>12)&0x0007)*2 + pos->stm;
 
-    if (from == 4 && to == 0 && pos->pieces[4] == WHITE_KING) {
-        to = 2;
-    } else if (from == 4 && to == 7 && pos->pieces[4] == WHITE_KING) {
-        to = 6;
-    } else if (from == 60 && to == 56 && pos->pieces[60] == BLACK_KING) {
-        to = 58;
-    } else if (from == 60 && to == 63 && pos->pieces[60] == BLACK_KING) {
-        to = 62;
-    }
-
     for (k=0;k<list->size;k++) {
         move = list->moves[k];
         if ((TO(move) == to) && (FROM(move) == from)) {
-            if ((promotion >= WHITE_KNIGHT) && (PROMOTION(move) == promotion)) {
+            if ((promotion >= WHITE_KNIGHT) &&
+                (PROMOTION(move) == promotion)) {
                 return move;
             } else if (promotion < WHITE_KNIGHT) {
                 return move;
