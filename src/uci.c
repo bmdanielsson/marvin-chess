@@ -401,6 +401,11 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
         } else if (MATCH(namestr, "EvalFile")) {
             strncpy(engine_eval_file, valuestr, MAX_PATH_LENGTH);
             engine_loaded_net = nnue_load_net(engine_eval_file);
+            if (!engine_loaded_net) {
+                strcpy(engine_eval_file, NETFILE_NAME);
+                engine_loaded_net = nnue_load_net(NULL);
+            }
+            engine_using_nnue = engine_loaded_net;
         }
         iter = strstr(iter, "name");
     }
