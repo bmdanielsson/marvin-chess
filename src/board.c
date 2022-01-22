@@ -877,7 +877,7 @@ bool board_is_castling_allowed(struct position *pos, int type)
 
     /*
      * Check that the squares between the start and stop squares
-     * if the king are unoccupied and not under attack. There is
+     * of the king are unoccupied and not under attack. There is
      * no need to check if there is a king on the starting square
      * since if there isn't the castling flag would not be set.
      */
@@ -893,10 +893,13 @@ bool board_is_castling_allowed(struct position *pos, int type)
     if (ISBITSET(occ, king_stop)) {
         return false;
     }
+	if (bb_is_attacked(pos, sq, FLIP_COLOR(pos->stm))) {
+        return false;
+    }
 
     /*
      * Check that the squares between the start and stop squares
-     * if the rook are unoccupied and not under attack. There is
+     * of the rook are unoccupied and not under attack. There is
      * no need to check if there is a rook on the starting square
      * since if there isn't the castling flag would not be set.
      */
