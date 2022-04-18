@@ -29,6 +29,7 @@
 
 #include "simd.h"
 #include "utils.h"
+#include "quantization.h"
 
 #if defined(USE_AVX2) || defined(USE_SSE)
 static int32_t hsum_4x32(__m128i v)
@@ -154,7 +155,7 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
     __m128i *po = (__m128i*)output;
 
     __m128i c0 = _mm_set1_epi32(0);
-    __m128i c127 = _mm_set1_epi32(127);
+    __m128i c127 = _mm_set1_epi32((int)MAX_QUANTIZED_ACTIVATION);
 
     for (k=0;k<niterations/4;k++) {
         __m128i v1 = _mm_load_si128(pi++);
@@ -186,7 +187,7 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
     int k;
 
     for (k=0;k<nvalues;k++) {
-        output[k] = CLAMP((input[k]>>shift), 0, 127);
+        output[k] = CLAMP((input[k]>>shift), 0, (int)MAX_QUANTIZED_ACTIVATION);
     }
 #endif
 }
@@ -230,7 +231,7 @@ void simd_clamp(int16_t *input, uint8_t *output, int nvalues)
     int k;
 
     for (k=0;k<nvalues;k++) {
-        output[k] = CLAMP(input[k], 0, 127);
+        output[k] = CLAMP(input[k], 0, (int)MAX_QUANTIZED_ACTIVATION);
     }
 #endif
 }

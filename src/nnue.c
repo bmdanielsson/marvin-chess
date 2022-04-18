@@ -31,6 +31,7 @@
 #include "utils.h"
 #include "bitboard.h"
 #include "simd.h"
+#include "quantization.h"
 
 #define INCBIN_PREFIX
 #define INCBIN_STYLE INCBIN_STYLE_SNAKE
@@ -50,14 +51,10 @@ struct layer {
 };
 
 /* Definition of the network architcechure */
-#define NET_VERSION 0x00000002
+#define NET_VERSION 0x00000003
 #define NET_HEADER_SIZE 4
 #define NUM_INPUT_FEATURES 64*64*10
 #define MAX_ACTIVE_FEATURES 30
-#define ACTIVATION_SCALE_BITS 6
-#define OUTPUT_SCALE_FACTOR 16
-
-/* Definition of the network */
 #define NUM_LAYERS 4
 #define HALFKX_LAYER_SIZE 128
 static struct layer layers[NUM_LAYERS];
@@ -309,7 +306,7 @@ static void linear_layer_forward(int idx, struct net_data *data, bool output)
                         layers[idx].weights.i8);
     if (!output) {
         simd_scale_and_clamp(data->intermediate, data->output,
-                             ACTIVATION_SCALE_BITS, layer_sizes[idx]);
+                             WEIGHT_SCALE_BITS, layer_sizes[idx]);
     }
 }
 
@@ -340,29 +337,38 @@ static bool parse_header(uint8_t **data)
 
 static bool parse_network(uint8_t **data)
 {
-    uint8_t *iter = *data;
-    int     k;
-    int     l;
+    float *iter = (float*)*data;
+    int   layer;
+    int   k;
 
     /* Read biases and weights for the HalfKX layer */
-    for (k=0;k<HALFKX_LAYER_SIZE;k++,iter+=2) {
-        layers[0].biases.i16[k] = read_uint16_le(iter);
+    for (k=0;k<HALFKX_LAYER_SIZE;k++,iter++) {
+        layers[0].biases.i16[k] = quant_halfkx_bias(*iter);
     }
-    for (k=0;k<HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES;k++,iter+=2) {
-        layers[0].weights.i16[k] = read_uint16_le(iter);
-    }
-
-    /* Read biases and weights for each linear layer */
-    for (k=1;k<NUM_LAYERS;k++) {
-        for (l=0;l<layer_sizes[k];l++,iter+=4) {
-            layers[k].biases.i32[l] = read_uint32_le(iter);
-        }
-        for (l=0;l<layer_sizes[k]*layer_sizes[k-1];l++,iter++) {
-            layers[k].weights.i8[l] = (int8_t)*iter;
-        }
+    for (k=0;k<HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES;k++,iter++) {
+        layers[0].weights.i16[k] = quant_halfkx_weight(*iter);
     }
 
-    *data = iter;
+    /* Read biases and weights for each hidden layer */
+    for (layer=1;layer<NUM_LAYERS-1;layer++) {
+        for (k=0;k<layer_sizes[layer];k++,iter++) {
+            layers[layer].biases.i32[k] = quant_hidden_bias(*iter);
+        }
+        for (k=0;k<layer_sizes[layer]*layer_sizes[layer-1];k++,iter++) {
+            layers[layer].weights.i8[k] = quant_hidden_weight(*iter);
+        }
+    }
+
+    /* Read biases and weights for the output layer */
+    layer = NUM_LAYERS - 1;
+    for (k=0;k<layer_sizes[layer];k++,iter++) {
+        layers[layer].biases.i32[k] = quant_output_bias(*iter);
+    }
+    for (k=0;k<layer_sizes[layer]*layer_sizes[layer-1];k++,iter++) {
+        layers[layer].weights.i8[k] = quant_output_weight(*iter);
+    }
+
+    *data = (uint8_t*)iter;
 
     return true;
 }
@@ -374,12 +380,12 @@ static uint32_t calculate_net_size(void)
 
     size += NET_HEADER_SIZE;
 
-    size += HALFKX_LAYER_SIZE*sizeof(int16_t);
-    size += HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES*sizeof(int16_t);
+    size += HALFKX_LAYER_SIZE*sizeof(float);
+    size += HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES*sizeof(float);
 
     for (k=1;k<NUM_LAYERS;k++) {
-        size += layer_sizes[k]*sizeof(int32_t);
-        size += layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t);
+        size += layer_sizes[k]*sizeof(float);
+        size += layer_sizes[k]*layer_sizes[k-1]*sizeof(float);
     }
 
     return size;
@@ -462,6 +468,10 @@ bool nnue_load_net(char *path)
     } else {
         data = (uint8_t*)nnue_net_data;
         size = (uint32_t)nnue_net_size;
+        if (size != calculate_net_size()) {
+            ret = false;
+            goto exit;
+        }
     }
 
     /* Parse network header */
@@ -492,7 +502,7 @@ int16_t nnue_evaluate(struct position *pos)
     struct net_data data;
 
     network_forward(pos, &data);
-    return data.intermediate[0]/OUTPUT_SCALE_FACTOR;
+    return data.intermediate[0]/OUTPUT_SCALE;
 }
 
 void nnue_make_move(struct position *pos, uint32_t move)
