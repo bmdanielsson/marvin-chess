@@ -226,4 +226,4 @@ tuner : $(OBJECTS) $(TUNER_OBJECTS)
 	$(CC) $(OBJECTS) $(TUNER_OBJECTS) $(LDFLAGS) -o tuner
 
 net :
-	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v2/$(nnuenet)
+	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v4/$(nnuenet)
