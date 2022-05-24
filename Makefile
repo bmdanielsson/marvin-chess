@@ -3,7 +3,7 @@ arch = x86-64-modern
 trace = no
 variant = release
 version = 5.2.0
-nnuenet = net-422c365.nnue
+nnuenet = net-9ef737e9.nnue
 
 # Default options
 sse = no

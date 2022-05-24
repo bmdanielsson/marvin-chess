@@ -51,12 +51,12 @@ struct layer {
 };
 
 /* Definition of the network architcechure */
-#define NET_VERSION 0x00000003
+#define NET_VERSION 0x00000004
 #define NET_HEADER_SIZE 4
 #define NUM_INPUT_FEATURES 64*64*10
 #define MAX_ACTIVE_FEATURES 30
 #define NUM_LAYERS 4
-#define HALFKX_LAYER_SIZE 128
+#define HALFKX_LAYER_SIZE 256
 static struct layer layers[NUM_LAYERS];
 static int layer_sizes[NUM_LAYERS] = {HALFKX_LAYER_SIZE*2, 32, 32, 1};
 
