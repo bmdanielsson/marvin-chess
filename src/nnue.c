@@ -38,7 +38,20 @@
 #include "incbin.h"
 INCBIN(nnue_net, NETFILE_NAME);
 
-/* Struct holding information about a layer in the network */
+/* Definition of the network architcechure */
+#define NET_VERSION 0x00000004
+#define NET_HEADER_SIZE 4
+#define NUM_INPUT_FEATURES 64*64*10
+#define MAX_ACTIVE_FEATURES 30
+#define NUM_LAYERS 4
+#define HALFKX_LAYER_SIZE 256
+static int model_layer_sizes[NUM_LAYERS] = {HALFKX_LAYER_SIZE*2, 32, 32, 1};
+
+/*
+ * Struct holding information about a layer in the network. The size
+ * may be padded in order to better match SIMD instructions. The model_size
+ * field holds the actual, unpadedd, size as defined in the model.
+ */
 struct layer {
     union {
         int8_t  *i8;
@@ -49,16 +62,6 @@ struct layer {
         int16_t *i16;
     }                   biases;
 };
-
-/* Definition of the network architcechure */
-#define NET_VERSION 0x00000004
-#define NET_HEADER_SIZE 4
-#define NUM_INPUT_FEATURES 64*64*10
-#define MAX_ACTIVE_FEATURES 30
-#define NUM_LAYERS 4
-#define HALFKX_LAYER_SIZE 256
-static struct layer layers[NUM_LAYERS];
-static int layer_sizes[NUM_LAYERS] = {HALFKX_LAYER_SIZE*2, 32, 32, 1};
 
 /* Struct for holding data during a forward pass */
 struct net_data {
@@ -74,6 +77,10 @@ struct feature_list {
     uint8_t  size;
     uint32_t features[MAX_ACTIVE_FEATURES];
 };
+
+/* The network */
+static struct layer layers[NUM_LAYERS];
+static int layer_sizes[NUM_LAYERS];
 
 /* Table mapping piece to piece index */
 static uint32_t piece2index[NSIDES][NPIECES];
@@ -185,13 +192,13 @@ static void perform_full_update(struct position *pos, int side)
     data = &pos->eval_stack[pos->sply].state.data[side][0];
 
     /* Add biases */
-    simd_copy(layers[0].biases.i16, data, HALFKX_LAYER_SIZE);
+    simd_copy(layers[0].biases.i16, data, layer_sizes[0]/2);
 
     /* Summarize the weights for all active features */
     for (k=0;k<active_features.size;k++) {
         index = active_features.features[k];
-        offset = HALFKX_LAYER_SIZE*index;
-        simd_add(&layers[0].weights.i16[offset], data, HALFKX_LAYER_SIZE);
+        offset = (layer_sizes[0]/2)*index;
+        simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
     }
 }
 
@@ -213,20 +220,20 @@ static void perform_incremental_update(struct position *pos, int side)
     prev_data = &pos->eval_stack[pos->sply-1].state.data[side][0];
 
     /* Copy the state from previous position */
-    simd_copy(prev_data, data, HALFKX_LAYER_SIZE);
+    simd_copy(prev_data, data, layer_sizes[0]/2);
 
     /* Subtract weights for removed features */
     for (k=0;k<removed.size;k++) {
         index = removed.features[k];
-        offset = HALFKX_LAYER_SIZE*index;
-        simd_sub(&layers[0].weights.i16[offset], data, HALFKX_LAYER_SIZE);
+        offset = (layer_sizes[0]/2)*index;
+        simd_sub(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
     }
 
     /* Add weights for added features */
     for (k=0;k<added.size;k++) {
         index = added.features[k];
-        offset = HALFKX_LAYER_SIZE*index;
-        simd_add(&layers[0].weights.i16[offset], data, HALFKX_LAYER_SIZE);
+        offset = (layer_sizes[0]/2)*index;
+        simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
     }
 }
 
@@ -292,17 +299,17 @@ static void halfkx_layer_forward(struct position *pos, struct net_data *data)
     perspectives[0] = pos->stm;
     perspectives[1] = FLIP_COLOR(pos->stm);
     for (side=0;side<NSIDES;side++) {
-        offset = HALFKX_LAYER_SIZE*side;
+        offset = (layer_sizes[0]/2)*side;
         temp = &data->output[offset];
         features = pos->eval_stack[pos->sply].state.data[perspectives[side]];
-        simd_clamp(features, temp, HALFKX_LAYER_SIZE);
+        simd_clamp(features, temp, layer_sizes[0]/2);
     }
 }
 
 static void linear_layer_forward(int idx, struct net_data *data, bool output)
 {
     simd_linear_forward(data->output, data->intermediate, layer_sizes[idx-1],
-                        layer_sizes[idx], layers[idx].biases.i32,
+                        model_layer_sizes[idx], layers[idx].biases.i32,
                         layers[idx].weights.i8);
     if (!output) {
         simd_scale_and_clamp(data->intermediate, data->output,
@@ -326,7 +333,6 @@ static bool parse_header(uint8_t **data)
     uint8_t  *iter = *data;
     uint32_t version;
 
-    /* Read version */
     version = read_uint32_le(iter);
     iter += 4;
 
@@ -335,38 +341,94 @@ static bool parse_header(uint8_t **data)
     return version == NET_VERSION;
 }
 
+static float* read_halfkx_layer(float *iter, struct layer *layer)
+{
+    int k;
+    int half;
+    int model_half;
+
+    /* Weights and biases are padded with zeroes if necessary */
+    model_half = model_layer_sizes[0]/2;
+    half = layer_sizes[0]/2;
+    for (k=0;k<model_half;k++,iter++) {
+        layer->biases.i16[k] = quant_halfkx_bias(*iter);
+    }
+    for (;k<half;k++) {
+        layer->biases.i16[k] = 0;
+    }
+    for (k=0;k<model_half*NUM_INPUT_FEATURES;k++,iter++) {
+        layer->weights.i16[k] = quant_halfkx_weight(*iter);
+    }
+    for (;k<half*NUM_INPUT_FEATURES;k++) {
+        layer->weights.i16[k] = 0;
+    }
+
+    return iter;
+}
+
+static float* read_linear_layer(float *iter, int idx, struct layer *layer)
+{
+    int k;
+    int l;
+
+    /* Weights and biases are padded with zeroes if necessary */
+    for (k=0;k<model_layer_sizes[idx];k++,iter++) {
+        layer->biases.i32[k] = quant_hidden_bias(*iter);
+    }
+    for (;k<layer_sizes[idx];k++) {
+        layer->biases.i32[k] = 0;
+    }
+    for (k=0;k<model_layer_sizes[idx];k++) {
+        for (l=0;l<model_layer_sizes[idx-1];l++,iter++) {
+            layer->weights.i8[k*layer_sizes[idx-1]+l] =
+                                                    quant_hidden_weight(*iter);
+        }
+        for (;l<layer_sizes[idx-1];l++) {
+            layer->weights.i8[k*layer_sizes[idx-1]+l] = 0;
+        }
+    }
+
+    return iter;
+}
+
+static float* read_output_layer(float *iter, int idx, struct layer *layer)
+{
+    int k;
+    int l;
+
+    /* Note that the size of the output layer is not padded */
+    for (k=0;k<model_layer_sizes[idx];k++,iter++) {
+        layer->biases.i32[k] = quant_output_bias(*iter);
+    }
+
+    for (k=0;k<model_layer_sizes[idx];k++) {
+        for (l=0;l<model_layer_sizes[idx-1];l++,iter++) {
+            layer->weights.i8[k*layer_sizes[idx-1]+l] =
+                                                    quant_output_weight(*iter);
+        }
+        for (;l<layer_sizes[idx-1];l++) {
+            layer->weights.i8[k*layer_sizes[idx-1]+l] = 0;
+        }
+    }
+
+    return iter;
+}
+
 static bool parse_network(uint8_t **data)
 {
     float *iter = (float*)*data;
-    int   layer;
     int   k;
 
     /* Read biases and weights for the HalfKX layer */
-    for (k=0;k<HALFKX_LAYER_SIZE;k++,iter++) {
-        layers[0].biases.i16[k] = quant_halfkx_bias(*iter);
-    }
-    for (k=0;k<HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES;k++,iter++) {
-        layers[0].weights.i16[k] = quant_halfkx_weight(*iter);
-    }
+    iter = read_halfkx_layer(iter, &layers[0]);
 
     /* Read biases and weights for each hidden layer */
-    for (layer=1;layer<NUM_LAYERS-1;layer++) {
-        for (k=0;k<layer_sizes[layer];k++,iter++) {
-            layers[layer].biases.i32[k] = quant_hidden_bias(*iter);
-        }
-        for (k=0;k<layer_sizes[layer]*layer_sizes[layer-1];k++,iter++) {
-            layers[layer].weights.i8[k] = quant_hidden_weight(*iter);
-        }
+    for (k=1;k<NUM_LAYERS-1;k++) {
+        iter = read_linear_layer(iter, k, &layers[k]);
     }
 
     /* Read biases and weights for the output layer */
-    layer = NUM_LAYERS - 1;
-    for (k=0;k<layer_sizes[layer];k++,iter++) {
-        layers[layer].biases.i32[k] = quant_output_bias(*iter);
-    }
-    for (k=0;k<layer_sizes[layer]*layer_sizes[layer-1];k++,iter++) {
-        layers[layer].weights.i8[k] = quant_output_weight(*iter);
-    }
+    iter = read_output_layer(iter, k, &layers[k]);
 
     *data = (uint8_t*)iter;
 
@@ -384,8 +446,8 @@ static uint32_t calculate_net_size(void)
     size += HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES*sizeof(float);
 
     for (k=1;k<NUM_LAYERS;k++) {
-        size += layer_sizes[k]*sizeof(float);
-        size += layer_sizes[k]*layer_sizes[k-1]*sizeof(float);
+        size += model_layer_sizes[k]*sizeof(float);
+        size += model_layer_sizes[k]*model_layer_sizes[k-1]*sizeof(float);
     }
 
     return size;
@@ -405,16 +467,22 @@ void nnue_init(void)
     }
 
     /* Allocate space for layers */
+    layer_sizes[0] = simd_pad_size(HALFKX_LAYER_SIZE)*2;
     layers[0].weights.i16 = aligned_malloc(64,
-                        HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES*sizeof(int16_t));
-    layers[0].biases.i16 = aligned_malloc(64,
-                        HALFKX_LAYER_SIZE*sizeof(int16_t));
-    for (k=1;k<NUM_LAYERS;k++) {
+                            layer_sizes[0]*NUM_INPUT_FEATURES*sizeof(int16_t));
+    layers[0].biases.i16 = aligned_malloc(64, layer_sizes[0]*sizeof(int16_t));
+    for (k=1;k<NUM_LAYERS-1;k++) {
+        layer_sizes[k] = simd_pad_size(model_layer_sizes[k]);
         layers[k].weights.i8 = aligned_malloc(64,
-                              layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t));
+                                layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t));
         layers[k].biases.i32 = aligned_malloc(64,
-                              layer_sizes[k]*sizeof(int32_t));
+                                layer_sizes[k]*sizeof(int32_t));
     }
+    layer_sizes[k] = model_layer_sizes[k]; /* Output layer is not padded */
+    layers[k].weights.i8 = aligned_malloc(64,
+                            layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t));
+    layers[k].biases.i32 = aligned_malloc(64,
+                            layer_sizes[k]*sizeof(int32_t));
 }
 
 void nnue_destroy(void)

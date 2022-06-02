@@ -15,7 +15,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include <assert.h>
 #include <stdlib.h>
 #include <stdalign.h>
 #ifdef USE_SSE
@@ -30,6 +29,14 @@
 #include "simd.h"
 #include "utils.h"
 #include "quantization.h"
+
+#if defined(USE_AVX2)
+#define MIN_SIZE 32
+#elif defined(USE_SSE)
+#define MIN_SIZE 16
+#else
+#define MIN_SIZE 1
+#endif
 
 #if defined(USE_AVX2) || defined(USE_SSE)
 static int32_t hsum_4x32(__m128i v)
@@ -48,6 +55,11 @@ static int32_t hsum_8x32(__m256i v)
     return hsum_4x32(sum128);
 }
 #endif
+
+int simd_pad_size(int size)
+{
+    return ((size%MIN_SIZE) == 0)?size:((size/MIN_SIZE)+1)*MIN_SIZE;
+}
 
 void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
                          int noutputs, int32_t *biases, int8_t *weights)
@@ -79,6 +91,9 @@ void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
 
         output[k] = hsum_8x32(vsum) + biases[k];
     }
+    for (;k<MIN_SIZE-(noutputs%MIN_SIZE);k++) {
+        output[k] = 0;
+    }
 #elif defined(USE_SSE)
     int k;
     int l;
@@ -104,6 +119,9 @@ void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
         }
 
         output[k] = hsum_4x32(vsum) + biases[k];
+    }
+    for (;k<MIN_SIZE-(noutputs%MIN_SIZE);k++) {
+        output[k] = 0;
     }
 #else
     int k;

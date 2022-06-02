@@ -21,6 +21,14 @@
 #include <stdint.h>
 
 /*
+ * Calculate a padded size.
+ *
+ * @param size The actual size.
+ * @return Return the size after padding.
+ */
+int simd_pad_size(int size);
+
+/*
  * SIMD implementation of a forward pass of a linear layer.
  * 
  * @param input The layer input. 
