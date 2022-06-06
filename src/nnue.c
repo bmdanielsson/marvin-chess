@@ -39,13 +39,13 @@
 INCBIN(nnue_net, NETFILE_NAME);
 
 /* Definition of the network architcechure */
-#define NET_VERSION 0x00000004
+#define NET_VERSION 0x00000005
 #define NET_HEADER_SIZE 4
 #define NUM_INPUT_FEATURES 64*64*10
 #define MAX_ACTIVE_FEATURES 30
 #define NUM_LAYERS 4
 #define HALFKX_LAYER_SIZE 256
-static int model_layer_sizes[NUM_LAYERS] = {HALFKX_LAYER_SIZE*2, 32, 32, 1};
+static int model_layer_sizes[NUM_LAYERS] = {HALFKX_LAYER_SIZE*2, 16, 16, 1};
 
 /*
  * Struct holding information about a layer in the network. The size

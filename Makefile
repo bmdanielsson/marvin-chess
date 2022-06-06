@@ -3,7 +3,7 @@ arch = x86-64-modern
 trace = no
 variant = release
 version = 5.2.0
-nnuenet = net-9ef737e9.nnue
+nnuenet = net-710faff.nnue
 
 # Default options
 sse = no
@@ -226,4 +226,4 @@ tuner : $(OBJECTS) $(TUNER_OBJECTS)
 	$(CC) $(OBJECTS) $(TUNER_OBJECTS) $(LDFLAGS) -o tuner
 
 net :
-	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v4/$(nnuenet)
+	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v5/$(nnuenet)
