@@ -19,7 +19,6 @@
 #define EVAL_H
 
 #include "chess.h"
-#include "trace.h"
 
 /*
  * Evaluate the position and assign a static score to it.
@@ -38,15 +37,5 @@ int eval_evaluate(struct position *pos, bool force_hce);
  * @return Returns true if the position is a draw.
  */
 bool eval_is_material_draw(struct position *pos);
-
-#ifdef TRACE
-/*
- * Generate a trace for the evaluation function.
- *
- * @param pos The position.
- * @param trace The evaluation trace.
- */
-void eval_generate_trace(struct position *pos, struct eval_trace *trace);
-#endif
 
 #endif

@@ -1,6 +1,5 @@
 # Default build configuration
 arch = x86-64-modern
-trace = no
 variant = release
 version = 5.2.0
 nnuenet = net-710faff.nnue
@@ -82,10 +81,6 @@ ifeq ($(popcnt), yes)
 else
     CPPFLAGS += -DTB_NO_HW_POP_COUNT
 endif
-.PHONY : trace
-ifeq ($(trace), yes)
-    CPPFLAGS += -DTRACE
-endif
 
 # Update flags based on build variant
 .PHONY : variant
@@ -124,11 +119,6 @@ CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-t
 # Extra include directories
 CFLAGS += -Iimport/fathom -Iimport/incbin -Isrc
 
-# Enable evaluation tracing for tuner
-ifeq ($(MAKECMDGOALS), tuner)
-    CFLAGS += -DTRACE
-endif
-
 # Compiler
 ifeq ($(OS), Windows_NT)
     CC = gcc
@@ -148,6 +138,7 @@ SOURCES = src/bitboard.c \
           src/hash.c \
           src/history.c \
           src/key.c \
+          src/main.c \
           src/movegen.c \
           src/moveselect.c \
           src/nnue.c \
@@ -165,30 +156,14 @@ SOURCES = src/bitboard.c \
           src/validation.c \
           src/xboard.c \
           import/fathom/tbprobe.c
-ENGINE_SOURCES = src/main.c
-TUNER_SOURCES = src/trace.c \
-                src/tuner.c \
-                src/tuningparam.c
-.PHONY : trace
-ifeq ($(trace), yes)
-    SOURCES += src/trace.c src/tuningparam.c
-endif
 
 # Intermediate files
 OBJECTS = $(SOURCES:%.c=%.o)
 DEPS = $(SOURCES:%.c=%.d)
-ENGINE_OBJECTS = $(ENGINE_SOURCES:%.c=%.o)
-ENGINE_DEPS = $(ENGINE_SOURCES:%.c=%.d)
-TUNER_OBJECTS = $(TUNER_SOURCES:%.c=%.o)
-TUNER_DEPS = $(TUNER_SOURCES:%.c=%.d)
 INTERMEDIATES = $(OBJECTS) $(DEPS)
-ENGINE_INTERMEDIATES = $(ENGINE_OBJECTS) $(ENGINE_DEPS)
-TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
 
 # Include depencies
 -include $(SOURCES:.c=.d)
--include $(ENGINE_SOURCES:.c=.d)
--include $(TUNER_SOURCES:.c=.d)
 
 # Targets
 .DEFAULT_GOAL = marvin
@@ -197,7 +172,7 @@ TUNER_INTERMEDIATES = $(TUNER_OBJECTS) $(TUNER_DEPS)
 	$(COMPILE.c) -MD -o $@ $<
 
 clean :
-	rm -f $(EXEFILE) tuner $(INTERMEDIATES) $(ENGINE_INTERMEDIATES) $(TUNER_INTERMEDIATES)
+	rm -f $(EXEFILE) tuner $(INTERMEDIATES)
 
 .PHONY : clean
 
@@ -206,24 +181,19 @@ help :
 	@echo ""
 	@echo "Supported targets:"
 	@echo "  marvin: Build the engine (default target)."
-	@echo "  tuner: Build the tuner program."
 	@echo "  net: Fetch the default NNUE net."
 	@echo "  help: Display this message."
 	@echo "  clean: Remove all intermediate files."
 	@echo ""
 	@echo "Supported options:"
 	@echo "  arch=[generic-64|x86-64|x86-64-modern|x86-64-avx2]: The architecture to build."
-	@echo "  trace=[yes|no]: Include support for tracing the evaluation."
 	@echo "  variant=[release|debug|profile]: The variant to build."
 	@echo "  version=<version>: Override the default version number."
 	@echo "  nnuenet=<file>: Override the default NNUE net."
 .PHONY : help
 
-marvin : $(OBJECTS) $(ENGINE_OBJECTS)
-	$(CC) $(OBJECTS) $(ENGINE_OBJECTS) $(LDFLAGS) -o $(EXEFILE)
-
-tuner : $(OBJECTS) $(TUNER_OBJECTS)
-	$(CC) $(OBJECTS) $(TUNER_OBJECTS) $(LDFLAGS) -o tuner
+marvin : $(OBJECTS)
+	$(CC) $(OBJECTS) $(LDFLAGS) -o $(EXEFILE)
 
 net :
 	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v5/$(nnuenet)
