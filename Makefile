@@ -1,7 +1,7 @@
 # Default build configuration
 arch = x86-64-modern
 variant = release
-version = 5.2.0
+version = 6.0.0
 nnuenet = net-710faff.nnue
 
 # Default options
