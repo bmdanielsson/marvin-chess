@@ -26,13 +26,6 @@
 #include "validation.h"
 #include "fen.h"
 
-int see_material[NPIECES] = {100,  100,      /* pawn */
-                             392,  392,      /* knight */
-                             406,  406,      /* bishop */
-                             654,  654,      /* rook */
-                             1381, 1381,     /* queen */
-                             0,    0};       /* king */
-
 bool see_ge(struct position *pos, uint32_t move, int threshold)
 {
     int      see_score;
@@ -67,9 +60,9 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
     sq = TO(move);
     piece = pos->pieces[FROM(move)];
     if (ISENPASSANT(move)) {
-        see_score = see_material[PAWN+FLIP_COLOR(stm)];
+        see_score = material_values[PAWN+FLIP_COLOR(stm)];
     } else if (ISCAPTURE(move)) {
-        see_score = see_material[pos->pieces[sq]];
+        see_score = material_values[pos->pieces[sq]];
     } else {
         see_score = 0;
     }
@@ -79,7 +72,7 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
         if (see_score < threshold) {
             return false;
         }
-        if ((see_score-see_material[piece]) >= threshold) {
+        if ((see_score-material_values[piece]) >= threshold) {
             return true;
         }
     }
@@ -138,8 +131,8 @@ bool see_ge(struct position *pos, uint32_t move, int threshold)
 
         /* Update the score based on the move */
         old_score = see_score;
-        see_score +=
-                (stm == maximizer)?see_material[victim]:-see_material[victim];
+        see_score += (stm == maximizer)?
+                            material_values[victim]:-material_values[victim];
 
         /* Apply the move. The current piece becomes the next victim. */
         attackers &= ~attacker;

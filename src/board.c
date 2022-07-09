@@ -25,7 +25,6 @@
 #include "bitboard.h"
 #include "validation.h"
 #include "debug.h"
-#include "eval.h"
 #include "hash.h"
 #include "search.h"
 #include "movegen.h"
@@ -34,6 +33,18 @@
 
 /* Point value for the different pieces */
 static int point_values[NPIECES] = {1, 1, 3, 3, 3, 3, 5, 5, 9, 9, 0, 0};
+
+static void update_material(struct position *pos, int piece, bool added)
+{
+    int delta;
+
+    delta = added?1:-1;
+    if (COLOR(piece) == BLACK) {
+        delta *= -1;
+    }
+
+    pos->material += delta*material_values[piece];
+}
 
 static void update_castling_availability(struct position *pos, int from, int to)
 {
@@ -171,7 +182,6 @@ static void add_piece(struct position *pos, int piece, int square)
     SETBIT(pos->bb_sides[COLOR(piece)], square);
     SETBIT(pos->bb_all, square);
     pos->pieces[square] = piece;
-    eval_update_piece_features(pos, piece, square, true);
 }
 
 static void remove_piece(struct position *pos, int piece, int square)
@@ -180,7 +190,6 @@ static void remove_piece(struct position *pos, int piece, int square)
     CLEARBIT(pos->bb_sides[COLOR(piece)], square);
     CLEARBIT(pos->bb_all, square);
     pos->pieces[square] = NO_PIECE;
-    eval_update_piece_features(pos, piece, square, false);
 }
 
 static struct unmake* push_history(struct position *pos)
@@ -247,11 +256,27 @@ void board_start_position(struct position *pos)
 
 bool board_setup_from_fen(struct position *pos, char *fenstr)
 {
+    uint64_t pieces;
+    int      sq;
+    int      piece;
+
     assert(pos != NULL);
     assert(fenstr != NULL);
 
     board_reset(pos);
-    return fen_setup_board(pos, fenstr) && valid_position(pos);
+    if (!fen_setup_board(pos, fenstr) || !valid_position(pos)) {
+        return false;
+    }
+
+    pos->material = 0;
+    pieces = pos->bb_all;
+    while (pieces != 0ULL) {
+        sq = POPBIT(&pieces);
+        piece = pos->pieces[sq];
+        update_material(pos, piece, true);
+    }
+
+    return true;
 }
 
 bool board_in_check(struct position *pos, int side)
@@ -319,10 +344,12 @@ bool board_make_move(struct position *pos, uint32_t move)
     if (ISCAPTURE(move)) {
         remove_piece(pos, capture, to);
         pos->key = key_update_piece(pos->key, capture, to);
+        update_material(pos, capture, false);
     } else if (ISENPASSANT(move)) {
         ep = (pos->stm == WHITE)?to-8:to+8;
         remove_piece(pos, PAWN+FLIP_COLOR(pos->stm), ep);
         pos->key = key_update_piece(pos->key, PAWN+FLIP_COLOR(pos->stm), ep);
+        update_material(pos, PAWN+FLIP_COLOR(pos->stm), false);
     }
 
     /* If this is a castling we have to remove the rook as well */
@@ -335,6 +362,8 @@ bool board_make_move(struct position *pos, uint32_t move)
     if (ISPROMOTION(move)) {
         add_piece(pos, promotion, to);
         pos->key = key_update_piece(pos->key, promotion, to);
+        update_material(pos, piece, false);
+        update_material(pos, promotion, true);
     } else {
         add_piece(pos, piece, to);
         pos->key = key_update_piece(pos->key, piece, to);
@@ -419,7 +448,9 @@ void board_unmake_move(struct position *pos)
     /* Remove piece from current position */
     if (ISPROMOTION(move)) {
         remove_piece(pos, piece, to);
+        update_material(pos, piece, false);
         piece = PAWN + move_color;
+        update_material(pos, piece, true);
     } else {
         remove_piece(pos, piece, to);
     }
@@ -440,8 +471,10 @@ void board_unmake_move(struct position *pos)
     /* Restore captured piece if necessary */
     if (ISCAPTURE(move)) {
         add_piece(pos, elem->capture, to);
+        update_material(pos, elem->capture, true);
     } else if (ISENPASSANT(move)) {
         add_piece(pos, PAWN+color, (move_color==WHITE)?to-8:to+8);
+        update_material(pos, PAWN+color, true);
     }
 
     /*

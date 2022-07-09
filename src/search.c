@@ -299,15 +299,15 @@ static int material_gain(struct position *pos, uint32_t move)
 
     /* Consider gain from capture moves */
     if (ISCAPTURE(move)) {
-        gain += see_material[pos->pieces[TO(move)]];
+        gain += material_values[pos->pieces[TO(move)]];
     } else if (ISENPASSANT(move)) {
-        gain += see_material[PAWN+FLIP_COLOR(pos->stm)];
+        gain += material_values[PAWN+FLIP_COLOR(pos->stm)];
     }
 
     /* Consider additional gain from promotion moves */
     if (ISPROMOTION(move)) {
-        gain += see_material[PROMOTION(move)+pos->stm];
-        gain -= see_material[PAWN+pos->stm];
+        gain += material_values[PROMOTION(move)+pos->stm];
+        gain -= material_values[PAWN+pos->stm];
     }
 
     return gain;

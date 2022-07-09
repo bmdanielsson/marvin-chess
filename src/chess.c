@@ -99,6 +99,13 @@ int kingside_castle_to[NSIDES] = {G1, G8};
 
 int queenside_castle_to[NSIDES] = {C1, C8};
 
+int material_values[NPIECES] = {100,  100,      /* pawn */
+                                392,  392,      /* knight */
+                                406,  406,      /* bishop */
+                                654,  654,      /* rook */
+                                1381, 1381,     /* queen */
+                                0,    0};       /* king */
+
 static void init_king_zones(void)
 {
     int sq;

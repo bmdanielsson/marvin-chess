@@ -330,8 +330,8 @@ bool fen_setup_board(struct position *pos, char *fenstr)
     /* Generate a key for the position */
     pos->key = key_generate(pos);
 
-    /* Initialize evaluation features */
-    eval_init_piece_features(pos);
+    /* Initialize material counter */
+    eval_init_material(pos);
 
     return true;
 }

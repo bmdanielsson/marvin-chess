@@ -47,11 +47,15 @@
 /* Bonus given to the side to move */
 #define TEMPO_BONUS 10
 
+/* Material difference used to decide when to switch between NNUE and HCE */
+#define HYBRID_EVAL_THRESHOLD 700
+
 /* Different evaluation components */
 struct eval {
     bool endgame[NSIDES];
     uint64_t passers;
     uint64_t candidates;
+    int phase;
     uint64_t rear_span[NSIDES];
     uint8_t pawn_shield[NSIDES][2][3];
     uint64_t attacked_by[NPIECES];
@@ -85,14 +89,13 @@ static int material_phase_value[NPIECES] = {
  * based on the current phase of the game. The formula is taken from
  * https://chessprogramming.wikispaces.com/Tapered+Eval
  */
-static int calculate_tapered_eval(struct position *pos, int score_mg,
-                                  int score_eg)
+static int calculate_tapered_eval(int matphase, int score_mg, int score_eg)
 {
     int total_phase;
     int phase;
 
     total_phase = 24;
-    phase = ((24-pos->matphase)*256 + (total_phase/2))/total_phase;
+    phase = ((24-matphase)*256 + (total_phase/2))/total_phase;
 
     /*
      * Guard against negative phase values. The phase value might
@@ -425,6 +428,12 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
         rel_rank = (side==WHITE)?rank:7-rank;
         attackspan = rear_attackspan[side][sq]|front_attackspan[side][sq];
 
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_PAWN_MG[sq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_PAWN_EG[sq];
+        eval->score[MIDDLEGAME][side] += PAWN_BASE_VALUE;
+        eval->score[ENDGAME][side] += PAWN_BASE_VALUE;
+        eval->phase += material_phase_value[PAWN+side];
+
         /* Look for isolated pawns */
         if ((attackspan&pos->bb_pieces[side+PAWN]) == 0ULL) {
             isolated = true;
@@ -577,6 +586,12 @@ static void evaluate_knights(struct position *pos, struct eval *eval)
         attacks = moves;
         moves &= (~pos->bb_sides[side]);
 
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_KNIGHT_MG[sq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_KNIGHT_EG[sq];
+        eval->score[MIDDLEGAME][side] += KNIGHT_MATERIAL_VALUE_MG;
+        eval->score[ENDGAME][side] += KNIGHT_MATERIAL_VALUE_EG;
+        eval->phase += material_phase_value[KNIGHT+side];
+
         /* Mobility */
         safe_moves = moves&(~eval->attacked_by[PAWN+FLIP_COLOR(side)]);
         eval->score[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
@@ -641,6 +656,12 @@ static void evaluate_bishops(struct position *pos, struct eval *eval)
         attacks = moves;
         moves &= (~pos->bb_sides[side]);
 
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_BISHOP_MG[sq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_BISHOP_EG[sq];
+        eval->score[MIDDLEGAME][side] += BISHOP_MATERIAL_VALUE_MG;
+        eval->score[ENDGAME][side] += BISHOP_MATERIAL_VALUE_EG;
+        eval->phase += material_phase_value[BISHOP+side];
+
         /* Mobility */
         safe_moves = moves&(~eval->attacked_by[PAWN+FLIP_COLOR(side)]);
         eval->score[MIDDLEGAME][side] += (BITCOUNT(safe_moves)*
@@ -686,6 +707,12 @@ static void evaluate_rooks(struct position *pos, struct eval *eval)
         moves = bb_rook_moves(pos->bb_all, sq);
         attacks = moves;
         moves &= (~pos->bb_sides[side]);
+
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_ROOK_MG[sq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_ROOK_EG[sq];
+        eval->score[MIDDLEGAME][side] += ROOK_MATERIAL_VALUE_MG;
+        eval->score[ENDGAME][side] += ROOK_MATERIAL_VALUE_EG;
+        eval->phase += material_phase_value[ROOK+side];
 
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
@@ -757,6 +784,12 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
                  eval->attacked_by[BISHOP+opp_side]|
                  eval->attacked_by[ROOK+opp_side];
 
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_QUEEN_MG[sq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_QUEEN_EG[sq];
+        eval->score[MIDDLEGAME][side] += QUEEN_MATERIAL_VALUE_MG;
+        eval->score[ENDGAME][side] += QUEEN_MATERIAL_VALUE_EG;
+        eval->phase += material_phase_value[QUEEN+side];
+
         /* Open and half-open files */
         if ((file_mask[file]&all_pawns) == 0ULL) {
             eval->score[MIDDLEGAME][side] += QUEEN_OPEN_FILE_MG;
@@ -797,6 +830,9 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         side = COLOR(pos->pieces[sq]);
+
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_KING_MG[sq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_KING_EG[sq];
 
         /* Calculate preassure on the enemy king */
         nattackers = 0;
@@ -883,7 +919,8 @@ int eval_evaluate(struct position *pos, bool force_hce)
     }
 
     /* Check if NNUE or classic eval should be used */
-    if (engine_using_nnue && engine_loaded_net && !force_hce) {
+    if (engine_using_nnue && engine_loaded_net && !force_hce &&
+        (abs(pos->material) < HYBRID_EVAL_THRESHOLD)) {
         if ((pos->worker == NULL) ||
             !hash_nnue_lookup(pos->worker, &nnue_score)) {
             nnue_score = nnue_evaluate(pos);
@@ -901,108 +938,45 @@ int eval_evaluate(struct position *pos, bool force_hce)
     /* Summarize each evaluation term from side to moves's pov */
     for (k=0;k<NPHASES;k++) {
         score[k] = eval.score[k][WHITE] - eval.score[k][BLACK];
-        score[k] += pos->material[k] + pos->psq[k];
         score[k] = (pos->stm == WHITE)?score[k]:-score[k];
     }
 
     /* Return score adjusted for game phase */
-    tapered_score = calculate_tapered_eval(pos, score[MIDDLEGAME],
+    tapered_score = calculate_tapered_eval(eval.phase, score[MIDDLEGAME],
                                            score[ENDGAME]);
 
     pos->eval_stack[pos->sply].score = tapered_score + TEMPO_BONUS;
     return pos->eval_stack[pos->sply].score;
 }
 
-void eval_init_piece_features(struct position *pos)
+void eval_init_material(struct position *pos)
 {
     uint64_t pieces;
     int      sq;
     int      piece;
-    int      k;
 
     assert(valid_position(pos));
 
-    /* Reset all feature scores */
-    for (k=0;k<NPHASES;k++) {
-        pos->material[k] = 0;
-        pos->psq[k] = 0;
-    }
-    pos->matphase = 0;
-
     /* Iterate over all pieces */
+    pos->material = 0;
     pieces = pos->bb_all;
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         piece = pos->pieces[sq];
-        eval_update_piece_features(pos, piece, sq, true);
+        eval_update_material(pos, piece, true);
     }
 }
 
-void eval_update_piece_features(struct position *pos, int piece, int sq,
-                                bool added)
+void eval_update_material(struct position *pos, int piece, bool added)
 {
     int delta;
-    int pdelta;
-    int side;
-
-    assert(valid_position(pos));
-    assert(valid_piece(piece));
-    assert(valid_square(sq));
 
     delta = added?1:-1;
-    pdelta = delta;
-    side = COLOR(piece);
-    if (side == BLACK) {
-        sq = MIRROR(sq);
+    if (COLOR(piece) == BLACK) {
         delta *= -1;
     }
 
-    pos->matphase += pdelta*material_phase_value[piece];
-    switch (piece) {
-    case WHITE_PAWN:
-    case BLACK_PAWN:
-        pos->psq[MIDDLEGAME] += (delta*PSQ_TABLE_PAWN_MG[sq]);
-        pos->psq[ENDGAME] += (delta*PSQ_TABLE_PAWN_EG[sq]);
-        pos->material[MIDDLEGAME] += (delta*PAWN_BASE_VALUE);
-        pos->material[ENDGAME] += (delta*PAWN_BASE_VALUE);
-        break;
-    case WHITE_KNIGHT:
-    case BLACK_KNIGHT:
-        pos->psq[MIDDLEGAME] += (delta*PSQ_TABLE_KNIGHT_MG[sq]);
-        pos->psq[ENDGAME] += (delta*PSQ_TABLE_KNIGHT_EG[sq]);
-        pos->material[MIDDLEGAME] += (delta*KNIGHT_MATERIAL_VALUE_MG);
-        pos->material[ENDGAME] += (delta*KNIGHT_MATERIAL_VALUE_EG);
-        break;
-    case WHITE_BISHOP:
-    case BLACK_BISHOP:
-        pos->psq[MIDDLEGAME] += (delta*PSQ_TABLE_BISHOP_MG[sq]);
-        pos->psq[ENDGAME] += (delta*PSQ_TABLE_BISHOP_EG[sq]);
-        pos->material[MIDDLEGAME] += (delta*BISHOP_MATERIAL_VALUE_MG);
-        pos->material[ENDGAME] += (delta*BISHOP_MATERIAL_VALUE_EG);
-        break;
-    case WHITE_ROOK:
-    case BLACK_ROOK:
-        pos->psq[MIDDLEGAME] += (delta*PSQ_TABLE_ROOK_MG[sq]);
-        pos->psq[ENDGAME] += (delta*PSQ_TABLE_ROOK_EG[sq]);
-        pos->material[MIDDLEGAME] += (delta*ROOK_MATERIAL_VALUE_MG);
-        pos->material[ENDGAME] += (delta*ROOK_MATERIAL_VALUE_EG);
-        break;
-    case WHITE_QUEEN:
-    case BLACK_QUEEN:
-        pos->psq[MIDDLEGAME] += (delta*PSQ_TABLE_QUEEN_MG[sq]);
-        pos->psq[ENDGAME] += (delta*PSQ_TABLE_QUEEN_EG[sq]);
-        pos->material[MIDDLEGAME] += (delta*QUEEN_MATERIAL_VALUE_MG);
-        pos->material[ENDGAME] += (delta*QUEEN_MATERIAL_VALUE_EG);
-        break;
-    case WHITE_KING:
-    case BLACK_KING:
-        pos->psq[MIDDLEGAME] += (delta*PSQ_TABLE_KING_MG[sq]);
-        pos->psq[ENDGAME] += (delta*PSQ_TABLE_KING_EG[sq]);
-        break;
-    default:
-        assert(false);
-        break;
-    }
+    pos->material += delta*material_values[piece];
 }
 
 /*

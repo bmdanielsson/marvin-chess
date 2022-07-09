@@ -433,13 +433,10 @@ struct position {
     /* Stack used to keep track of evaluation information */
     struct eval_item eval_stack[MAX_PLY];
     /*
-     * The material score, piece/square table score from white's point
-     * of view and the material phase value. These values are incrementally
+     * The material score from white's point. This value is incrementally
      * updated during the search.
      */
-    int material[NPHASES];
-    int psq[NPHASES];
-    int matphase;
+    int material;
 
     /* Pointers to the owning worker and the active game state */
     struct search_worker *worker;
@@ -664,6 +661,9 @@ extern int kingside_castle_to[NSIDES];
 
 /* Destination square for the king when doing queen side castling */
 extern int queenside_castle_to[NSIDES];
+
+/* Phase independent material values used during search */
+extern int material_values[NPIECES];
 
 /* Initialize chess data */
 void chess_data_init(void);

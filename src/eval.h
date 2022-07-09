@@ -31,24 +31,20 @@
 int eval_evaluate(struct position *pos, bool force_hce);
 
 /*
- * Initialize incrementally updated features that only depend on pieces
- * and their position on the board.
+ * Initialize the material counter.
  *
  * @param pos The board structure.
  */
-void eval_init_piece_features(struct position *pos);
+void eval_init_material(struct position *pos);
 
 /*
- * Incrementally updated evaluation features that only depend on pieces
- * and their position on the board.
+ * Incrementally update the material counter.
  *
  * @param pos The board structure.
  * @param piece The changed piece.
- * @param sq The square that the change occurred on.
  * @param added Flag indicating if the piece was added or removed.
  */
-void eval_update_piece_features(struct position *pos, int piece, int sq,
-                                bool added);
+void eval_update_material(struct position *pos, int piece, bool added);
 
 /*
  * Check if the position is a draw by insufficient material.

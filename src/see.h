@@ -20,9 +20,6 @@
 
 #include "chess.h"
 
-/* Material values for see calculations */
-extern int see_material[NPIECES];
-
 /*
  * Check if the Static Exchange Evaluation (SEE) score of a capturer
  * is equal to or above a certain threshold.
