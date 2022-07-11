@@ -885,6 +885,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     struct movelist     quiets;
     bool                tt_found;
     struct tt_item      tt_item;
+    bool                pv_found;
     struct moveselector ms;
 
     /* Check if the time is up or if we have received a new command */
@@ -902,6 +903,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     (void)eval_evaluate(pos, false);
 
     /* Search all moves */
+    pv_found = false;
     quiets.size = 0;
     tt_flag = TT_ALPHA;
     best_score = -INFINITE_SCORE;
@@ -940,7 +942,16 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
         }
 
         /* Recursivly search the move */
-        score = -search(worker, new_depth-1, -beta, -alpha, true, NOMOVE);
+        if (!pv_found) {
+            score = -search(worker, new_depth-1, -beta, -alpha, true, NOMOVE);
+        } else {
+            score = -search(worker, new_depth-1, -alpha-1, -alpha, true,
+                            NOMOVE);
+            if (score > alpha && score < beta) {
+                score = -search(worker, new_depth-1, -beta, -alpha, true,
+                                NOMOVE);
+            }
+        }
         board_unmake_move(pos);
 
         /* Check if a new best move have been found */
@@ -970,6 +981,7 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                  * update the principle variation with our new best
                  * move.
                  */
+                pv_found = true;
                 tt_flag = TT_EXACT;
                 alpha = score;
                 update_pv(worker, move);
