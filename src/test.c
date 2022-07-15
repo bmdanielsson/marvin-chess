@@ -35,7 +35,7 @@
 #include "smp.h"
 
 /* Depth to search the benchmark positions to */
-#define BENCH_DEPTH 15
+#define BENCH_DEPTH 17
 
 /* Benchmark positions */
 static char *positions[] = {
