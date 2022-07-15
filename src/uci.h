@@ -61,8 +61,11 @@ void uci_send_bound_info(struct search_worker *worker, int score, bool lower);
  * Send information about the move currently being searched.
  *
  * @param worker The worker.
+ * @param movenumber The move number.
+ * @param move The move.
  */
-void uci_send_move_info(struct search_worker *worker);
+void uci_send_move_info(struct search_worker *worker, int movenumber,
+                        uint32_t move);
 
 /*
  * Send information the currently best lines.

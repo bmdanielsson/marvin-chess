@@ -153,8 +153,6 @@ static void prepare_worker(struct search_worker *worker,
     /* Clear statistics */
     worker->nodes = 0;
     worker->qnodes = 0;
-    worker->currmovenumber = 0;
-    worker->currmove = NOMOVE;
     worker->tbhits = 0ULL;
 
     /* Clear best move information */

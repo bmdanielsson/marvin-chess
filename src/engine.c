@@ -345,14 +345,15 @@ void engine_send_bound_info(struct search_worker *worker, int score, bool lower)
     }
 }
 
-void engine_send_move_info(struct search_worker *worker)
+void engine_send_move_info(struct search_worker *worker, int movenumber,
+                           uint32_t move)
 {
     if (worker->state->silent) {
         return;
     }
 
     if (engine_protocol == PROTOCOL_UCI) {
-        uci_send_move_info(worker);
+        uci_send_move_info(worker, movenumber, move);
     }
 }
 

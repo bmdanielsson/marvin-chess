@@ -473,10 +473,6 @@ struct search_worker {
     int depth;
     /* The current selective search depth in plies */
     int seldepth;
-    /* The move currently being searched */
-    uint32_t currmove;
-    /* The number of the move currently being searched (one-based) */
-    int currmovenumber;
     /* The number of tablebase hits */
     uint64_t tbhits;
 

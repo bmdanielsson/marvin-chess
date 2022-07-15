@@ -125,8 +125,11 @@ void engine_send_bound_info(struct search_worker *worker, int score,
  * Send information about the move currently being searched.
  *
  * @param worker The worker.
+ * @param movenumber The move number.
+ * @param move The move.
  */
-void engine_send_move_info(struct search_worker *worker);
+void engine_send_move_info(struct search_worker *worker, int movenumber,
+                           uint32_t move);
 
 /*
  * Send information the currently best lines.

@@ -590,7 +590,8 @@ void uci_send_bound_info(struct search_worker *worker, int score, bool lower)
     engine_write_command(buffer);
 }
 
-void uci_send_move_info(struct search_worker *worker)
+void uci_send_move_info(struct search_worker *worker, int movenumber,
+                        uint32_t move)
 {
     char movestr[MAX_MOVESTR_LENGTH];
     int  msec;
@@ -603,9 +604,9 @@ void uci_send_move_info(struct search_worker *worker)
     }
 
     /* Send command */
-    move2str(worker->currmove, movestr);
+    move2str(move, movestr);
     engine_write_command("info depth %d currmove %s currmovenumber %d",
-                         worker->depth, movestr, worker->currmovenumber);
+                         worker->depth, movestr, movenumber);
 }
 
 void uci_send_multipv_info(struct search_worker *worker)

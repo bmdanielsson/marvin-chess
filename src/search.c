@@ -885,8 +885,15 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     struct movelist     quiets;
     bool                tt_found;
     struct tt_item      tt_item;
-    bool                pv_found;
     struct moveselector ms;
+    bool                extended;
+    bool                tactical;
+    int                 hist;
+    int                 chist;
+    int                 fhist;
+    int                 reduction;
+    bool                gives_check;
+    int                 movenumber;
 
     /* Check if the time is up or if we have received a new command */
     checkup(worker);
@@ -903,11 +910,10 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     (void)eval_evaluate(pos, false);
 
     /* Search all moves */
-    pv_found = false;
     quiets.size = 0;
     tt_flag = TT_ALPHA;
     best_score = -INFINITE_SCORE;
-    worker->currmovenumber = 0;
+    movenumber = 0;
     select_init_node(&ms, worker, false, in_check, best_move);
     while (select_get_move(&ms, worker, &move)) {
         if ((worker->multipv > 1) && is_multipv_move(worker, move)) {
@@ -918,12 +924,10 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
             continue;
         }
 
-        /* Send stats for the first worker */
-        worker->currmovenumber++;
-        worker->currmove = move;
-        if (worker->id == 0)  {
-            engine_send_move_info(worker);
-        }
+        /* Various move properties */
+        gives_check = board_move_gives_check(pos, move);
+        tactical = ISTACTICAL(move) || in_check || gives_check;
+        history_get_scores(worker, move, &hist, &chist, &fhist);
 
         /* Remeber all quiet moves */
         if (!ISTACTICAL(move)) {
@@ -935,19 +939,57 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
             continue;
         }
 
+        /* Send stats for the first worker */
+        extended = false;
+        movenumber++;
+        if (worker->id == 0)  {
+            engine_send_move_info(worker, movenumber, move);
+        }
+
         /* Extend checking moves */
         new_depth = depth;
         if (board_in_check(pos, pos->stm)) {
             new_depth++;
+            extended = true;
+        }
+
+        /*
+         * LMR (Late Move Reduction). With good move ordering later moves
+         * are unlikely to be good. Therefore search them to a reduced
+         * depth. Exceptions are made for tactical moves, like captures and
+         * promotions.
+         */
+        reduction = 0;
+        if (!tactical && !extended && (new_depth > 2) && (movenumber > 1)) {
+            reduction = lmr_reductions[MIN(new_depth, 63)][MIN(movenumber, 63)];
+            reduction -= (CLAMP(((fhist+chist+hist)/5000), -2, 2));
         }
 
         /* Recursivly search the move */
-        if (!pv_found) {
+        reduction = CLAMP(reduction, 0, new_depth-1);
+        if (best_score == -INFINITE_SCORE) {
+            /*
+             * Perform a full search until a pv move is found. Usually
+             * this is the first move.
+             */
             score = -search(worker, new_depth-1, -beta, -alpha, true, NOMOVE);
         } else {
-            score = -search(worker, new_depth-1, -alpha-1, -alpha, true,
-                            NOMOVE);
-            if (score > alpha && score < beta) {
+            /* Perform a reduced depth search with a zero window */
+            score = -search(worker, new_depth-reduction-1, -alpha-1, -alpha,
+                            true, NOMOVE);
+
+            /* Re-search with full depth if the move improved alpha */
+            if ((score > alpha) && (reduction > 0)) {
+                score = -search(worker, new_depth-1, -alpha-1, -alpha, true,
+                                NOMOVE);
+            }
+
+            /*
+             * Re-search with full depth and a full window if alpha was
+             * improved. If this is not a pv node then the full window
+             * is actually a null window so there is no need to re-search.
+             */
+            if (score > alpha) {
                 score = -search(worker, new_depth-1, -beta, -alpha, true,
                                 NOMOVE);
             }
@@ -981,7 +1023,6 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                  * update the principle variation with our new best
                  * move.
                  */
-                pv_found = true;
                 tt_flag = TT_EXACT;
                 alpha = score;
                 update_pv(worker, move);
