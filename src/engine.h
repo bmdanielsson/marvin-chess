@@ -138,11 +138,4 @@ void engine_send_move_info(struct search_worker *worker, int movenumber,
  */
 void engine_send_multipv_info(struct search_worker *worker);
 
-/*
- * Send information about which evaluation that is being used.
- *
- * @param worker The worker.
- */
-void engine_send_eval_info(struct search_worker *worker);
-
 #endif

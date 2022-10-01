@@ -667,13 +667,3 @@ void uci_send_multipv_info(struct search_worker *worker)
         engine_write_command(buffer);
     }
 }
-
-void uci_send_eval_info(void)
-{
-    if (!engine_using_nnue || !engine_loaded_net) {
-        engine_write_command("info string Using classic evaluation");
-    } else {
-        engine_write_command("info string Using NNUE evaluation with %s",
-                             engine_eval_file);
-    }
-}

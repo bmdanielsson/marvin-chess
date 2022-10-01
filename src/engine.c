@@ -367,14 +367,3 @@ void engine_send_multipv_info(struct search_worker *worker)
         uci_send_multipv_info(worker);
     }
 }
-
-void engine_send_eval_info(struct search_worker *worker)
-{
-    if (worker->state->silent) {
-        return;
-    }
-
-    if (engine_protocol == PROTOCOL_UCI) {
-        uci_send_eval_info();
-    }
-}

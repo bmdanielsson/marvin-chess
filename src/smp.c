@@ -338,9 +338,6 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
                       &workers[k]);
     }
 
-    /* Send information to the GUI about which eval that is being used */
-    engine_send_eval_info(&workers[0]);
-
     /* Start the master worker thread */
     search_find_best_move(&workers[0]);
 

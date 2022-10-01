@@ -74,9 +74,4 @@ void uci_send_move_info(struct search_worker *worker, int movenumber,
  */
 void uci_send_multipv_info(struct search_worker *worker);
 
-/*
- * Send information about which evaluation that is being used.
- */
-void uci_send_eval_info(void);
-
 #endif

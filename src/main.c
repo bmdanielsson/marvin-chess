@@ -86,6 +86,12 @@ static void print_version(void)
 {
     printf("%s %s (%s)\n", APP_NAME, APP_VERSION, APP_ARCH);
     printf("%s\n", APP_AUTHOR);
+    printf("\n");
+    if (!engine_using_nnue || !engine_loaded_net) {
+        printf("Using classic evaluation\n");
+    } else {
+        printf("Using NNUE evaluation with %s\n", engine_eval_file);
+    }
 }
 
 int main(int argc, char *argv[])
