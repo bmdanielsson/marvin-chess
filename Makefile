@@ -1,7 +1,7 @@
 # Default build configuration
 arch = x86-64-modern
 variant = release
-version = 6.0.0
+version = 6.1.0
 nnuenet = net-4397f5f.nnue
 
 # Default options
