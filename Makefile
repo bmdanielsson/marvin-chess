@@ -2,7 +2,7 @@
 arch = x86-64-modern
 variant = release
 version = 6.0.0
-nnuenet = net-710faff.nnue
+nnuenet = net-4397f5f.nnue
 
 # Default options
 sse = no
