@@ -369,28 +369,36 @@ struct nnue_cache_item {
     int score;
 };
 
-/* Information about pieces impacted by a move */
-struct dirty_pieces {
-    int ndirty;
-    int piece[3];
-    int from[3];
-    int to[3];
+/* Update to apply to the NNUE accumulator */
+struct nnue_update {
+    uint8_t piece;
+    uint8_t sq;
+    bool add;
 };
 
-/* The state of NNUE input features for a position */
-struct nnue_input_state {
-    /* State data */
-    alignas(64) int16_t data[NSIDES][256];
-    /* Flag indicating if the state data us up to date */
-    bool valid;
+/* Accumulator for NNUE input features for a position */
+#define NNUE_NUM_INPUT_FEATURES 64*64*10
+#define NNUE_MAX_ACTIVE_FEATURES 30
+#define NNUE_NUM_LAYERS 4
+#define NNUE_HALFKX_LAYER_SIZE 256
+struct nnue_accumulator {
+    /* Accumulator data */
+    alignas(64) int16_t data[NSIDES][NNUE_HALFKX_LAYER_SIZE];
+    /*
+     * Updates that has to be applied to the accumulator to make
+     * it up to date for the current position.
+     */
+    struct nnue_update updates[6];
+    uint8_t nupdates;
+    bool refresh[NSIDES];
+    /* Flag indicating if the accumulator data is up to date */
+    bool up2date;
 };
 
 /* Item in the evaluation stack */
 struct eval_item {
-    /* State of NNUE input features */
-    struct nnue_input_state state;
-    /* Pieces impacted by the latest move */
-    struct dirty_pieces dirty_pieces;
+    /* Accumulator for NNUE input features */
+    struct nnue_accumulator accumulator;
     /* The evaluation score */
     int score;
 };

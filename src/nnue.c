@@ -41,11 +41,8 @@ INCBIN(nnue_net, NETFILE_NAME);
 /* Definition of the network architcechure */
 #define NET_VERSION 0x00000005
 #define NET_HEADER_SIZE 4
-#define NUM_INPUT_FEATURES 64*64*10
-#define MAX_ACTIVE_FEATURES 30
-#define NUM_LAYERS 4
-#define HALFKX_LAYER_SIZE 256
-static int model_layer_sizes[NUM_LAYERS] = {HALFKX_LAYER_SIZE*2, 16, 16, 1};
+static int model_layer_sizes[NNUE_NUM_LAYERS] =
+                                        {NNUE_HALFKX_LAYER_SIZE*2, 16, 16, 1};
 
 /*
  * Struct holding information about a layer in the network. The size
@@ -65,22 +62,13 @@ struct layer {
 
 /* Struct for holding data during a forward pass */
 struct net_data {
-    alignas(64) int32_t intermediate[HALFKX_LAYER_SIZE*2];
-    alignas(64) uint8_t output[HALFKX_LAYER_SIZE*2];
-};
-
-/*
- * List of active features for one half. The features are the position
- * of all non-king pieces in relation to one of the two kings.
- */
-struct feature_list {
-    uint8_t  size;
-    uint32_t features[MAX_ACTIVE_FEATURES];
+    alignas(64) int32_t intermediate[NNUE_HALFKX_LAYER_SIZE*2];
+    alignas(64) uint8_t output[NNUE_HALFKX_LAYER_SIZE*2];
 };
 
 /* The network */
-static struct layer layers[NUM_LAYERS];
-static int layer_sizes[NUM_LAYERS];
+static struct layer layers[NNUE_NUM_LAYERS];
+static int layer_sizes[NNUE_NUM_LAYERS];
 
 /* Table mapping piece to piece index */
 static uint32_t piece2index[NSIDES][NPIECES];
@@ -90,22 +78,57 @@ static int transform_square(int sq, int side)
     return (side == BLACK)?MIRROR(sq):sq;
 }
 
-static int calculate_feature_index(int sq, int piece, int king_sq, int side)
+static int feature_index(int sq, int piece, int king_sq, int side)
 {
     sq = transform_square(sq, side);
     return sq + piece2index[side][piece] + KING*NSQUARES*king_sq;
 }
 
-static void find_active_features(struct position *pos, int side,
-                                 struct feature_list *list)
+static void update_accumulator(struct position *pos, int side)
+{
+    struct nnue_accumulator *acc;
+    int16_t                 *data;
+    int                     k;
+    int                     king_sq;
+    uint32_t                index;
+    uint32_t                offset;
+
+    acc = &pos->eval_stack[pos->sply].accumulator;
+    data = &acc->data[side][0];
+
+    /*
+     * Find the location of the king. For black
+     * the board is flipped.
+     */
+    king_sq = transform_square(LSB(pos->bb_pieces[side+KING]), side);
+
+    /* Apply required updates to the accumulator */
+    for (k=0;k<acc->nupdates;k++) {
+        index = feature_index(acc->updates[k].sq,
+                              acc->updates[k].piece, king_sq, side);
+        offset = (layer_sizes[0]/2)*index;
+        if (acc->updates[k].add) {
+            simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
+        } else {
+            simd_sub(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
+        }
+    }
+}
+
+static void refresh_accumulator(struct position *pos, int side)
 {
     int      king_sq;
     int      sq;
     uint32_t index;
+    uint32_t offset;
+    int16_t  *data;
     uint64_t bb;
 
-    /* Initialize */
-    list->size = 0;
+    /* Setup data pointer */
+    data = &pos->eval_stack[pos->sply].accumulator.data[side][0];
+
+    /* Add biases */
+    simd_copy(layers[0].biases.i16, data, layer_sizes[0]/2);
 
     /* Find the location of the king */
     king_sq = transform_square(LSB(pos->bb_pieces[side+KING]), side);
@@ -113,131 +136,16 @@ static void find_active_features(struct position *pos, int side,
     /* Construct a bitboard of all pieces excluding the two kings */
     bb = pos->bb_all&(~(pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING]));
 
-    /* Construct a king/piece index for each piece and add it to the list */
+    /* Update the accumulator based on each piece */
     while (bb != 0ULL) {
         sq = POPBIT(&bb);
-
-        /*
-         * Calculate the feature index for this
-         * piece and add it to the list.
-         */
-        index = calculate_feature_index(sq, pos->pieces[sq], king_sq, side);
-        list->features[list->size++] = index;
-    }
-}
-
-static bool find_changed_features(struct position *pos, int side,
-                                  struct feature_list *added,
-                                  struct feature_list *removed)
-{
-    struct dirty_pieces *dp = &pos->eval_stack[pos->sply].dirty_pieces;
-    int                 k;
-    int                 king_sq;
-    int                 piece;
-    uint32_t            index;
-
-    /* Initialize */
-    added->size = 0;
-    removed->size = 0;
-
-    /*
-     * Find the location of the king. For black
-     * the board is rotated 180 degrees.
-     */
-    king_sq = transform_square(LSB(pos->bb_pieces[side+KING]), side);
-
-    /* Loop over all dirty pieces and update feature lists */
-    for (k=0;k<dp->ndirty;k++) {
-        piece = dp->piece[k];
-
-        /* Ignore the two kings */
-        if (VALUE(piece) == KING) {
-            continue;
-        }
-
-        /* Look for removed or added features */
-        if (dp->from[k] != NO_SQUARE) {
-            /*
-             * Calculate the feature index for this piece and add it
-             * to the list of removed features.
-             */
-            index = calculate_feature_index(dp->from[k], piece, king_sq, side);
-            removed->features[removed->size++] = index;
-        }
-        if (dp->to[k] != NO_SQUARE) {
-            /*
-             * Calculate the feature index for this piece and add it
-             * to the list of added pieces.
-             */
-            index = calculate_feature_index(dp->to[k], piece, king_sq, side);
-            added->features[added->size++] = index;
-        }
-    }
-
-    return false;
-}
-
-static void perform_full_update(struct position *pos, int side)
-{
-    struct feature_list active_features;
-    uint32_t            offset;
-    uint32_t            index;
-    int16_t             *data;
-    int                 k;
-
-    /* Find all active features */
-    find_active_features(pos, side, &active_features);
-
-    /* Setup data pointer */
-    data = &pos->eval_stack[pos->sply].state.data[side][0];
-
-    /* Add biases */
-    simd_copy(layers[0].biases.i16, data, layer_sizes[0]/2);
-
-    /* Summarize the weights for all active features */
-    for (k=0;k<active_features.size;k++) {
-        index = active_features.features[k];
+        index = feature_index(sq, pos->pieces[sq], king_sq, side);
         offset = (layer_sizes[0]/2)*index;
         simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
     }
 }
 
-static void perform_incremental_update(struct position *pos, int side)
-{
-    struct feature_list added;
-    struct feature_list removed;
-    uint32_t            offset;
-    uint32_t            index;
-    int                 k;
-    int16_t             *data;
-    int16_t             *prev_data;
-
-    /* Find all changed features */
-    find_changed_features(pos, side, &added, &removed);
-
-    /* Setup data pointers */
-    data = &pos->eval_stack[pos->sply].state.data[side][0];
-    prev_data = &pos->eval_stack[pos->sply-1].state.data[side][0];
-
-    /* Copy the state from previous position */
-    simd_copy(prev_data, data, layer_sizes[0]/2);
-
-    /* Subtract weights for removed features */
-    for (k=0;k<removed.size;k++) {
-        index = removed.features[k];
-        offset = (layer_sizes[0]/2)*index;
-        simd_sub(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
-    }
-
-    /* Add weights for added features */
-    for (k=0;k<added.size;k++) {
-        index = added.features[k];
-        offset = (layer_sizes[0]/2)*index;
-        simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
-    }
-}
-
-static bool incremental_update_possible(struct position *pos, int side)
+static bool accumulator_refresh_required(struct position *pos, int side)
 {
     /*
      * If there is no worker associated with the position then
@@ -245,65 +153,68 @@ static bool incremental_update_possible(struct position *pos, int side)
      * full update is done.
      */
     if (pos->worker == NULL) {
-        return false;
+        return true;
     }
 
     /*
      * If the state of the previous position is not valid
      * then a full refresh is required.
      */
-    if ((pos->sply == 0) || !pos->eval_stack[pos->sply-1].state.valid) {
-        return false;
+    if ((pos->sply == 0) || !pos->eval_stack[pos->sply-1].accumulator.up2date) {
+        return true;
     }
 
     /*
      * If the king for this side has moved then all feature
      * indeces are invalid and a refresh is required.
      */
-    if (pos->eval_stack[pos->sply].dirty_pieces.piece[0] == (side + KING)) {
-        return false;
-    }
-
-    return true;
+    return pos->eval_stack[pos->sply].accumulator.refresh[side];
 }
 
 static void halfkx_layer_forward(struct position *pos, struct net_data *data)
 {
-    int      perspectives[NSIDES];
+    int16_t  *acc_data;
+    int16_t  *prev_acc_data;
     int      side;
-    uint32_t offset;
-    uint8_t  *temp;
-    int16_t  *features;
+    uint32_t size;
+    uint8_t  *dest;
+    int16_t  *half;
 
     /*
-     * Check if the state is up to date. If it's
+     * Check if the accumulator is up to date. If it's
      * not then it has to be updated.
      */
-    if (!pos->eval_stack[pos->sply].state.valid) {
+    if (!pos->eval_stack[pos->sply].accumulator.up2date) {
         for (side=0;side<NSIDES;side++) {
-            if (incremental_update_possible(pos, side)) {
-                perform_incremental_update(pos, side);
+            if (accumulator_refresh_required(pos, side)) {
+                refresh_accumulator(pos, side);
             } else {
-                perform_full_update(pos, side);
+                /* Copy accumulator data from the previous ply */
+                acc_data =
+                        &pos->eval_stack[pos->sply].accumulator.data[side][0];
+                prev_acc_data =
+                        &pos->eval_stack[pos->sply-1].accumulator.data[side][0];
+                simd_copy(prev_acc_data, acc_data, layer_sizes[0]/2);
+
+                /* Apply required updates */
+                update_accumulator(pos, side);
             }
         }
 
-        /* Mark the state as valid */
-        pos->eval_stack[pos->sply].state.valid = true;
+        /* Mark the accumulator as up to date */
+        pos->eval_stack[pos->sply].accumulator.up2date = true;
     }
 
     /*
      * Combine the two halves to form the inputs to the network. The
      * values are clamped to be in the range [0, 127].
      */
-    perspectives[0] = pos->stm;
-    perspectives[1] = FLIP_COLOR(pos->stm);
-    for (side=0;side<NSIDES;side++) {
-        offset = (layer_sizes[0]/2)*side;
-        temp = &data->output[offset];
-        features = pos->eval_stack[pos->sply].state.data[perspectives[side]];
-        simd_clamp(features, temp, layer_sizes[0]/2);
-    }
+    size = layer_sizes[0]/2;
+    dest = &data->output[0];
+    half = pos->eval_stack[pos->sply].accumulator.data[pos->stm];
+    simd_clamp(half, dest, size);
+    half = pos->eval_stack[pos->sply].accumulator.data[FLIP_COLOR(pos->stm)];
+    simd_clamp(half, dest+size, size);
 }
 
 static void linear_layer_forward(int idx, struct net_data *data, bool output)
@@ -322,7 +233,7 @@ static void network_forward(struct position *pos, struct net_data *data)
     int k;
 
     halfkx_layer_forward(pos, data);
-    for (k=1;k<NUM_LAYERS-1;k++) {
+    for (k=1;k<NNUE_NUM_LAYERS-1;k++) {
         linear_layer_forward(k, data, false);
     }
     linear_layer_forward(k, data, true);
@@ -356,10 +267,10 @@ static float* read_halfkx_layer(float *iter, struct layer *layer)
     for (;k<half;k++) {
         layer->biases.i16[k] = 0;
     }
-    for (k=0;k<model_half*NUM_INPUT_FEATURES;k++,iter++) {
+    for (k=0;k<model_half*NNUE_NUM_INPUT_FEATURES;k++,iter++) {
         layer->weights.i16[k] = quant_halfkx_weight(*iter);
     }
-    for (;k<half*NUM_INPUT_FEATURES;k++) {
+    for (;k<half*NNUE_NUM_INPUT_FEATURES;k++) {
         layer->weights.i16[k] = 0;
     }
 
@@ -423,7 +334,7 @@ static bool parse_network(uint8_t **data)
     iter = read_halfkx_layer(iter, &layers[0]);
 
     /* Read biases and weights for each hidden layer */
-    for (k=1;k<NUM_LAYERS-1;k++) {
+    for (k=1;k<NNUE_NUM_LAYERS-1;k++) {
         iter = read_linear_layer(iter, k, &layers[k]);
     }
 
@@ -442,10 +353,10 @@ static uint32_t calculate_net_size(void)
 
     size += NET_HEADER_SIZE;
 
-    size += HALFKX_LAYER_SIZE*sizeof(float);
-    size += HALFKX_LAYER_SIZE*NUM_INPUT_FEATURES*sizeof(float);
+    size += NNUE_HALFKX_LAYER_SIZE*sizeof(float);
+    size += NNUE_HALFKX_LAYER_SIZE*NNUE_NUM_INPUT_FEATURES*sizeof(float);
 
-    for (k=1;k<NUM_LAYERS;k++) {
+    for (k=1;k<NNUE_NUM_LAYERS;k++) {
         size += model_layer_sizes[k]*sizeof(float);
         size += model_layer_sizes[k]*model_layer_sizes[k-1]*sizeof(float);
     }
@@ -467,11 +378,11 @@ void nnue_init(void)
     }
 
     /* Allocate space for layers */
-    layer_sizes[0] = simd_pad_size(HALFKX_LAYER_SIZE)*2;
+    layer_sizes[0] = simd_pad_size(NNUE_HALFKX_LAYER_SIZE)*2;
     layers[0].weights.i16 = aligned_malloc(64,
-                            layer_sizes[0]*NUM_INPUT_FEATURES*sizeof(int16_t));
+                    layer_sizes[0]*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t));
     layers[0].biases.i16 = aligned_malloc(64, layer_sizes[0]*sizeof(int16_t));
-    for (k=1;k<NUM_LAYERS-1;k++) {
+    for (k=1;k<NNUE_NUM_LAYERS-1;k++) {
         layer_sizes[k] = simd_pad_size(model_layer_sizes[k]);
         layers[k].weights.i8 = aligned_malloc(64,
                                 layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t));
@@ -491,7 +402,7 @@ void nnue_destroy(void)
 
     aligned_free(layers[0].weights.i16);
     aligned_free(layers[0].biases.i16);
-    for (k=1;k<NUM_LAYERS;k++) {
+    for (k=1;k<NNUE_NUM_LAYERS;k++) {
         aligned_free(layers[k].weights.i8);
         aligned_free(layers[k].biases.i32);
     }
@@ -502,7 +413,7 @@ void nnue_reset_state(struct position *pos)
     int k;
 
     for (k=0;k<MAX_PLY;k++) {
-        pos->eval_stack[k].state.valid = false;
+        pos->eval_stack[k].accumulator.up2date = false;
     }
 }
 
@@ -575,12 +486,12 @@ int16_t nnue_evaluate(struct position *pos)
 
 void nnue_make_move(struct position *pos, uint32_t move)
 {
-    int                 from = FROM(move);
-    int                 to = TO(move);
-    int                 promotion = PROMOTION(move);
-    int                 capture = pos->pieces[to];
-    int                 piece = pos->pieces[from];
-    struct dirty_pieces *dp;
+    struct nnue_accumulator *acc;
+    int                     from = FROM(move);
+    int                     to = TO(move);
+    int                     promotion = PROMOTION(move);
+    int                     capture = pos->pieces[to];
+    int                     piece = pos->pieces[from];
 
     assert(pos != NULL);
 
@@ -588,57 +499,68 @@ void nnue_make_move(struct position *pos, uint32_t move)
         return;
     }
 
-    pos->eval_stack[pos->sply].state.valid = false;
-    dp = &(pos->eval_stack[pos->sply].dirty_pieces);
-    dp->ndirty = 1;
+    acc = &pos->eval_stack[pos->sply].accumulator;
+    acc->up2date = false;
+    acc->nupdates = 0;
+    acc->refresh[WHITE] = piece == WHITE_KING;
+    acc->refresh[BLACK] = piece == BLACK_KING;
 
     if (ISKINGSIDECASTLE(move)) {
-        dp->ndirty = 2;
+        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
+        acc->updates[acc->nupdates].sq = to;
+        acc->updates[acc->nupdates].add = false;
+        acc->nupdates++;
 
-        dp->piece[0] = KING + pos->stm;
-        dp->from[0] = from;
-        dp->to[0] = KINGCASTLE_KINGMOVE(to);
-
-        dp->piece[1] = ROOK + pos->stm;
-        dp->from[1] = to;
-        dp->to[1] = KINGCASTLE_KINGMOVE(to) - 1;
+        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
+        acc->updates[acc->nupdates].sq = KINGCASTLE_KINGMOVE(to) - 1;
+        acc->updates[acc->nupdates].add = true;
+        acc->nupdates++;
     } else if (ISQUEENSIDECASTLE(move)) {
-        dp->ndirty = 2;
+        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
+        acc->updates[acc->nupdates].sq = to;
+        acc->updates[acc->nupdates].add = false;
+        acc->nupdates++;
 
-        dp->piece[0] = KING + pos->stm;
-        dp->from[0] = from;
-        dp->to[0] = QUEENCASTLE_KINGMOVE(to);
-
-        dp->piece[1] = ROOK + pos->stm;
-        dp->from[1] = to;
-        dp->to[1] = QUEENCASTLE_KINGMOVE(to) + 1;
+        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
+        acc->updates[acc->nupdates].sq = QUEENCASTLE_KINGMOVE(to) + 1;
+        acc->updates[acc->nupdates].add = true;
+        acc->nupdates++;
     } else if (ISENPASSANT(move)) {
-        dp->ndirty = 2;
+        acc->updates[acc->nupdates].piece = piece;
+        acc->updates[acc->nupdates].sq = from;
+        acc->updates[acc->nupdates].add = false;
+        acc->nupdates++;
 
-        dp->piece[0] = piece;
-        dp->from[0] = from;
-        dp->to[0] = to;
+        acc->updates[acc->nupdates].piece = piece;
+        acc->updates[acc->nupdates].sq = to;
+        acc->updates[acc->nupdates].add = true;
+        acc->nupdates++;
 
-        dp->piece[1] = PAWN + FLIP_COLOR(pos->stm);
-        dp->from[1] = (pos->stm == WHITE)?to-8:to+8;
-        dp->to[1] = NO_SQUARE;
+        acc->updates[acc->nupdates].piece = PAWN + FLIP_COLOR(pos->stm);
+        acc->updates[acc->nupdates].sq = (pos->stm == WHITE)?to-8:to+8;
+        acc->updates[acc->nupdates].add = false;
+        acc->nupdates++;
     } else {
-        dp->piece[0] = piece;
-        dp->from[0] = from;
-        dp->to[0] = to;
+        if (VALUE(piece) != KING) {
+            acc->updates[acc->nupdates].piece = piece;
+            acc->updates[acc->nupdates].sq = from;
+            acc->updates[acc->nupdates].add = false;
+            acc->nupdates++;
+        }
 
         if (ISCAPTURE(move)) {
-            dp->ndirty = 2;
-            dp->piece[1] = capture;
-            dp->from[1] = to;
-            dp->to[1] = NO_SQUARE;
+            acc->updates[acc->nupdates].piece = capture;
+            acc->updates[acc->nupdates].sq = to;
+            acc->updates[acc->nupdates].add = false;
+            acc->nupdates++;
         }
-        if (ISPROMOTION(move)) {
-            dp->to[0] = NO_SQUARE;
-            dp->piece[dp->ndirty] = promotion;
-            dp->from[dp->ndirty] = NO_SQUARE;
-            dp->to[dp->ndirty] = to;
-            dp->ndirty++;
+
+        if (VALUE(piece) != KING) {
+            acc->updates[acc->nupdates].piece =
+                                            ISPROMOTION(move)?promotion:piece;
+            acc->updates[acc->nupdates].sq = to;
+            acc->updates[acc->nupdates].add = true;
+            acc->nupdates++;
         }
     }
 }
@@ -651,9 +573,10 @@ void nnue_make_null_move(struct position *pos)
         return;
     }
 
-    if ((pos->sply > 0) && pos->eval_stack[pos->sply-1].state.valid) {
-        pos->eval_stack[pos->sply].state = pos->eval_stack[pos->sply-1].state;
+    if ((pos->sply > 0) && pos->eval_stack[pos->sply-1].accumulator.up2date) {
+        pos->eval_stack[pos->sply].accumulator =
+                                    pos->eval_stack[pos->sply-1].accumulator;
     } else {
-        pos->eval_stack[pos->sply].state.valid = false;
+        pos->eval_stack[pos->sply].accumulator.up2date = false;
     }
 }
