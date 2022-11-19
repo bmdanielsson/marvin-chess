@@ -70,18 +70,25 @@ struct net_data {
 static struct layer layers[NNUE_NUM_LAYERS];
 static int layer_sizes[NNUE_NUM_LAYERS];
 
-/* Table mapping piece to piece index */
-static uint32_t piece2index[NSIDES][NPIECES];
-
-static int transform_square(int sq, int side)
-{
-    return (side == BLACK)?MIRROR(sq):sq;
-}
-
 static int feature_index(int sq, int piece, int king_sq, int side)
 {
-    sq = transform_square(sq, side);
-    return sq + piece2index[side][piece] + KING*NSQUARES*king_sq;
+    int piece_index;
+
+    /*
+     * For black the board should be flipped so squares must be
+     * updated accordingly. Additionally the piece index is
+     * side-to-move relative so for black the indexing order has
+     * to be swapped.
+     */
+    if (side == BLACK) {
+        sq = MIRROR(sq);
+        king_sq = MIRROR(king_sq);
+        piece_index = FLIP_COLOR(piece)*NSQUARES;
+    } else {
+        piece_index = piece*NSQUARES;
+    }
+
+    return sq + piece_index + (NPIECES-2)*NSQUARES*king_sq;
 }
 
 static void update_accumulator(struct position *pos, int side)
@@ -96,11 +103,8 @@ static void update_accumulator(struct position *pos, int side)
     acc = &pos->eval_stack[pos->sply].accumulator;
     data = &acc->data[side][0];
 
-    /*
-     * Find the location of the king. For black
-     * the board is flipped.
-     */
-    king_sq = transform_square(LSB(pos->bb_pieces[side+KING]), side);
+    /* Find the location of the firendly king */
+    king_sq = LSB(pos->bb_pieces[side+KING]);
 
     /* Apply required updates to the accumulator */
     for (k=0;k<acc->nupdates;k++) {
@@ -130,8 +134,8 @@ static void refresh_accumulator(struct position *pos, int side)
     /* Add biases */
     simd_copy(layers[0].biases.i16, data, layer_sizes[0]/2);
 
-    /* Find the location of the king */
-    king_sq = transform_square(LSB(pos->bb_pieces[side+KING]), side);
+    /* Find the location of the friendly king */
+    king_sq = LSB(pos->bb_pieces[side+KING]);
 
     /* Construct a bitboard of all pieces excluding the two kings */
     bb = pos->bb_all&(~(pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING]));
@@ -366,16 +370,7 @@ static uint32_t calculate_net_size(void)
 
 void nnue_init(void)
 {
-    int piece;
     int k;
-
-    /* Initialize piece index table */
-    for (piece=0;piece<KING;piece+=2) {
-        piece2index[WHITE][piece] = piece*NSQUARES;
-        piece2index[WHITE][piece+1] = (piece+1)*NSQUARES;
-        piece2index[BLACK][piece] = (piece+1)*NSQUARES;
-        piece2index[BLACK][piece+1] = piece*NSQUARES;
-    }
 
     /* Allocate space for layers */
     layer_sizes[0] = simd_pad_size(NNUE_HALFKX_LAYER_SIZE)*2;
