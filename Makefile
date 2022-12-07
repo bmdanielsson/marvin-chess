@@ -104,14 +104,19 @@ endif
 ifeq ($(OS), Windows_NT)
     CFLAGS += -DWINDOWS -D_CRT_SECURE_NO_DEPRECATE
     EXEFILE = marvin.exe
+    RM = del /f /q
+    SEP = \\
 else
 ifeq ($(variant), release)
     CFLAGS += -flto
     LDFLAGS += -flto
 endif
+    RM = rm -f
+    SEP = /
     LDFLAGS += -lpthread -lm
     EXEFILE = marvin
 endif
+PSEP = $(strip $(SEP))
 
 # Configure warnings
 CFLAGS += -W -Wall -Werror -Wno-array-bounds -Wno-pointer-to-int-cast -Wno-int-to-pointer-cast
@@ -172,7 +177,7 @@ INTERMEDIATES = $(OBJECTS) $(DEPS)
 	$(COMPILE.c) -MD -o $@ $<
 
 clean :
-	rm -f $(EXEFILE) tuner $(INTERMEDIATES)
+	$(RM) $(EXEFILE) $(subst /,$(SEP),$(INTERMEDIATES))
 
 .PHONY : clean
 
