@@ -128,14 +128,6 @@ bool board_move_gives_check(struct position *pos, uint32_t move);
 int board_point_value(struct position *pos);
 
 /*
- * Find the path to a quiet position.
- *
- * @param pos The position.
- * @param pv Location to store the principle variation at.
- */
-void board_quiet(struct position *pos, struct movelist *pv);
-
-/*
  * Check if castling is allowed in a given position.
  *
  * @param pos The position.

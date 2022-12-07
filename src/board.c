@@ -31,9 +31,6 @@
 #include "engine.h"
 #include "nnue.h"
 
-/* Point value for the different pieces */
-static int point_values[NPIECES] = {1, 1, 3, 3, 3, 3, 5, 5, 9, 9, 0, 0};
-
 static void update_material(struct position *pos, int piece, bool added)
 {
     int delta;
@@ -91,89 +88,6 @@ static void update_castling_availability(struct position *pos, int from, int to)
             pos->castle &= ~WHITE_QUEENSIDE;
         }
     }
-}
-
-static int point_value(struct position *pos)
-{
-    int sq;
-    int piece;
-    int wp;
-    int bp;
-
-    wp = 0;
-    bp = 0;
-    for (sq=0;sq<NSQUARES;sq++) {
-        piece = pos->pieces[sq];
-        if (piece == NO_PIECE) {
-            continue;
-        } else if (COLOR(piece) == WHITE) {
-            wp += point_values[piece];
-        } else {
-            bp += point_values[piece];
-        }
-    }
-    return pos->stm == WHITE?wp-bp:-(wp-bp);
-}
-
-static int quiet(struct position *pos, int alpha, int beta, struct movelist *pv)
-{
-    int             score;
-    int             best_score;
-    int             static_score;
-    uint32_t        move;
-    struct movelist list;
-    int             k;
-    struct movelist line;
-    bool            in_check;
-
-    in_check = board_in_check(pos, pos->stm);
-    static_score = point_value(pos);
-    best_score = -INFINITE_SCORE;
-
-    if (!in_check) {
-        best_score = static_score;
-        if (static_score >= beta) {
-            return static_score;
-        }
-        if (static_score > alpha) {
-            alpha = static_score;
-        }
-    }
-
-    list.size = 0;
-    if (in_check) {
-        gen_legal_moves(pos, &list);
-        if (list.size == 0) {
-            return -CHECKMATE;
-        }
-    } else {
-        gen_capture_moves(pos, &list);
-        gen_promotion_moves(pos, &list, false);
-    }
-    for (k=0;k<list.size;k++) {
-        move = list.moves[k];
-        if (!board_make_move(pos, move)) {
-            continue;
-        }
-        line.size = 0;
-        score = -quiet(pos, -beta, -alpha, &line);
-        board_unmake_move(pos);
-
-        if (score > best_score) {
-            best_score = score;
-            if (score > alpha) {
-                if (score >= beta) {
-                    break;
-                }
-                alpha = score;
-                pv->moves[0] = move;
-                memcpy(pv->moves+1, line.moves, line.size*sizeof(uint32_t));
-                pv->size = line.size + 1;
-            }
-        }
-    }
-
-    return best_score;
 }
 
 static void add_piece(struct position *pos, int piece, int square)
@@ -822,12 +736,6 @@ bool board_move_gives_check(struct position *pos, uint32_t move)
     pos->pieces[from] = src_piece;
 
     return gives_check;
-}
-
-void board_quiet(struct position *pos, struct movelist *pv)
-{
-    pv->size = 0;
-    (void)quiet(pos, -INFINITE_SCORE, INFINITE_SCORE, pv);
 }
 
 bool board_is_castling_allowed(struct position *pos, int type)

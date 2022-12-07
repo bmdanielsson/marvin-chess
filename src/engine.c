@@ -152,29 +152,6 @@ static void cmd_perft(char *cmd, struct gamestate *state)
 
 /*
  * Custom command
- * Syntax: quiet
- */
-static void cmd_quiet(struct gamestate *state)
-{
-    struct position pos;
-    struct movelist pv;
-    int             k;
-    char            movestr[MAX_MOVESTR_LENGTH];
-
-    pv.size = 0;
-    pos = state->pos;
-    board_quiet(&pos, &pv);
-
-    printf("pv");
-    for (k=0;k<pv.size;k++) {
-        move2str(pv.moves[k], movestr);
-        printf(" %s", movestr);
-    }
-    printf("\n");
-}
-
-/*
- * Custom command
  * Syntax: bench
  */
 static void cmd_bench(void)
@@ -216,8 +193,6 @@ void engine_loop(struct gamestate *state)
             cmd_eval(state);
         } else if (MATCH(cmd, "perft")) {
             cmd_perft(cmd, state);
-        } else if (MATCH(cmd, "quiet")) {
-            cmd_quiet(state);
         } else if (MATCH(cmd, "bench")) {
             cmd_bench();
         } else {
