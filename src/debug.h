@@ -83,11 +83,4 @@ void dbg_print_move(uint32_t move);
  */
 void dbg_print_movelist(struct movelist *list);
 
-/*
- * Interactivly browse the trasposition table.
- *
- * @param pos The board structure.
- */
-void dbg_browse_transposition_table(struct position *pos);
-
 #endif

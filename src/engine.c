@@ -70,15 +70,6 @@ static mutex_t tx_lock;
 
 /*
  * Custom command
- * Syntax: browse
- */
-static void cmd_browse(struct gamestate *state)
-{
-    dbg_browse_transposition_table(&state->pos);
-}
-
-/*
- * Custom command
  * Syntax: display
  */
 static void cmd_display(struct gamestate *state)
@@ -183,9 +174,7 @@ void engine_loop(struct gamestate *state)
 
         /* Custom commands */
         handled = true;
-        if (MATCH(cmd, "browse")) {
-            cmd_browse(state);
-        } else if (MATCH(cmd, "display")) {
+        if (MATCH(cmd, "display")) {
             cmd_display(state);
         } else if (MATCH(cmd, "divide")) {
             cmd_divide(cmd, state);
