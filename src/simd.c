@@ -28,7 +28,6 @@
 
 #include "simd.h"
 #include "utils.h"
-#include "quantization.h"
 
 #if defined(USE_AVX2)
 #define MIN_SIZE 32
@@ -37,6 +36,8 @@
 #else
 #define MIN_SIZE 1
 #endif
+
+#define MAX_QUANTIZED_ACTIVATION 127.0f
 
 #if defined(USE_AVX2) || defined(USE_SSE)
 static int32_t hsum_4x32(__m128i v)

@@ -148,7 +148,6 @@ SOURCES = src/bitboard.c \
           src/moveselect.c \
           src/nnue.c \
           src/polybook.c \
-          src/quantization.c \
           src/search.c \
           src/see.c \
           src/simd.c \

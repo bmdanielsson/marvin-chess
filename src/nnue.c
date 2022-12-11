@@ -31,12 +31,15 @@
 #include "utils.h"
 #include "bitboard.h"
 #include "simd.h"
-#include "quantization.h"
 
 #define INCBIN_PREFIX
 #define INCBIN_STYLE INCBIN_STYLE_SNAKE
 #include "incbin.h"
 INCBIN(nnue_net, NETFILE_NAME);
+
+/* NNUE quantization parameters */
+#define WEIGHT_SCALE_BITS 6
+#define OUTPUT_SCALE 16.0f
 
 /* Definition of the network architcechure */
 #define NET_VERSION 0x00000005
@@ -256,7 +259,7 @@ static bool parse_header(uint8_t **data)
     return version == NET_VERSION;
 }
 
-static float* read_halfkx_layer(float *iter, struct layer *layer)
+static uint8_t* read_halfkx_layer(uint8_t *iter, struct layer *layer)
 {
     int k;
     int half;
@@ -265,14 +268,14 @@ static float* read_halfkx_layer(float *iter, struct layer *layer)
     /* Weights and biases are padded with zeroes if necessary */
     model_half = model_layer_sizes[0]/2;
     half = layer_sizes[0]/2;
-    for (k=0;k<model_half;k++,iter++) {
-        layer->biases.i16[k] = quant_halfkx_bias(*iter);
+    for (k=0;k<model_half;k++,iter+=2) {
+        layer->biases.i16[k] = read_uint16_le(iter);
     }
     for (;k<half;k++) {
         layer->biases.i16[k] = 0;
     }
-    for (k=0;k<model_half*NNUE_NUM_INPUT_FEATURES;k++,iter++) {
-        layer->weights.i16[k] = quant_halfkx_weight(*iter);
+    for (k=0;k<model_half*NNUE_NUM_INPUT_FEATURES;k++,iter+=2) {
+        layer->weights.i16[k] = read_uint16_le(iter);
     }
     for (;k<half*NNUE_NUM_INPUT_FEATURES;k++) {
         layer->weights.i16[k] = 0;
@@ -281,22 +284,21 @@ static float* read_halfkx_layer(float *iter, struct layer *layer)
     return iter;
 }
 
-static float* read_linear_layer(float *iter, int idx, struct layer *layer)
+static uint8_t* read_linear_layer(uint8_t *iter, int idx, struct layer *layer)
 {
     int k;
     int l;
 
     /* Weights and biases are padded with zeroes if necessary */
-    for (k=0;k<model_layer_sizes[idx];k++,iter++) {
-        layer->biases.i32[k] = quant_hidden_bias(*iter);
+    for (k=0;k<model_layer_sizes[idx];k++,iter+=4) {
+        layer->biases.i32[k] = read_uint32_le(iter);
     }
     for (;k<layer_sizes[idx];k++) {
         layer->biases.i32[k] = 0;
     }
     for (k=0;k<model_layer_sizes[idx];k++) {
         for (l=0;l<model_layer_sizes[idx-1];l++,iter++) {
-            layer->weights.i8[k*layer_sizes[idx-1]+l] =
-                                                    quant_hidden_weight(*iter);
+            layer->weights.i8[k*layer_sizes[idx-1]+l] = (int8_t)*iter;
         }
         for (;l<layer_sizes[idx-1];l++) {
             layer->weights.i8[k*layer_sizes[idx-1]+l] = 0;
@@ -306,20 +308,18 @@ static float* read_linear_layer(float *iter, int idx, struct layer *layer)
     return iter;
 }
 
-static float* read_output_layer(float *iter, int idx, struct layer *layer)
+static uint8_t* read_output_layer(uint8_t *iter, int idx, struct layer *layer)
 {
     int k;
     int l;
 
     /* Note that the size of the output layer is not padded */
-    for (k=0;k<model_layer_sizes[idx];k++,iter++) {
-        layer->biases.i32[k] = quant_output_bias(*iter);
+    for (k=0;k<model_layer_sizes[idx];k++,iter+=4) {
+        layer->biases.i32[k] = read_uint32_le(iter);
     }
-
     for (k=0;k<model_layer_sizes[idx];k++) {
         for (l=0;l<model_layer_sizes[idx-1];l++,iter++) {
-            layer->weights.i8[k*layer_sizes[idx-1]+l] =
-                                                    quant_output_weight(*iter);
+            layer->weights.i8[k*layer_sizes[idx-1]+l] = (int8_t)*iter;
         }
         for (;l<layer_sizes[idx-1];l++) {
             layer->weights.i8[k*layer_sizes[idx-1]+l] = 0;
@@ -331,7 +331,7 @@ static float* read_output_layer(float *iter, int idx, struct layer *layer)
 
 static bool parse_network(uint8_t **data)
 {
-    float *iter = (float*)*data;
+    uint8_t *iter = *data;
     int   k;
 
     /* Read biases and weights for the HalfKX layer */
@@ -345,7 +345,7 @@ static bool parse_network(uint8_t **data)
     /* Read biases and weights for the output layer */
     iter = read_output_layer(iter, k, &layers[k]);
 
-    *data = (uint8_t*)iter;
+    *data = iter;
 
     return true;
 }
@@ -357,12 +357,12 @@ static uint32_t calculate_net_size(void)
 
     size += NET_HEADER_SIZE;
 
-    size += NNUE_HALFKX_LAYER_SIZE*sizeof(float);
-    size += NNUE_HALFKX_LAYER_SIZE*NNUE_NUM_INPUT_FEATURES*sizeof(float);
+    size += NNUE_HALFKX_LAYER_SIZE*sizeof(int16_t);
+    size += NNUE_HALFKX_LAYER_SIZE*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t);
 
     for (k=1;k<NNUE_NUM_LAYERS;k++) {
-        size += model_layer_sizes[k]*sizeof(float);
-        size += model_layer_sizes[k]*model_layer_sizes[k-1]*sizeof(float);
+        size += model_layer_sizes[k]*sizeof(int32_t);
+        size += model_layer_sizes[k]*model_layer_sizes[k-1]*sizeof(int8_t);
     }
 
     return size;
