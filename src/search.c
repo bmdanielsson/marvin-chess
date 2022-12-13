@@ -443,39 +443,41 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                   bool try_null, uint32_t exclude_move)
 {
     int                 score;
-    int                 tt_score;
-    int                 tb_score;
     int                 best_score;
-    int                 static_score;
-    int                 threshold;
     uint32_t            move;
-    uint32_t            tt_move;
     uint32_t            best_move;
-    int                 movenumber;
-    bool                found_move;
-    int                 reduction;
-    int                 futility_pruning;
-    bool                in_check;
-    bool                gives_check;
     int                 tt_flag;
-    bool                pv_node;
-    bool                tactical;
-    bool                extended;
-    int                 new_depth;
-    struct tt_item      tt_item;
-    bool                tt_found;
     struct position     *pos = &worker->pos;
-    bool                is_singular;
+    int                 in_check;
+    int                 new_depth;
     struct movelist     quiets;
-    int                 see_prune_margin[2];
+    bool                tt_found;
+    struct tt_item      tt_item;
+    uint32_t            tt_move;
+    int                 tt_score;
+    struct moveselector ms;
+    bool                extended;
+    bool                tactical;
     int                 hist;
     int                 chist;
     int                 fhist;
-    struct moveselector ms;
+    int                 reduction;
+    bool                gives_check;
+    int                 movenumber;
+    int                 see_prune_margin[2];
+    bool                pv_node;
+    bool                is_root;
+    int                 static_score;
     bool                improving;
+    int                 tb_score;
+    int                 threshold;
+    bool                is_singular;
+    bool                futility_pruning;
+    bool                found_move;
 
     /* Set node type */
     pv_node = (beta-alpha) > 1;
+    is_root = pos->sply == 0;
 
     /* Setup margins for SEE pruning */
     see_prune_margin[0] = SEE_QUIET_MARGIN(depth);
@@ -507,7 +509,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * is hidden just beyond the horizon. Stopping early also allow us
      * to spend more time analyzing other positions.
      */
-    if (board_is_repetition(pos) || (pos->fifty >= 100)) {
+    if (!is_root && (board_is_repetition(pos) || (pos->fifty >= 100))) {
         return 0;
     }
 
@@ -517,10 +519,12 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * search then a search is required so a cutoff should not
      * be done for this node.
      */
+    best_move = NOMOVE;
     tt_move = NOMOVE;
-    tt_score = 0; 
+    tt_score = 0;
     tt_found = hash_tt_lookup(pos, &tt_item);
     if (tt_found) {
+        best_move = is_root?tt_item.move:NOMOVE;
         tt_move = tt_item.move;
         tt_score = adjust_mate_score(pos, tt_item.score);
         if (!pv_node && (tt_move != exclude_move) &&
@@ -530,7 +534,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Probe tablebases */
-    if (worker->state->probe_wdl &&
+    if (!is_root && worker->state->probe_wdl &&
         (BITCOUNT(pos->bb_all) <= (int)TB_LARGEST)) {
         if (probe_wdl_tables(worker, alpha, beta, &tb_score)) {
             return tb_score;
@@ -543,140 +547,149 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      */
     static_score = eval_evaluate(pos, false);
     improving = (pos->sply >= 2 &&
-                        static_score > pos->eval_stack[pos->sply-2].score);
+                            static_score > pos->eval_stack[pos->sply-2].score);
 
-    /* Reverse futility pruning */
+    /* Find out if the side to move is in check */
     in_check = board_in_check(pos, pos->stm);
-    if ((depth <= FUTILITY_DEPTH) &&
-        !in_check &&
-        !pv_node &&
-        board_has_non_pawn(pos, pos->stm) &&
-        ((static_score-futility_margin[depth]) >= beta)) {
-        return static_score;
-    }
 
-    /*
-     * Try Razoring. If the current score indicates that we are far below
-     * alpha then we're in a really bad place and it's no point doing a
-     * full search.
-     */
-    if (!in_check &&
-        !pv_node &&
-        (tt_move == NOMOVE) &&
-        (depth <= RAZORING_DEPTH) &&
-        ((static_score+razoring_margin[depth]) <= alpha)) {
-        if (depth == 1) {
-            return quiescence(worker, 0, alpha, beta);
+    /* Additional pruning for non-root nodes */
+    is_singular = false;
+    futility_pruning = false;
+    if (!is_root) {
+        /* Reverse futility pruning */
+        if ((depth <= FUTILITY_DEPTH) && !in_check && !pv_node &&
+            board_has_non_pawn(pos, pos->stm) &&
+            ((static_score-futility_margin[depth]) >= beta)) {
+            return static_score;
         }
 
-        threshold = alpha - razoring_margin[depth];
-        score = quiescence(worker, 0, threshold, threshold+1);
-        if (score <= threshold) {
-            return score;
-        }
-    }
-
-    /*
-     * Null move pruning. If the opponent can't beat beta even when given
-     * a free move then there is no point doing a full search. However
-     * some care has to be taken since the idea will fail in zugzwang
-     * positions.
-     */
-    if (try_null &&
-        !in_check &&
-        (depth > NULLMOVE_DEPTH) &&
-        board_has_non_pawn(pos, pos->stm)) {
-        reduction = NULLMOVE_BASE_REDUCTION + depth/NULLMOVE_DIVISOR;
-        board_make_null_move(pos);
-        score = -search(worker, depth-reduction-1, -beta, -beta+1, false,
-                        NOMOVE);
-        board_unmake_null_move(pos);
-        if (score >= beta) {
-            /*
-             * Since the score is based on doing a null move a checkmate
-             * score doesn't necessarilly indicate a forced mate. So
-             * return beta instead in this case.
-             */
-            return score < KNOWN_WIN?score:beta;
-        }
-    }
-
-    /*
-     * Probcut. If there is a good capture and a reduced search confirms
-     * that it is better than beta (with a certain margin) then it's
-     * relativly safe to skip the search.
-     */
-    if (!pv_node && !in_check && (depth >= PROBCUT_DEPTH) &&
-        board_has_non_pawn(&worker->pos, pos->stm)) {
-        threshold = beta + PROBCUT_MARGIN;
-
-        select_init_node(&ms, worker, true, in_check, tt_move);
-        while (select_get_move(&ms, worker, &move)) {
-            /*
-             * Skip non-captures and captures that are not
-             * good enough (according to SEE).
-             */
-            if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
-                continue;
-            }
-            if (!see_ge(pos, move, threshold-static_score)) {
-                continue;
-            }
-            if (move == exclude_move) {
-                continue;
+        /*
+         * Try Razoring. If the current score indicates that we are far below
+         * alpha then we're in a really bad place and it's no point doing a
+         * full search.
+         */
+        if (!in_check && !pv_node && (tt_move == NOMOVE) &&
+            (depth <= RAZORING_DEPTH) &&
+            ((static_score+razoring_margin[depth]) <= alpha)) {
+            if (depth == 1) {
+                return quiescence(worker, 0, alpha, beta);
             }
 
-            /* Search the move */
-            if (!board_make_move(pos, move)) {
-                continue;
-            }
-            score = -search(worker, depth-PROBCUT_DEPTH+1, -threshold,
-                            -threshold+1, true, NOMOVE);
-            board_unmake_move(pos);
-            if (score >= threshold) {
+            threshold = alpha - razoring_margin[depth];
+            score = quiescence(worker, 0, threshold, threshold+1);
+            if (score <= threshold) {
                 return score;
             }
         }
-    }
 
-    /* Check if the move from the transposition table is singular */
-    is_singular = false;
-    if (depth >= SE_DEPTH &&
-        (exclude_move == NOMOVE) &&
-        (tt_move != NOMOVE) &&
-        (tt_item.type == TT_BETA) &&
-        (tt_item.depth >= (depth-3)) &&
-        (abs(beta) < KNOWN_WIN) &&
-        board_is_move_pseudo_legal(pos, tt_move)) {
-        threshold = tt_score-2*depth;
-
-        score = search(worker, depth/2, threshold-1, threshold, true, tt_move);
-        if (score < threshold) {
-            is_singular = true;
+        /*
+         * Null move pruning. If the opponent can't beat beta even when given
+         * a free move then there is no point doing a full search. However
+         * some care has to be taken since the idea will fail in zugzwang
+         * positions.
+         */
+        if (try_null &&
+            !in_check &&
+            (depth > NULLMOVE_DEPTH) &&
+            board_has_non_pawn(pos, pos->stm)) {
+            reduction = NULLMOVE_BASE_REDUCTION + depth/NULLMOVE_DIVISOR;
+            board_make_null_move(pos);
+            score = -search(worker, depth-reduction-1, -beta, -beta+1, false,
+                            NOMOVE);
+            board_unmake_null_move(pos);
+            if (score >= beta) {
+                /*
+                 * Since the score is based on doing a null move a checkmate
+                 * score doesn't necessarilly indicate a forced mate. So
+                 * return beta instead in this case.
+                 */
+                return score < KNOWN_WIN?score:beta;
+            }
         }
-    }
 
-    /*
-     * Decide if futility pruning should be tried for this node. The
-     * basic idea is that if the current static evaluation plus a margin
-     * is less than alpha then this position is probably lost so there is
-     * no point searching further.
-     */
-    futility_pruning = false;
-    if ((depth <= FUTILITY_DEPTH) &&
-        ((static_score+futility_margin[depth]) <= alpha)) {
-        futility_pruning = true;
+        /*
+         * Probcut. If there is a good capture and a reduced search confirms
+         * that it is better than beta (with a certain margin) then it's
+         * relativly safe to skip the search.
+         */
+        if (!pv_node && !in_check && (depth >= PROBCUT_DEPTH) &&
+            board_has_non_pawn(&worker->pos, pos->stm)) {
+            threshold = beta + PROBCUT_MARGIN;
+
+            select_init_node(&ms, worker, true, in_check, tt_move);
+            while (select_get_move(&ms, worker, &move)) {
+                /*
+                 * Skip non-captures and captures that are not
+                 * good enough (according to SEE).
+                 */
+                if (!ISCAPTURE(move) && !ISENPASSANT(move)) {
+                    continue;
+                }
+                if (!see_ge(pos, move, threshold-static_score)) {
+                    continue;
+                }
+                if (move == exclude_move) {
+                    continue;
+                }
+
+                /* Search the move */
+                if (!board_make_move(pos, move)) {
+                    continue;
+                }
+                score = -search(worker, depth-PROBCUT_DEPTH+1, -threshold,
+                                -threshold+1, true, NOMOVE);
+                board_unmake_move(pos);
+                if (score >= threshold) {
+                    return score;
+                }
+            }
+        }
+
+        /* Check if the move from the transposition table is singular */
+        if (depth >= SE_DEPTH &&
+            (exclude_move == NOMOVE) &&
+            (tt_move != NOMOVE) &&
+            (tt_item.type == TT_BETA) &&
+            (tt_item.depth >= (depth-3)) &&
+            (abs(beta) < KNOWN_WIN) &&
+            board_is_move_pseudo_legal(pos, tt_move)) {
+            threshold = tt_score-2*depth;
+
+            score = search(worker, depth/2, threshold-1, threshold, true,
+                           tt_move);
+            if (score < threshold) {
+                is_singular = true;
+            }
+        }
+
+        /*
+         * Decide if futility pruning should be tried for this node. The
+         * basic idea is that if the current static evaluation plus a margin
+         * is less than alpha then this position is probably lost so there is
+         * no point searching further.
+         */
+        if ((depth <= FUTILITY_DEPTH) &&
+            ((static_score+futility_margin[depth]) <= alpha)) {
+            futility_pruning = true;
+        }
     }
 
     /* Search all moves */
     quiets.size = 0;
-    best_score = -INFINITE_SCORE;
-    best_move = NOMOVE;
     tt_flag = TT_ALPHA;
+    best_score = -INFINITE_SCORE;
     movenumber = 0;
     found_move = false;
     select_init_node(&ms, worker, false, in_check, tt_move);
     while (select_get_move(&ms, worker, &move)) {
+        if (is_root && (worker->multipv > 1) && is_multipv_move(worker, move)) {
+            continue;
+        }
+        if (is_root && (worker->state->move_filter.size > 0) &&
+            !is_filtered_move(worker, move)) {
+            continue;
+        }
+
         /*
          * If this a singular extension search then skip the move
          * that is expected to be singular.
@@ -696,7 +709,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         }
 
         /* Pruning of moves at low depths */
-        if (best_score > KNOWN_LOSS) {
+        if (!is_root && (best_score > KNOWN_LOSS)) {
             /*
              * If the futility pruning flag is set then prune all moves except
              * tactical ones.
@@ -735,6 +748,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             }
         }
 
+        /* Setup reductions and extensions */
         new_depth = depth;
         extended = false;
 
@@ -748,14 +762,14 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
          * Extend checking moves unless SEE indicates
          * that the move is losing material.
          */
-        if (!extended && gives_check && see_ge(pos, move, 0)) {
+        if (!extended && gives_check && (is_root || see_ge(pos, move, 0))) {
             new_depth++;
             extended = true;
         }
 
         /* Extend recaptures */
-        if (!extended && pos->sply >= 1 && pv_node && !gives_check &&
-            is_recapture(pos, move) && see_ge(pos, move, 0)) {
+        if (!is_root && !extended && pos->sply >= 1 && pv_node &&
+            !gives_check && is_recapture(pos, move) && see_ge(pos, move, 0)) {
             new_depth++;
             extended = true;
         }
@@ -766,6 +780,11 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         }
         movenumber++;
         found_move = true;
+
+        /* Send stats for the first worker */
+        if (is_root && worker->id == 0)  {
+            engine_send_move_info(worker, movenumber, move);
+        }
 
         /*
          * LMR (Late Move Reduction). With good move ordering later moves
@@ -811,191 +830,6 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         }
         board_unmake_move(pos);
 
-        /* Check if we have found a new best move */
-        if (score > best_score) {
-            best_score = score;
-            best_move = move;
-
-            /*
-             * Check if the score is above the lower bound. In that
-             * case a new PV move may have been found.
-             */
-            if (score > alpha) {
-                /*
-                 * Check if the score is above the upper bound. If it is then
-                 * the move is "too good" and our opponent would never let
-                 * us reach this position. This means that there is no need to
-                 * search this position further.
-                 */
-                if (score >= beta) {
-                    if (!ISTACTICAL(move) || !see_ge(pos, move, 0)) {
-                        killer_add_move(worker, move);
-                        counter_add_move(worker, move);
-                    }
-                    tt_flag = TT_BETA;
-                    break;
-                }
-
-                /*
-                 * Update the lower bound with the new score. Also
-                 * update the principle variation with our new best move.
-                 */
-                tt_flag = TT_EXACT;
-                alpha = score;
-                update_pv(worker, move);
-            }
-        }
-    }
-
-    /* If the best move is a quiet move then update the history table */
-    if (!ISTACTICAL(best_move) && (tt_flag == TT_BETA)) {
-        history_update_tables(worker, &quiets, depth);
-    }
-
-    /*
-     * If no legal move have been found then it is either checkmate
-     * or stalemate. If the player is in check then it is checkmate
-     * and so set the score to -CHECKMATE. Otherwise it is stalemate
-     * so set the score to zero. In case of checkmate the current search
-     * ply is also subtracted to make sure that a shorter mate results
-     * in a higher score.
-     */
-    if (!found_move) {
-        tt_flag = TT_EXACT;
-        best_score = in_check?-CHECKMATE+pos->sply:0;
-    }
-
-    /* Store the result for this node in the transposition table */
-    hash_tt_store(pos, best_move, depth, best_score, tt_flag);
-
-    return best_score;
-}
-
-static int search_root(struct search_worker *worker, int depth, int alpha,
-                       int beta)
-{
-    int                 score;
-    int                 best_score;
-    uint32_t            move;
-    uint32_t            best_move;
-    int                 tt_flag;
-    struct position     *pos = &worker->pos;
-    int                 in_check;
-    int                 new_depth;
-    struct movelist     quiets;
-    bool                tt_found;
-    struct tt_item      tt_item;
-    struct moveselector ms;
-    bool                extended;
-    bool                tactical;
-    int                 hist;
-    int                 chist;
-    int                 fhist;
-    int                 reduction;
-    bool                gives_check;
-    int                 movenumber;
-
-    /* Check if the time is up or if we have received a new command */
-    checkup(worker);
-
-    /* Reset the search tree for this ply */
-    worker->pv_table[0].size = 0;
-
-    /* Check the transposition table and initialize some helper variables */
-    tt_found = hash_tt_lookup(pos, &tt_item);
-    best_move = tt_found?tt_item.move:NOMOVE;
-    in_check = board_in_check(pos, pos->stm);
-
-    /* Trigger an update of the evaluation stack */
-    (void)eval_evaluate(pos, false);
-
-    /* Search all moves */
-    quiets.size = 0;
-    tt_flag = TT_ALPHA;
-    best_score = -INFINITE_SCORE;
-    movenumber = 0;
-    select_init_node(&ms, worker, false, in_check, best_move);
-    while (select_get_move(&ms, worker, &move)) {
-        if ((worker->multipv > 1) && is_multipv_move(worker, move)) {
-            continue;
-        }
-        if ((worker->state->move_filter.size > 0) &&
-            !is_filtered_move(worker, move)) {
-            continue;
-        }
-
-        /* Various move properties */
-        gives_check = board_move_gives_check(pos, move);
-        tactical = ISTACTICAL(move) || in_check || gives_check;
-        history_get_scores(worker, move, &hist, &chist, &fhist);
-
-        /* Remeber all quiet moves */
-        if (!ISTACTICAL(move)) {
-            quiets.moves[quiets.size++] = move;
-        }
-
-        /* Make the move */
-        if (!board_make_move(pos, move)) {
-            continue;
-        }
-
-        /* Send stats for the first worker */
-        extended = false;
-        movenumber++;
-        if (worker->id == 0)  {
-            engine_send_move_info(worker, movenumber, move);
-        }
-
-        /* Extend checking moves */
-        new_depth = depth;
-        if (board_in_check(pos, pos->stm)) {
-            new_depth++;
-            extended = true;
-        }
-
-        /*
-         * LMR (Late Move Reduction). With good move ordering later moves
-         * are unlikely to be good. Therefore search them to a reduced
-         * depth. Exceptions are made for tactical moves, like captures and
-         * promotions.
-         */
-        reduction = 0;
-        if (!tactical && !extended && (new_depth > 2) && (movenumber > 1)) {
-            reduction = lmr_reductions[MIN(new_depth, 63)][MIN(movenumber, 63)];
-            reduction -= (CLAMP(((fhist+chist+hist)/5000), -2, 2));
-        }
-
-        /* Recursivly search the move */
-        reduction = CLAMP(reduction, 0, new_depth-1);
-        if (best_score == -INFINITE_SCORE) {
-            /*
-             * Perform a full search until a pv move is found. Usually
-             * this is the first move.
-             */
-            score = -search(worker, new_depth-1, -beta, -alpha, true, NOMOVE);
-        } else {
-            /* Perform a reduced depth search with a zero window */
-            score = -search(worker, new_depth-reduction-1, -alpha-1, -alpha,
-                            true, NOMOVE);
-
-            /* Re-search with full depth if the move improved alpha */
-            if ((score > alpha) && (reduction > 0)) {
-                score = -search(worker, new_depth-1, -alpha-1, -alpha, true,
-                                NOMOVE);
-            }
-
-            /*
-             * Re-search with full depth and a full window if alpha was
-             * improved. If this is not a pv node then the full window
-             * is actually a null window so there is no need to re-search.
-             */
-            if (score > alpha) {
-                score = -search(worker, new_depth-1, -beta, -alpha, true,
-                                NOMOVE);
-            }
-        }
-        board_unmake_move(pos);
-
         /* Check if a new best move have been found */
         if (score > best_score) {
             /* Update the best score and best move for this iteration */
@@ -1013,6 +847,9 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                 if (score >= beta) {
                     if (!ISTACTICAL(move) || !see_ge(pos, move, 0)) {
                         killer_add_move(worker, move);
+                        if (!is_root) {
+                            counter_add_move(worker, move);
+                        }
                     }
                     tt_flag = TT_BETA;
                     break;
@@ -1032,14 +869,18 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
                  * are only updated when the score is inside the aspiration
                  * window since it's only then that the score can be trusted.
                  */
-                worker->mpv_moves[worker->mpvidx] = move;
-                copy_pv(&worker->pv_table[0],
-                        &worker->mpv_lines[worker->mpvidx].pv);
-                worker->mpv_lines[worker->mpvidx].score = score;
-                worker->mpv_lines[worker->mpvidx].depth = worker->depth;
-                worker->mpv_lines[worker->mpvidx].seldepth = worker->seldepth;
-                if ((worker->id == 0) && (worker->multipv == 1)) {
-                    engine_send_pv_info(worker->state, &worker->mpv_lines[0]);
+                if (is_root) {
+                    worker->mpv_moves[worker->mpvidx] = move;
+                    copy_pv(&worker->pv_table[0],
+                            &worker->mpv_lines[worker->mpvidx].pv);
+                    worker->mpv_lines[worker->mpvidx].score = score;
+                    worker->mpv_lines[worker->mpvidx].depth = worker->depth;
+                    worker->mpv_lines[worker->mpvidx].seldepth =
+                                                            worker->seldepth;
+                    if ((worker->id == 0) && (worker->multipv == 1)) {
+                        engine_send_pv_info(worker->state,
+                                            &worker->mpv_lines[0]);
+                    }
                 }
             }
         }
@@ -1048,6 +889,19 @@ static int search_root(struct search_worker *worker, int depth, int alpha,
     /* If the best move is a quiet move then update the history table */
     if (!ISTACTICAL(best_move) && (tt_flag == TT_BETA)) {
         history_update_tables(worker, &quiets, depth);
+    }
+
+    /*
+     * If no legal move have been found then it is either checkmate
+     * or stalemate. If the player is in check then it is checkmate
+     * and so set the score to -CHECKMATE. Otherwise it is stalemate
+     * so set the score to zero. In case of checkmate the current search
+     * ply is also subtracted to make sure that a shorter mate results
+     * in a higher score.
+     */
+    if (!is_root && !found_move) {
+        tt_flag = TT_EXACT;
+        best_score = in_check?-CHECKMATE+pos->sply:0;
     }
 
     /* Store the result for this node in the transposition table */
@@ -1090,7 +944,7 @@ static void search_aspiration_window(struct search_worker *worker, int depth,
         worker->seldepth = 0;
         alpha = MAX(alpha, -INFINITE_SCORE);
         beta = MIN(beta, INFINITE_SCORE);
-        score = search_root(worker, depth-reduce, alpha, beta);
+        score = search(worker, depth-reduce, alpha, beta, false, NOMOVE);
 
         /*
          * If the score is outside of the alpha/beta bounds then
