@@ -1,6 +1,7 @@
 /*
+Copyright (c) 2013-2018 Ronald de Man
 Copyright (c) 2015 basil00
-Modifications Copyright (c) 2016-2019 by Jon Dart
+Modifications Copyright (c) 2016-2020 by Jon Dart
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -38,10 +39,6 @@ SOFTWARE.
 #endif
 #include "tbprobe.h"
 
-#ifdef __cplusplus
-using namespace std;
-#endif
-
 #define TB_PIECES 7
 #define TB_HASHBITS  (TB_PIECES < 7 ?  11 : 12)
 #define TB_MAX_PIECE (TB_PIECES < 7 ? 254 : 650)
@@ -59,11 +56,21 @@ using namespace std;
 #define FD_ERR -1
 typedef size_t map_t;
 #else
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
 #include <windows.h>
 #define SEP_CHAR ';'
 #define FD HANDLE
 #define FD_ERR INVALID_HANDLE_VALUE
 typedef HANDLE map_t;
+#endif
+
+// This must be after the inclusion of Windows headers, because otherwise
+// std::byte conflicts with "byte" in rpcndr.h . The error occurs if C++
+// standard is at lest 17, as std::byte was introduced in C++17.
+#ifdef __cplusplus
+using namespace std;
 #endif
 
 #define DECOMP64
@@ -112,18 +119,27 @@ typedef HANDLE map_t;
 #define TB_SOFTWARE_POP_COUNT
 #elif defined (__GNUC__) && defined(__x86_64__) && defined(__SSE4_2__)
 #include <popcntintrin.h>
-#define popcount(x)             _mm_popcnt_u64((x))
+#define popcount(x)             (int)_mm_popcnt_u64((x))
 #elif defined(_MSC_VER) && (_MSC_VER >= 1500) && defined(_M_AMD64)
 #include <nmmintrin.h>
-#define popcount(x)             _mm_popcnt_u64((x))
+#define popcount(x)             (int)_mm_popcnt_u64((x))
+#else
+// try to use a builtin
+#if defined (__has_builtin)
+#if __has_builtin(__builtin_popcountll)
+#define popcount(x) __builtin_popcountll((x))
 #else
 #define TB_SOFTWARE_POP_COUNT
 #endif
+#else
+#define TB_SOFTWARE_POP_COUNT
+#endif
+#endif
 
 #ifdef TB_SOFTWARE_POP_COUNT
-// Not a recognized compiler/architecture that has popcount:
-// fall back to a software popcount. This one is still reasonably
-// fast.
+// Not a recognized compiler/architecture that has popcount, and
+// no builtin available: fall back to a software popcount. This one
+// is still reasonably fast.
 static inline unsigned tb_software_popcount(uint64_t x)
 {
     x = x - ((x >> 1) & 0x5555555555555555ull);
@@ -131,7 +147,6 @@ static inline unsigned tb_software_popcount(uint64_t x)
     x = (x + (x >> 4)) & 0x0f0f0f0f0f0f0f0full;
     return (x * 0x0101010101010101ull) >> 56;
 }
-
 #define popcount(x) tb_software_popcount(x)
 #endif
 
@@ -178,12 +193,8 @@ static unsigned lsb(uint64_t b) {
 #endif
 #endif
 
-#ifndef max
 #define max(a,b) a > b ? a : b
-#endif
-#ifndef min
 #define min(a,b) a < b ? a : b
-#endif
 
 #include "stdendian.h"
 
@@ -303,8 +314,16 @@ static FD open_tb(const char *str, const char *suffix)
 #ifndef _WIN32
     fd = open(file, O_RDONLY);
 #else
+#ifdef _UNICODE
+    wchar_t ucode_name[4096];
+    size_t len;
+    mbstowcs_s(&len, ucode_name, 4096, file, _TRUNCATE);
+    fd = CreateFile(ucode_name, GENERIC_READ, FILE_SHARE_READ, NULL,
+			  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+#else
     fd = CreateFile(file, GENERIC_READ, FILE_SHARE_READ, NULL,
 			  OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+#endif
 #endif
     free(file);
     if (fd != FD_ERR) {
@@ -361,8 +380,8 @@ static void *map_file(FD fd, map_t *mapping)
 static void unmap_file(void *data, map_t size)
 {
   if (!data) return;
-  if (!munmap(data, size)) {
-	  perror("munmap");
+  if (munmap(data, size) != 0) {
+      perror("munmap");
   }
 }
 #else
@@ -824,9 +843,13 @@ bool tb_init(const char *path)
     numWdl = numDtm = numDtz = 0;
   }
 
+  TB_LARGEST = 0;
+
   // if path is an empty string or equals "<empty>", we are done.
   const char *p = path;
-  if (strlen(p) == 0 || !strcmp(p, "<empty>")) return true;
+  if (strlen(p) == 0 || !strcmp(p, "<empty>")) {
+    return true;
+  }
 
   pathString = (char*)malloc(strlen(p) + 1);
   strcpy(pathString, p);
@@ -850,7 +873,6 @@ bool tb_init(const char *path)
 
   tbNumPiece = tbNumPawn = 0;
   TB_MaxCardinality = TB_MaxCardinalityDTM = 0;
-  TB_LARGEST = 0;
 
   if (!pieceEntry) {
     pieceEntry = (struct PieceEntry*)malloc(TB_MAX_PIECE * sizeof(*pieceEntry));
@@ -1543,7 +1565,7 @@ static bool init_table(struct BaseEntry *be, const char *str, int type)
         } else {
           data += (uintptr_t)data & 0x01;
           for (int i = 0; i < 4; i++) {
-            mapIdx[t][i] = (uint16_t)(data + 1 - (uint8_t *)map);
+            mapIdx[t][i] = (uint16_t)((uint16_t*)data + 1 - (uint16_t *)map);
             data += 2 + 2 * read_le_u16(data);
           }
         }
@@ -2197,8 +2219,10 @@ int probe_dtz(Pos *pos, int *success)
          continue; // not legal
       int v = -probe_wdl(&pos1, success);
       if (*success == 0) return 0;
-      if (v == wdl)
+      if (v == wdl) {
+        assert(wdl < 3);
         return WdlToDtz[wdl + 2];
+      }
     }
   }
 
@@ -2279,6 +2303,7 @@ static int root_probe_dtz(const Pos *pos, bool hasRepeated, bool useRule50, stru
     if (pos1.rule50 == 0) {
       // If the move resets the 50-move counter, dtz is -101/-1/0/1/101.
       v = -probe_wdl(&pos1, &success);
+      assert(v < 3);
       v = WdlToDtz[v + 2];
     } else {
       // Otherwise, take dtz for the new position and correct by 1 ply.
@@ -2354,6 +2379,9 @@ int root_probe_wdl(const Pos *pos, bool useRule50, struct TbRootMoves *rm)
 // Use the DTM tables to find mate scores.
 // Either DTZ or WDL must have been probed successfully earlier.
 // A return value of 0 means that not all probes were successful.
+#if defined(__cplusplus) && __cplusplus >= 201703L
+[[maybe_unused]]
+#endif
 int root_probe_dtm(const Pos *pos, struct TbRootMoves *rm)
 {
   int success;
@@ -2397,6 +2425,9 @@ int root_probe_dtm(const Pos *pos, struct TbRootMoves *rm)
 }
 
 // Use the DTM tables to complete a PV with mate score.
+#if defined(__cplusplus) && __cplusplus >= 201703L
+[[maybe_unused]]
+#endif
 void tb_expand_mate(Pos *pos, struct TbRootMove *move, Value moveScore, unsigned cardinalityDTM)
 {
   int success = 1, chk = 0;
@@ -2416,7 +2447,7 @@ void tb_expand_mate(Pos *pos, struct TbRootMove *move, Value moveScore, unsigned
   }
 
   // Now try to expand until the actual mate.
-  if (popcount(pos->white | pos->black) <= cardinalityDTM) {
+  if (popcount(pos->white | pos->black) <= (int)cardinalityDTM) {
     while (v != -TB_VALUE_MATE && move->pvSize < TB_MAX_PLY) {
       v = v > 0 ? -v - 1 : -v + 1;
       wdl = -wdl;
