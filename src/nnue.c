@@ -42,10 +42,10 @@ INCBIN(nnue_net, NETFILE_NAME);
 #define OUTPUT_SCALE 16.0f
 
 /* Definition of the network architcechure */
-#define NET_VERSION 0x00000005
+#define NET_VERSION 0x00000007
 #define NET_HEADER_SIZE 4
 static int model_layer_sizes[NNUE_NUM_LAYERS] =
-                                        {NNUE_HALFKX_LAYER_SIZE*2, 16, 16, 1};
+                                        {NNUE_HALFKX_LAYER_SIZE*2, 8, 16, 1};
 
 /*
  * Struct holding information about a layer in the network. The size
