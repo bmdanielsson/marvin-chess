@@ -132,12 +132,11 @@ int main(int argc, char *argv[])
 
     /* Handle command line options */
     if ((argc == 2) &&
-        (!strncmp(argv[1], "-b", 2) || !strncmp(argv[1], "--bench", 6))) {
+        (MATCH(argv[1], "-b") || MATCH(argv[1], "--bench"))) {
         test_run_benchmark();
         return 0;
     } else if ((argc == 2) &&
-               (!strncmp(argv[1], "-v", 2) ||
-                !strncmp(argv[1], "--version", 9))) {
+               (MATCH(argv[1], "-v") || MATCH(argv[1], "--version"))) {
         print_version();
         return 0;
     }
