@@ -374,6 +374,15 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
                 smp_destroy_workers();
                 smp_create_workers(value);
             }
+        } else if (MATCH(namestr, "MoveOverhead")) {
+            if (sscanf(valuestr, "%d", &value) == 1) {
+                if (value < MIN_MOVE_OVERHEAD) {
+                    value = MIN_MOVE_OVERHEAD;
+                } else if (value > MAX_MOVE_OVERHEAD) {
+                    value = MAX_MOVE_OVERHEAD;
+                }
+                tc_set_move_overhead(value);
+            }
         } else if (MATCH(namestr, "LogLevel")) {
             if (sscanf(valuestr, "%d", &value) == 1) {
                 if (value > LOG_HIGHEST_LEVEL) {
@@ -437,6 +446,9 @@ static void uci_cmd_uci(struct gamestate *state)
     engine_write_command(
                         "option name MultiPV type spin default 1 min 1 max %d",
                         MAX_MULTIPV_LINES);
+    engine_write_command(
+                 "option name MoveOverhead type spin default %d min %d max %d",
+                 DEFAULT_MOVE_OVERHEAD, MIN_MOVE_OVERHEAD, MAX_MOVE_OVERHEAD);
     engine_write_command(
                        "option name LogLevel type spin default %d min 0 max %d",
                         dbg_get_log_level(), LOG_HIGHEST_LEVEL);

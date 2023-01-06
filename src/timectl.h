@@ -31,6 +31,13 @@
 #define TC_REGULAR       0x00000020
 
 /*
+ * Set move overheaed.
+ *
+ * @param overhead The overhead to set (in ms).
+ */
+void tc_set_move_overhead(int overhead);
+
+/*
  * Configure the time control to use for the next search.
  *
  * @param time The number of milliseconds left on the clock for the engine.

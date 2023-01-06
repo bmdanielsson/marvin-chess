@@ -34,6 +34,11 @@
 #define MAX_MAIN_HASH_SIZE_32BIT 1024
 #define MAX_MAIN_HASH_SIZE_64BIT 131072
 
+/* Move overhead (in ms) to avoid losing on time */
+#define DEFAULT_MOVE_OVERHEAD 50
+#define MIN_MOVE_OVERHEAD 0
+#define MAX_MOVE_OVERHEAD 2000
+
 /* The size to use for the NNUE cache (in MB) */
 #define NNUE_CACHE_SIZE 2
 

@@ -21,6 +21,7 @@
 #include "timectl.h"
 #include "utils.h"
 #include "debug.h"
+#include "config.h"
 
 /*
  * When using sudden death or fischer time controls this constant is used. An
@@ -28,9 +29,6 @@
  * to the time control.
  */
 #define MOVES_TO_TIME_CONTROL 30
-
-/* Safety margin to avoid loosing on time (in ms) */
-#define SAFETY_MARGIN 50
 
 /* Flags indicating special time control modes */
 static int tc_flags = 0;
@@ -59,6 +57,14 @@ static time_t search_start = 0;
 
 /* Keeps track if the clock is running or not */
 static bool clock_is_running = false;
+
+/* Safety margin to avoid loosing on time (in ms) */
+static int safety_margin = DEFAULT_MOVE_OVERHEAD;
+
+void tc_set_move_overhead(int overhead)
+{
+    safety_margin = overhead;
+}
 
 void tc_configure_time_control(int time, int inc, int movestogo, int flags)
 {
@@ -101,7 +107,7 @@ void tc_allocate_time(void)
         hard_time_limit = 0;
         return;
     } else if (tc_flags&TC_FIXED_TIME) {
-        allocated = MAX(tc_time_left-SAFETY_MARGIN, 0);
+        allocated = MAX(tc_time_left, 0);
         soft_time_limit = search_start + allocated;
         hard_time_limit = soft_time_limit;
         return;
@@ -109,7 +115,7 @@ void tc_allocate_time(void)
 
     /* Calculate how much time to allocate */
     allocated = tc_time_left/tc_movestogo + tc_increment;
-    allocated = MIN(allocated, tc_time_left-SAFETY_MARGIN);
+    allocated = MIN(allocated, tc_time_left-safety_margin);
 
     /*
      * Setup time limits. The soft time limit is time the engine is
@@ -118,7 +124,7 @@ void tc_allocate_time(void)
      */
     soft_time_limit = search_start + allocated;
     allocated = MIN(5*allocated, tc_time_left*0.8);
-    allocated = MIN(allocated, tc_time_left-SAFETY_MARGIN);
+    allocated = MIN(allocated, tc_time_left-safety_margin);
     hard_time_limit = search_start + allocated;
 }
 
