@@ -417,42 +417,6 @@ static void xboard_cmd_hard(void)
     ponder_mode = true;
 }
 
-static void xboard_cmd_hint(struct gamestate *state)
-{
-    uint32_t move;
-    char     movestr[MAX_MOVESTR_LENGTH];
-
-    /* Check the opening book */
-    move = polybook_probe(&state->pos);
-
-    /*
-     * If there is no move in the opening book try to
-     * find a move to suggest through other means.
-     */
-    if (move == NOMOVE) {
-        /* Check if there is a ponder move */
-        if (state->ponder_move != NOMOVE) {
-            move = state->ponder_move;
-        } else {
-		    /*
-             * If all else fails do a shallow search to
-             * find a resonably good move.
-             */
-            tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
-            state->exit_on_mate = true;
-            state->sd = 6;
-            state->silent = true;
-            smp_search(state, false, true, tablebase_mode);
-            move = state->best_move;
-            state->silent = false;
-        }
-	}
-
-    /* Send hint */
-    move2str(move, movestr);
-    engine_write_command("Hint: %s", movestr);
-}
-
 static void xboard_cmd_level(char *cmd)
 {
 	int   min;
@@ -792,8 +756,6 @@ bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop)
         xboard_cmd_go(state);
     } else if (MATCH(cmd, "hard")) {
         xboard_cmd_hard();
-    } else if (MATCH(cmd, "hint")) {
-        xboard_cmd_hint(state);
     } else if (MATCH(cmd, "level")) {
         xboard_cmd_level(cmd);
     } else if (MATCH(cmd, "memory")) {
@@ -875,13 +837,6 @@ bool xboard_check_input(struct search_worker *worker)
     } else if (MATCH(cmd, "?") ||
                MATCH(cmd, "exit")) {
         stop = true;
-    } else if(MATCH(cmd, "hint")) {
-        /*
-         * This only makes sense if the engine is in analyze mode
-         * so send the current best move as a hint.
-         */
-        move2str(worker->mpv_moves[0], movestr);
-        engine_write_command("Hint: %s", movestr);
     } else if (MATCH(cmd, "easy")) {
         xboard_cmd_easy();
     } else if (MATCH(cmd, "hard")) {
