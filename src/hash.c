@@ -166,12 +166,12 @@ void hash_tt_store(struct position *pos, uint32_t move, int depth, int score,
         if (type != TT_EXACT) {
             return;
         }
-        score += pos->sply;
+        score += pos->height;
     } else if (score < -KNOWN_WIN) {
         if (type != TT_EXACT) {
             return;
         }
-        score -= pos->sply;
+        score -= pos->height;
     }
 
     /* Find the correct bucket */

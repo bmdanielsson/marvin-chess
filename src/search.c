@@ -116,9 +116,9 @@ static bool check_tt_cutoff(struct tt_item *item, int depth, int alpha,
 static int adjust_mate_score(struct position *pos, int score)
 {
     if (score > KNOWN_WIN) {
-        return score - pos->sply;
+        return score - pos->height;
     } else if (score < -KNOWN_WIN) {
-        return score + pos->sply;
+        return score + pos->height;
     }
     return score;
 }
@@ -225,11 +225,11 @@ static bool probe_wdl_tables(struct search_worker *worker, int alpha, int beta,
 
     switch (res) {
     case TB_WIN:
-        *score = TABLEBASE_WIN-pos->sply;
+        *score = TABLEBASE_WIN-pos->height;
         cutoff = (*score >= beta);
         break;
     case TB_LOSS:
-        *score = TABLEBASE_LOSS+pos->sply;
+        *score = TABLEBASE_LOSS+pos->height;
         cutoff = (*score <= alpha);
         break;
     default:
@@ -247,11 +247,12 @@ static void update_pv(struct search_worker *worker, uint32_t move)
     struct position *pos;
 
     pos = &worker->pos;
-    worker->pv_table[pos->sply].moves[0] = move;
-    memcpy(&worker->pv_table[pos->sply].moves[1],
-           &worker->pv_table[pos->sply+1].moves[0],
-           worker->pv_table[pos->sply+1].size*sizeof(uint32_t));
-    worker->pv_table[pos->sply].size = worker->pv_table[pos->sply+1].size + 1;
+    worker->pv_table[pos->height].moves[0] = move;
+    memcpy(&worker->pv_table[pos->height].moves[1],
+           &worker->pv_table[pos->height+1].moves[0],
+           worker->pv_table[pos->height+1].size*sizeof(uint32_t));
+    worker->pv_table[pos->height].size =
+                                    worker->pv_table[pos->height+1].size + 1;
 }
 
 static void checkup(struct search_worker *worker)
@@ -334,15 +335,15 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     }
 
     /* Check if the selective depth should be updated */
-    if (pos->sply > worker->seldepth) {
-        worker->seldepth = pos->sply;
+    if (pos->height > worker->seldepth) {
+        worker->seldepth = pos->height;
     }
 
     /* Check if the time is up or if we have received a new command */
     checkup(worker);
 
     /* Reset the search tree for this ply */
-    worker->pv_table[pos->sply].size = 0;
+    worker->pv_table[pos->height].size = 0;
 
     /* Check if we should considered the game as a draw */
     if (board_is_repetition(pos) || (pos->fifty >= 100)) {
@@ -353,7 +354,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     static_score = eval_evaluate(pos, false);
 
     /* If we have reached the maximum depth then we stop */
-    if (pos->sply >= (MAX_PLY-1)) {
+    if (pos->height >= (MAX_PLY-1)) {
         return static_score;
     }
 
@@ -436,7 +437,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
      * In case the side to move is in check the all all moves are generated
      * so if no legal move was found then it must be checkmate.
      */
-    return (in_check && !found_move)?-CHECKMATE+pos->sply:best_score;
+    return (in_check && !found_move)?-CHECKMATE+pos->height:best_score;
 }
 
 static int search(struct search_worker *worker, int depth, int alpha, int beta,
@@ -477,7 +478,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
 
     /* Set node type */
     pv_node = (beta-alpha) > 1;
-    is_root = pos->sply == 0;
+    is_root = pos->height == 0;
 
     /* Setup margins for SEE pruning */
     see_prune_margin[0] = SEE_QUIET_MARGIN(depth);
@@ -487,7 +488,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     worker->nodes++;
 
     /* Check if we have reached the full depth of the search */
-    if ((depth <= 0) || (pos->sply >= MAX_SEARCH_DEPTH)) {
+    if ((depth <= 0) || (pos->height >= MAX_SEARCH_DEPTH)) {
         return quiescence(worker, 0, alpha, beta);
     }
 
@@ -495,12 +496,12 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     checkup(worker);
 
     /* Check if the selective depth should be updated */
-    if (pos->sply > worker->seldepth) {
-        worker->seldepth = pos->sply;
+    if (pos->height > worker->seldepth) {
+        worker->seldepth = pos->height;
     }
 
     /* Reset the search tree for this ply */
-    worker->pv_table[pos->sply].size = 0;
+    worker->pv_table[pos->height].size = 0;
 
     /*
      * Check if the game should be considered a draw. A position is
@@ -546,8 +547,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * to use for pruning decisions.
      */
     static_score = eval_evaluate(pos, false);
-    improving = (pos->sply >= 2 &&
-                            static_score > pos->eval_stack[pos->sply-2].score);
+    improving = (pos->height >= 2 &&
+                        static_score > pos->eval_stack[pos->height-2].score);
 
     /* Find out if the side to move is in check */
     in_check = board_in_check(pos, pos->stm);
@@ -768,7 +769,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         }
 
         /* Extend recaptures */
-        if (!is_root && !extended && pos->sply >= 1 && pv_node &&
+        if (!is_root && !extended && pos->height >= 1 && pv_node &&
             !gives_check && is_recapture(pos, move) && see_ge(pos, move, 0)) {
             new_depth++;
             extended = true;
@@ -901,7 +902,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      */
     if (!is_root && !found_move) {
         tt_flag = TT_EXACT;
-        best_score = in_check?-CHECKMATE+pos->sply:0;
+        best_score = in_check?-CHECKMATE+pos->height:0;
     }
 
     /* Store the result for this node in the transposition table */

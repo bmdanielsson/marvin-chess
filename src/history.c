@@ -219,14 +219,14 @@ void killer_add_move(struct search_worker *worker, uint32_t move)
 {
     struct position *pos = &worker->pos;
 
-    worker->killer_table[pos->sply] = move;
+    worker->killer_table[pos->height] = move;
 }
 
 uint32_t killer_get_move(struct search_worker *worker)
 {
     assert(worker != NULL);
 
-    return worker->killer_table[worker->pos.sply];
+    return worker->killer_table[worker->pos.height];
 }
 
 void counter_clear_table(struct search_worker *worker)
@@ -247,7 +247,7 @@ void counter_add_move(struct search_worker *worker, uint32_t move)
     uint32_t        prev_move;
     int             prev_to;
 
-    assert(worker->pos.sply > 0);
+    assert(worker->pos.height > 0);
 
     pos = &worker->pos;
     prev_move = pos->history[pos->ply-1].move;

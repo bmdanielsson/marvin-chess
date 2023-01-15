@@ -279,7 +279,7 @@ void smp_search(struct gamestate *state, bool pondering, bool use_book,
     state->root_in_tb = false;
     state->root_tb_score = 0;
     state->pondering = pondering;
-    state->pos.sply = 0;
+    state->pos.height = 0;
     state->completed.score = -INFINITE_SCORE;
     state->completed.pv.size = 0;
     state->completed.depth = 0;

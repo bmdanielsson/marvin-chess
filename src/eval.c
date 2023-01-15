@@ -928,7 +928,7 @@ int eval_evaluate(struct position *pos, bool force_hce)
                 hash_nnue_store(pos->worker, nnue_score);
             }
         }
-        pos->eval_stack[pos->sply].score = nnue_score;
+        pos->eval_stack[pos->height].score = nnue_score;
         return nnue_score;
     }
 
@@ -945,8 +945,8 @@ int eval_evaluate(struct position *pos, bool force_hce)
     tapered_score = calculate_tapered_eval(eval.phase, score[MIDDLEGAME],
                                            score[ENDGAME]);
 
-    pos->eval_stack[pos->sply].score = tapered_score + TEMPO_BONUS;
-    return pos->eval_stack[pos->sply].score;
+    pos->eval_stack[pos->height].score = tapered_score + TEMPO_BONUS;
+    return pos->eval_stack[pos->height].score;
 }
 
 void eval_init_material(struct position *pos)

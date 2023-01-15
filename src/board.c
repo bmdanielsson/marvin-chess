@@ -114,7 +114,7 @@ static struct unmake* push_history(struct position *pos)
 
     elem = &pos->history[pos->ply];
     pos->ply++;
-    pos->sply++;
+    pos->height++;
 
     return elem;
 }
@@ -124,8 +124,8 @@ static struct unmake* pop_history(struct position *pos)
     assert(pos->ply > 0);
 
     pos->ply--;
-    if (pos->sply > 0) {
-        pos->sply--;
+    if (pos->height > 0) {
+        pos->height--;
     }
 
     return &pos->history[pos->ply];
@@ -154,7 +154,7 @@ void board_reset(struct position *pos)
     pos->castle = 0;
     pos->stm = NO_SIDE;
     pos->ply = 0;
-    pos->sply = 0;
+    pos->height = 0;
     pos->fifty = 0;
 
     nnue_reset_state(pos);

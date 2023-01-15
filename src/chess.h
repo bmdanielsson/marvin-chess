@@ -430,8 +430,8 @@ struct position {
     int stm;
     /* Halfmove counter */
     int ply;
-    /* Halfmove counter relative to the root of the search tree */
-    int sply;
+    /* The height of the search tree */
+    int height;
     /* Counter used for the fifty-move-draw rule */
     int fifty;
     /* Fullmove counter */

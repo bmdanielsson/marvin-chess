@@ -103,7 +103,7 @@ static void update_accumulator(struct position *pos, int side)
     uint32_t                index;
     uint32_t                offset;
 
-    acc = &pos->eval_stack[pos->sply].accumulator;
+    acc = &pos->eval_stack[pos->height].accumulator;
     data = &acc->data[side][0];
 
     /* Find the location of the firendly king */
@@ -132,7 +132,7 @@ static void refresh_accumulator(struct position *pos, int side)
     uint64_t bb;
 
     /* Setup data pointer */
-    data = &pos->eval_stack[pos->sply].accumulator.data[side][0];
+    data = &pos->eval_stack[pos->height].accumulator.data[side][0];
 
     /* Add biases */
     simd_copy(layers[0].biases.i16, data, layer_sizes[0]/2);
@@ -167,7 +167,8 @@ static bool accumulator_refresh_required(struct position *pos, int side)
      * If the state of the previous position is not valid
      * then a full refresh is required.
      */
-    if ((pos->sply == 0) || !pos->eval_stack[pos->sply-1].accumulator.up2date) {
+    if ((pos->height == 0) ||
+        !pos->eval_stack[pos->height-1].accumulator.up2date) {
         return true;
     }
 
@@ -175,7 +176,7 @@ static bool accumulator_refresh_required(struct position *pos, int side)
      * If the king for this side has moved then all feature
      * indeces are invalid and a refresh is required.
      */
-    return pos->eval_stack[pos->sply].accumulator.refresh[side];
+    return pos->eval_stack[pos->height].accumulator.refresh[side];
 }
 
 static void halfkx_layer_forward(struct position *pos, struct net_data *data)
@@ -191,16 +192,16 @@ static void halfkx_layer_forward(struct position *pos, struct net_data *data)
      * Check if the accumulator is up to date. If it's
      * not then it has to be updated.
      */
-    if (!pos->eval_stack[pos->sply].accumulator.up2date) {
+    if (!pos->eval_stack[pos->height].accumulator.up2date) {
         for (side=0;side<NSIDES;side++) {
             if (accumulator_refresh_required(pos, side)) {
                 refresh_accumulator(pos, side);
             } else {
                 /* Copy accumulator data from the previous ply */
                 acc_data =
-                        &pos->eval_stack[pos->sply].accumulator.data[side][0];
+                    &pos->eval_stack[pos->height].accumulator.data[side][0];
                 prev_acc_data =
-                        &pos->eval_stack[pos->sply-1].accumulator.data[side][0];
+                    &pos->eval_stack[pos->height-1].accumulator.data[side][0];
                 simd_copy(prev_acc_data, acc_data, layer_sizes[0]/2);
 
                 /* Apply required updates */
@@ -209,7 +210,7 @@ static void halfkx_layer_forward(struct position *pos, struct net_data *data)
         }
 
         /* Mark the accumulator as up to date */
-        pos->eval_stack[pos->sply].accumulator.up2date = true;
+        pos->eval_stack[pos->height].accumulator.up2date = true;
     }
 
     /*
@@ -218,9 +219,9 @@ static void halfkx_layer_forward(struct position *pos, struct net_data *data)
      */
     size = layer_sizes[0]/2;
     dest = &data->output[0];
-    half = pos->eval_stack[pos->sply].accumulator.data[pos->stm];
+    half = pos->eval_stack[pos->height].accumulator.data[pos->stm];
     simd_clamp(half, dest, size);
-    half = pos->eval_stack[pos->sply].accumulator.data[FLIP_COLOR(pos->stm)];
+    half = pos->eval_stack[pos->height].accumulator.data[FLIP_COLOR(pos->stm)];
     simd_clamp(half, dest+size, size);
 }
 
@@ -494,7 +495,7 @@ void nnue_make_move(struct position *pos, uint32_t move)
         return;
     }
 
-    acc = &pos->eval_stack[pos->sply].accumulator;
+    acc = &pos->eval_stack[pos->height].accumulator;
     acc->up2date = false;
     acc->nupdates = 0;
     acc->refresh[WHITE] = piece == WHITE_KING;
@@ -568,10 +569,11 @@ void nnue_make_null_move(struct position *pos)
         return;
     }
 
-    if ((pos->sply > 0) && pos->eval_stack[pos->sply-1].accumulator.up2date) {
-        pos->eval_stack[pos->sply].accumulator =
-                                    pos->eval_stack[pos->sply-1].accumulator;
+    if ((pos->height > 0) &&
+        pos->eval_stack[pos->height-1].accumulator.up2date) {
+        pos->eval_stack[pos->height].accumulator =
+                                    pos->eval_stack[pos->height-1].accumulator;
     } else {
-        pos->eval_stack[pos->sply].accumulator.up2date = false;
+        pos->eval_stack[pos->height].accumulator.up2date = false;
     }
 }
