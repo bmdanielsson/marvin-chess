@@ -68,6 +68,8 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     bool     ponder = false;
     uint32_t move;
     bool     skip_book = false;
+    uint32_t best_move;
+    uint32_t ponder_move;
 
     /* Start the clock */
     tc_start_clock();
@@ -213,13 +215,14 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     tc_configure_time_control(movetime, moveinc, movestogo, flags);
 
     /* Search the position for a move */
-    smp_search(state, ponder && ponder_mode, own_book_mode && !skip_book,
-               tablebase_mode);
+    best_move = smp_search(state, ponder && ponder_mode,
+                           own_book_mode && !skip_book, tablebase_mode,
+                           &ponder_move);
 
     /* Send the best move */
-    move2str(state->best_move, best_movestr);
-    if (ponder_mode && (state->ponder_move != NOMOVE)) {
-        move2str(state->ponder_move, ponder_movestr);
+    move2str(best_move, best_movestr);
+    if (ponder_mode && (ponder_move != NOMOVE)) {
+        move2str(ponder_move, ponder_movestr);
         engine_write_command("bestmove %s ponder %s", best_movestr,
                              ponder_movestr);
     } else {

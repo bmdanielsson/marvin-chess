@@ -224,10 +224,9 @@ static void make_engine_move(struct gamestate *state)
         tc_configure_time_control(engine_time_left, engine_time_increment,
                                   moves_to_time_control, flags);
 
-        /* Search the position for a move */
-        smp_search(state, ponder_mode && ponder, true, tablebase_mode);
-        best_move = state->best_move;
-        ponder_move = state->ponder_move;
+        /* Search the position to find the best move */
+        best_move = smp_search(state, ponder_mode && ponder, true,
+                               tablebase_mode, &ponder_move);
 
         /*
          * If the search finishes while the engine is pondering
@@ -292,7 +291,7 @@ static void xboard_cmd_analyze(struct gamestate *state)
         tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
 
         /* Search until told otherwise */
-        smp_search(state, false, false, tablebase_mode);
+        (void)smp_search(state, false, false, tablebase_mode, NULL);
 
         /* Exit analyze mode if there is no pending command */
         cmd = engine_get_pending_command();

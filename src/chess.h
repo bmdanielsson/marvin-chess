@@ -531,11 +531,8 @@ struct gamestate {
      * searching in pondering mode.
      */
     bool pondering;
-    /* Information about the best move */
-    uint32_t best_move;
-    uint32_t ponder_move;
-    /* PV information for the highest completed depth */
-    struct pvinfo completed;
+    /* The highest completed depth */
+    int completed_depth;
     /* The number of lines to search */
     int multipv;
 };
