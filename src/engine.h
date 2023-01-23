@@ -50,6 +50,20 @@ extern bool engine_loaded_net;
 extern char engine_eval_file[MAX_PATH_LENGTH+1];
 
 /*
+ * Create a new game state object.
+ *
+ * @return Returns the new object.
+ */
+struct gamestate* engine_create_game_state(void);
+
+/*
+ * Destroy a game state object.
+ *
+ * @param state The object to destroy.
+ */
+void engine_destroy_game_state(struct gamestate *state);
+
+/*
  * The main engine loop.
  *
  * @param state The game state object.

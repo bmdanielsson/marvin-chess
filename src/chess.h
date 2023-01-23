@@ -669,20 +669,6 @@ extern int material_values[NPIECES];
 void chess_data_init(void);
 
 /*
- * Create a new game state object.
- *
- * @return Returns the new object.
- */
-struct gamestate* create_game_state(void);
-
-/*
- * Destroy a game state object.
- *
- * @param state The object to destroy.
- */
-void destroy_game_state(struct gamestate *state);
-
-/*
  * Convert a move into a string representation.
  *
  * @param move The move.

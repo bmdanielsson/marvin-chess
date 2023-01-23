@@ -167,7 +167,7 @@ void test_run_benchmark(void)
     smp_destroy_workers();
     smp_create_workers(1);
 
-    state = create_game_state();
+    state = engine_create_game_state();
     nodes = 0ULL;
     total = 0;
     npos = sizeof(positions)/sizeof(char*);
@@ -193,7 +193,7 @@ void test_run_benchmark(void)
     printf("Total number of nodes: %"PRIu64"\n", nodes);
     printf("Speed: %.2fkN/s\n", ((double)nodes)/(total/1000.0)/1000);
 
-    destroy_game_state(state);
+    engine_destroy_game_state(state);
 
     hash_tt_destroy_table();
     hash_tt_create_table(tt_size);

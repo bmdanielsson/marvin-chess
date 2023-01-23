@@ -150,6 +150,29 @@ static void cmd_bench(void)
     test_run_benchmark();
 }
 
+struct gamestate* engine_create_game_state(void)
+{
+    struct gamestate *state;
+
+    state = aligned_malloc(64, sizeof(struct gamestate));
+    if (state == NULL) {
+        return NULL;
+    }
+    memset(state, 0, sizeof(struct gamestate));
+    board_reset(&state->pos);
+    board_start_position(&state->pos);
+    state->multipv = 1;
+
+    return state;
+}
+
+void engine_destroy_game_state(struct gamestate *state)
+{
+    assert(state != NULL);
+
+    aligned_free(state);
+}
+
 void engine_loop(struct gamestate *state)
 {
     char *cmd;

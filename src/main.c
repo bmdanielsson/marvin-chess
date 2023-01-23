@@ -142,7 +142,7 @@ int main(int argc, char *argv[])
     }
 
     /* Create game state */
-    state = create_game_state();
+    state = engine_create_game_state();
     if (state == NULL) {
         return 1;
     }
@@ -152,7 +152,8 @@ int main(int argc, char *argv[])
 
     /* Clean up */
     polybook_close();
-    destroy_game_state(state);
+    engine_destroy_game_state(state);
+    hash_tt_destroy_table();
     smp_destroy_workers();
     smp_destroy();
     nnue_destroy();
