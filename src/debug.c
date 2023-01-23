@@ -30,6 +30,7 @@
 #include "movegen.h"
 #include "board.h"
 #include "thread.h"
+#include "data.h"
 
 /* Pointer to log file. */
 static FILE *logfp = NULL;

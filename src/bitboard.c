@@ -21,6 +21,7 @@
 #include <stdio.h>
 
 #include "bitboard.h"
+#include "data.h"
 #include "validation.h"
 
 /*

@@ -20,6 +20,7 @@
 #include <string.h>
 
 #include "board.h"
+#include "data.h"
 #include "fen.h"
 #include "key.h"
 #include "bitboard.h"

@@ -30,6 +30,7 @@
 #include "debug.h"
 #include "engine.h"
 #include "nnue.h"
+#include "data.h"
 
 /* Phase valuse for different piece types */
 #define PAWN_PHASE      0

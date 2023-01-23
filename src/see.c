@@ -25,6 +25,7 @@
 #include "bitboard.h"
 #include "validation.h"
 #include "fen.h"
+#include "data.h"
 
 bool see_ge(struct position *pos, uint32_t move, int threshold)
 {

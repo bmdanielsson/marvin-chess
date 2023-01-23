@@ -24,6 +24,7 @@
 #include "history.h"
 #include "utils.h"
 #include "validation.h"
+#include "data.h"
 
 /* The maximum allowed history score */
 #define MAX_HISTORY_SCORE (INT_MAX/3)

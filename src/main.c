@@ -37,6 +37,7 @@
 #include "see.h"
 #include "search.h"
 #include "nnue.h"
+#include "data.h"
 
 /* The maximum length of a line in the configuration file */
 #define CFG_MAX_LINE_LENGTH 1024
@@ -118,7 +119,7 @@ int main(int argc, char *argv[])
     read_config_file();
 
     /* Initialize components */
-    chess_data_init();
+    data_init();
     bb_init();
     search_init();
     polybook_open(BOOKFILE_NAME);

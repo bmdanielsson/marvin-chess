@@ -22,6 +22,7 @@
 #include "bitboard.h"
 #include "validation.h"
 #include "debug.h"
+#include "data.h"
 
 #define ADD_MOVE(l,f,t,p,fl) l->moves[l->size++] = MOVE((f), (t), (p), (fl))
 

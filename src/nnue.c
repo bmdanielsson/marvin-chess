@@ -31,6 +31,7 @@
 #include "utils.h"
 #include "bitboard.h"
 #include "simd.h"
+#include "data.h"
 
 #define INCBIN_PREFIX
 #define INCBIN_STYLE INCBIN_STYLE_SNAKE

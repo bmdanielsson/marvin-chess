@@ -25,6 +25,7 @@
 #include "validation.h"
 #include "eval.h"
 #include "board.h"
+#include "data.h"
 
 /* Returns true if c is a digit between '0' and '8'. */
 #define IS_DIGIT_08(c)  ((c=='0')||(c=='1')||(c=='2')||(c=='3')|| \

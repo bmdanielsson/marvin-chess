@@ -40,6 +40,7 @@
 #include "fen.h"
 #include "history.h"
 #include "nnue.h"
+#include "data.h"
 
 /* Calculates if it is time to check the clock and poll for commands */
 #define CHECKUP(n) (((n)&1023)==0)
