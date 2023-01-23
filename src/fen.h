@@ -20,7 +20,7 @@
 
 #include <stdbool.h>
 
-#include "chess.h"
+#include "types.h"
 
 /* The chess starting position in FEN format */
 #define FEN_STARTPOS "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"

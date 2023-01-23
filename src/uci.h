@@ -20,7 +20,7 @@
 
 #include <stdbool.h>
 
-#include "chess.h"
+#include "types.h"
 
 /*
  * Handle an UCI command.

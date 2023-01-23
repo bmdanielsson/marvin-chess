@@ -20,7 +20,7 @@
 
 #include <stdio.h>
 
-#include "chess.h"
+#include "types.h"
 
 /*
  * Generate all pseudo legal move for this position.

@@ -18,7 +18,7 @@
 #ifndef POLYBOOK_H
 #define POLYBOOK_H
 
-#include "chess.h"
+#include "types.h"
 
 /*
  * Open the opening book.

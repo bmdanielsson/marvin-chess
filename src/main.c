@@ -22,7 +22,7 @@
 #include <limits.h>
 
 #include "utils.h"
-#include "chess.h"
+#include "types.h"
 #include "board.h"
 #include "bitboard.h"
 #include "debug.h"

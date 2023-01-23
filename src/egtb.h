@@ -20,7 +20,7 @@
 
 #include <stdbool.h>
 
-#include "chess.h"
+#include "types.h"
 
 /* Scores assigned to tablebase wins/losses */
 #define TABLEBASE_WIN   19000

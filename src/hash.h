@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-#include "chess.h"
+#include "types.h"
 
 /* Different flags for transposition table entries */
 enum {

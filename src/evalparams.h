@@ -18,7 +18,7 @@
 #ifndef EVALPARAMS_H
 #define EVALPARAMS_H
 
-#include "chess.h"
+#include "types.h"
 
 extern int DOUBLE_PAWNS_MG;
 extern int DOUBLE_PAWNS_EG;

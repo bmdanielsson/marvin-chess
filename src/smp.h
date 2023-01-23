@@ -18,7 +18,7 @@
 #ifndef SMP_H
 #define SMP_H
 
-#include "chess.h"
+#include "types.h"
 
 /* Initilaize the SMP component */
 void smp_init(void);

@@ -20,7 +20,7 @@
 
 #include <stdbool.h>
 
-#include "chess.h"
+#include "types.h"
 
 /*
  * Check if the board position is valid.

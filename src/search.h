@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-#include "chess.h"
+#include "types.h"
 #include "egtb.h"
 
 /*

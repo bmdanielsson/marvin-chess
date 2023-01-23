@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-#include "chess.h"
+#include "types.h"
 
 /*
  * Generate a unique key for a chess position.

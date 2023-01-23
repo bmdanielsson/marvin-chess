@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "chess.h"
+#include "types.h"
 #include "utils.h"
 
 /* Set a bit in a bitboard */

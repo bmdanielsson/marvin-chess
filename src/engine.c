@@ -31,7 +31,7 @@
 #include "config.h"
 #include "eval.h"
 #include "utils.h"
-#include "chess.h"
+#include "types.h"
 #include "timectl.h"
 #include "thread.h"
 #include "smp.h"

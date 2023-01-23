@@ -18,7 +18,7 @@
 #ifndef SEE_H
 #define SEE_H
 
-#include "chess.h"
+#include "types.h"
 
 /*
  * Check if the Static Exchange Evaluation (SEE) score of a capturer

@@ -18,7 +18,7 @@
 #ifndef MOVESELECT_H
 #define MOVESELECT_H
 
-#include "chess.h"
+#include "types.h"
 
 /*
  * Initialize the move selector.

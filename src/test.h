@@ -18,7 +18,7 @@
 #ifndef TEST_H
 #define TEST_H
 
-#include "chess.h"
+#include "types.h"
 
 /*
  * Run perft on a specific position. Perft results can be compared with the

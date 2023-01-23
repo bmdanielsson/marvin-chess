@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 
-#include "chess.h"
+#include "types.h"
 
 /* The highest (most verbose) log level */
 #define LOG_HIGHEST_LEVEL 2

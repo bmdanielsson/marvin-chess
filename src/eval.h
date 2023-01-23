@@ -18,7 +18,7 @@
 #ifndef EVAL_H
 #define EVAL_H
 
-#include "chess.h"
+#include "types.h"
 
 /*
  * Evaluate the position and assign a static score to it.

@@ -20,7 +20,7 @@
 
 #include <stdbool.h>
 
-#include "chess.h"
+#include "types.h"
 
 /* Initialize the NNUE component */
 void nnue_init(void);

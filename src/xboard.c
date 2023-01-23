@@ -24,7 +24,7 @@
 #include "xboard.h"
 #include "config.h"
 #include "utils.h"
-#include "chess.h"
+#include "types.h"
 #include "board.h"
 #include "search.h"
 #include "hash.h"

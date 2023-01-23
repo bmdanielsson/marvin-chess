@@ -20,7 +20,7 @@
 
 #include <stdbool.h>
 
-#include "chess.h"
+#include "types.h"
 
 /* Maximum length accepted for file paths */
 #define MAX_PATH_LENGTH 1024

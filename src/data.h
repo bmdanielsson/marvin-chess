@@ -20,7 +20,7 @@
 
 #include <stdint.h>
 
-#include "chess.h"
+#include "types.h"
 
 /* Bitboard mask for each square */
 extern uint64_t sq_mask[NSQUARES];

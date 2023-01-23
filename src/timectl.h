@@ -20,7 +20,7 @@
 
 #include <stdbool.h>
 
-#include "chess.h"
+#include "types.h"
 
 /* Different time control flags */
 #define TC_INFINITE_TIME 0x00000001
