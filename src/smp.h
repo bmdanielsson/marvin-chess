@@ -52,12 +52,11 @@ void smp_newgame(void);
  * @param state The game state.
  * @param pondering If a pindering search should be started.
  * @param use_book If the opening book should be used.
- * @param use_tablebases If tablebases should be used.
  * @param ponder_move Optional location to store ponder move at.
  * @return Returns the best move in the position.
  */
 uint32_t smp_search(struct gamestate *state, bool pondering, bool use_book,
-                    bool use_tablebases, uint32_t *ponder_move);
+                    uint32_t *ponder_move);
 
 /*
  * The number of nodes searched.

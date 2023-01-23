@@ -31,7 +31,7 @@
 #include "polybook.h"
 #include "config.h"
 #include "test.h"
-#include "tbprobe.h"
+#include "egtb.h"
 #include "smp.h"
 #include "hash.h"
 #include "see.h"
@@ -69,7 +69,7 @@ static void read_config_file(void)
         } else if (sscanf(line, "LOG_LEVEL=%d", &int_val) == 1) {
             dbg_set_log_level(int_val);
         } else if (sscanf(line, "SYZYGY_PATH=%s", engine_syzygy_path) == 1) {
-            tb_init(engine_syzygy_path);
+            egtb_init(engine_syzygy_path);
         } else if (sscanf(line, "NUM_THREADS=%d", &int_val) == 1) {
             engine_default_num_threads = CLAMP(int_val, 1, MAX_WORKERS);
         }

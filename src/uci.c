@@ -34,14 +34,13 @@
 #include "hash.h"
 #include "engine.h"
 #include "validation.h"
-#include "tbprobe.h"
+#include "egtb.h"
 #include "smp.h"
 #include "nnue.h"
 
 /* Different UCI modes */
 static bool ponder_mode = false;
 static bool own_book_mode = true;
-static bool tablebase_mode = false;
 
 /* Helper variable used for sorting pv lines */
 static struct pvinfo sorted_mpv_lines[MAX_MULTIPV_LINES];
@@ -216,8 +215,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
 
     /* Search the position for a move */
     best_move = smp_search(state, ponder && ponder_mode,
-                           own_book_mode && !skip_book, tablebase_mode,
-                           &ponder_move);
+                           own_book_mode && !skip_book, &ponder_move);
 
     /* Send the best move */
     move2str(best_move, best_movestr);
@@ -365,8 +363,7 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
             }
         } else if (MATCH(namestr, "SyzygyPath")) {
             strncpy(engine_syzygy_path, valuestr, MAX_PATH_LENGTH);
-            tb_init(engine_syzygy_path);
-            tablebase_mode = TB_LARGEST > 0;
+            egtb_init(engine_syzygy_path);
         } else if (MATCH(namestr, "Threads")) {
             if (sscanf(valuestr, "%d", &value) == 1) {
                 if (value > MAX_WORKERS) {
@@ -427,8 +424,6 @@ static void uci_cmd_uci(struct gamestate *state)
 {
     engine_protocol = PROTOCOL_UCI;
     engine_variant = VARIANT_STANDARD;
-
-    tablebase_mode = TB_LARGEST > 0;
 
     state->silent = false;
 

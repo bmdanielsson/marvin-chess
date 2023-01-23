@@ -36,7 +36,7 @@
 #include "timectl.h"
 #include "polybook.h"
 #include "debug.h"
-#include "tbprobe.h"
+#include "egtb.h"
 #include "smp.h"
 
 /* Possible game results */
@@ -52,7 +52,6 @@ static bool analyze_mode = false;
 static bool force_mode = false;
 static bool post_mode = false;
 static bool ponder_mode = false;
-static bool tablebase_mode = false;
 
 /* The side that the engine is playing */
 static int engine_side = BLACK;
@@ -226,7 +225,7 @@ static void make_engine_move(struct gamestate *state)
 
         /* Search the position to find the best move */
         best_move = smp_search(state, ponder_mode && ponder, true,
-                               tablebase_mode, &ponder_move);
+                               &ponder_move);
 
         /*
          * If the search finishes while the engine is pondering
@@ -291,7 +290,7 @@ static void xboard_cmd_analyze(struct gamestate *state)
         tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
 
         /* Search until told otherwise */
-        (void)smp_search(state, false, false, tablebase_mode, NULL);
+        (void)smp_search(state, false, false, NULL);
 
         /* Exit analyze mode if there is no pending command */
         cmd = engine_get_pending_command();
@@ -380,10 +379,6 @@ static void xboard_cmd_egtpath(char *cmd)
 {
     char *iter;
 
-    if (tablebase_mode) {
-        return;
-    }
-
     iter = strstr(cmd, "syzygy");
     if (iter == NULL) {
         engine_write_command("Error (malformed command): %s", cmd);
@@ -393,8 +388,7 @@ static void xboard_cmd_egtpath(char *cmd)
     iter = skip_whitespace(iter);
 
     strncpy(engine_syzygy_path, iter, MAX_PATH_LENGTH);
-    tb_init(engine_syzygy_path);
-    tablebase_mode = TB_LARGEST > 0;
+    egtb_init(engine_syzygy_path);
 }
 
 static void xboard_cmd_force(void)
@@ -714,7 +708,6 @@ static void xboard_cmd_xboard(struct gamestate *state)
     engine_variant = VARIANT_STANDARD;
 
     ponder_mode = false;
-    tablebase_mode = TB_LARGEST > 0;
     analyze_mode = false;
     force_mode = false;
     post_mode = false;

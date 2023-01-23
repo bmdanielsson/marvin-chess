@@ -21,6 +21,7 @@
 #include <stdint.h>
 
 #include "chess.h"
+#include "egtb.h"
 
 /*
  * Score indicating infinity. Value is used for
@@ -36,10 +37,6 @@
  * we can be sure that we have found a forced mate.
  */
 #define FORCED_MATE (CHECKMATE - MAX_SEARCH_DEPTH)
-
-/* Scores assigned to tablebase wins/losses */
-#define TABLEBASE_WIN   19000
-#define TABLEBASE_LOSS  -19000
 
 /* Score indicating a known win/loss */
 #define KNOWN_WIN   (TABLEBASE_WIN - MAX_SEARCH_DEPTH)

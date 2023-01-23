@@ -136,6 +136,7 @@ SOURCES = src/bitboard.c \
           src/board.c \
           src/chess.c \
           src/debug.c \
+          src/egtb.c \
           src/engine.c \
           src/eval.c \
           src/evalparams.c \

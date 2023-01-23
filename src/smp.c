@@ -28,7 +28,6 @@
 #include "search.h"
 #include "engine.h"
 #include "validation.h"
-#include "tbprobe.h"
 #include "polybook.h"
 #include "bitboard.h"
 #include "board.h"
@@ -50,84 +49,6 @@ static atomic_bool should_stop = false;
 /* Data for worker threads */
 static int number_of_workers = 0;
 static struct search_worker *workers = NULL;
-
-static bool probe_dtz_tables(struct gamestate *state, int *score)
-{
-    unsigned int    res;
-    int             wdl;
-    int             promotion;
-    int             flags;
-    int             from;
-    int             to;
-    struct position *pos;
-
-    pos = &state->pos;
-    res = tb_probe_root(pos->bb_sides[WHITE], pos->bb_sides[BLACK],
-                    pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING],
-                    pos->bb_pieces[WHITE_QUEEN]|pos->bb_pieces[BLACK_QUEEN],
-                    pos->bb_pieces[WHITE_ROOK]|pos->bb_pieces[BLACK_ROOK],
-                    pos->bb_pieces[WHITE_BISHOP]|pos->bb_pieces[BLACK_BISHOP],
-                    pos->bb_pieces[WHITE_KNIGHT]|pos->bb_pieces[BLACK_KNIGHT],
-                    pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN],
-                    pos->fifty, pos->castle,
-                    pos->ep_sq != NO_SQUARE?pos->ep_sq:0,
-                    pos->stm == WHITE, NULL);
-    if (res == TB_RESULT_FAILED) {
-        return false;
-    }
-    wdl = TB_GET_WDL(res);
-    switch (wdl) {
-    case TB_LOSS:
-        *score = -TABLEBASE_WIN;
-        break;
-    case TB_WIN:
-        *score = TABLEBASE_WIN;
-        break;
-    case TB_BLESSED_LOSS:
-    case TB_CURSED_WIN:
-    case TB_DRAW:
-    default:
-        *score = 0;
-        break;
-    }
-
-    from = TB_GET_FROM(res);
-    to = TB_GET_TO(res);
-    flags = NORMAL;
-    promotion = NO_PIECE;
-    if (TB_GET_EP(res) != 0) {
-        flags = EN_PASSANT;
-    } else {
-        if (pos->pieces[to] != NO_PIECE) {
-            flags |= CAPTURE;
-        }
-        switch (TB_GET_PROMOTES(res)) {
-        case TB_PROMOTES_QUEEN:
-            flags |= PROMOTION;
-            promotion = QUEEN + pos->stm;
-            break;
-        case TB_PROMOTES_ROOK:
-            flags |= PROMOTION;
-            promotion = ROOK + pos->stm;
-            break;
-        case TB_PROMOTES_BISHOP:
-            flags |= PROMOTION;
-            promotion = BISHOP + pos->stm;
-            break;
-        case TB_PROMOTES_KNIGHT:
-            flags |= PROMOTION;
-            promotion = KNIGHT + pos->stm;
-            break;
-        case TB_PROMOTES_NONE:
-        default:
-            break;
-        }
-    }
-    state->move_filter.moves[0] = MOVE(from, to, promotion, flags);
-    state->move_filter.size = 1;
-
-    return true;
-}
 
 static thread_retval_t worker_thread_func(void *data)
 {
@@ -240,7 +161,7 @@ void smp_newgame(void)
 }
 
 uint32_t smp_search(struct gamestate *state, bool pondering, bool use_book,
-                    bool use_tablebases, uint32_t *ponder_move)
+                    uint32_t *ponder_move)
 {
     int                  k;
     struct search_worker *worker;
@@ -248,6 +169,7 @@ uint32_t smp_search(struct gamestate *state, bool pondering, bool use_book,
     struct movelist      legal;
     bool                 send_pv;
     uint32_t             best_move;
+    uint32_t             move;
 
     assert(valid_position(&state->pos));
     assert(number_of_workers > 0);
@@ -278,7 +200,7 @@ uint32_t smp_search(struct gamestate *state, bool pondering, bool use_book,
 
     /* Prepare for search */
     hash_tt_age_table();
-    state->probe_wdl = use_tablebases;
+    state->probe_wdl = true;
     state->root_in_tb = false;
     state->root_tb_score = 0;
     state->pondering = pondering;
@@ -286,11 +208,15 @@ uint32_t smp_search(struct gamestate *state, bool pondering, bool use_book,
     state->completed_depth = 0;
 
     /* Probe tablebases for the root position */
-    if (use_tablebases &&
+    if (egtb_should_probe(&state->pos) &&
         (state->move_filter.size == 0) &&
-        (state->multipv == 1) &&
-        (BITCOUNT(state->pos.bb_all) <= (int)TB_LARGEST)) {
-        state->root_in_tb = probe_dtz_tables(state, &state->root_tb_score);
+        (state->multipv == 1)) {
+        state->root_in_tb = egtb_probe_dtz_tables(&state->pos, &move,
+                                                  &state->root_tb_score);
+        if (state->root_in_tb) {
+            state->move_filter.moves[0] = move;
+            state->move_filter.size = 1;
+        }
         state->probe_wdl = !state->root_in_tb;
     }
 

@@ -36,7 +36,6 @@
 #include "utils.h"
 #include "debug.h"
 #include "bitboard.h"
-#include "tbprobe.h"
 #include "smp.h"
 #include "fen.h"
 #include "history.h"
@@ -111,6 +110,13 @@ static bool check_tt_cutoff(struct tt_item *item, int depth, int alpha,
         }
     }
     return false;
+}
+
+static bool check_tb_cutoff(int score, int alpha, int beta)
+{
+    return (((score < 0) && (score <= alpha)) ||
+            ((score > 0) && (score >= beta)) ||
+            (score == 0));
 }
 
 static int adjust_mate_score(struct position *pos, int score)
@@ -197,49 +203,6 @@ static bool is_recapture(struct position *pos, uint32_t move)
     }
 
     return false;
-}
-
-static bool probe_wdl_tables(struct search_worker *worker, int alpha, int beta,
-                             int *score)
-{
-    unsigned int    res;
-    struct position *pos;
-    bool            cutoff;
-
-    pos = &worker->pos;
-    res = tb_probe_wdl(pos->bb_sides[WHITE], pos->bb_sides[BLACK],
-                    pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING],
-                    pos->bb_pieces[WHITE_QUEEN]|pos->bb_pieces[BLACK_QUEEN],
-                    pos->bb_pieces[WHITE_ROOK]|pos->bb_pieces[BLACK_ROOK],
-                    pos->bb_pieces[WHITE_BISHOP]|pos->bb_pieces[BLACK_BISHOP],
-                    pos->bb_pieces[WHITE_KNIGHT]|pos->bb_pieces[BLACK_KNIGHT],
-                    pos->bb_pieces[WHITE_PAWN]|pos->bb_pieces[BLACK_PAWN],
-                    pos->fifty, pos->castle,
-                    pos->ep_sq != NO_SQUARE?pos->ep_sq:0,
-                    pos->stm == WHITE);
-    if (res == TB_RESULT_FAILED) {
-        *score = 0;
-        return false;
-    }
-    worker->tbhits++;
-
-    switch (res) {
-    case TB_WIN:
-        *score = TABLEBASE_WIN-pos->height;
-        cutoff = (*score >= beta);
-        break;
-    case TB_LOSS:
-        *score = TABLEBASE_LOSS+pos->height;
-        cutoff = (*score <= alpha);
-        break;
-    default:
-        /* Draw */
-        *score = 0;
-        cutoff = true;
-        break;
-    }
-
-    return cutoff;
 }
 
 static void update_pv(struct search_worker *worker, uint32_t move)
@@ -535,10 +498,12 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Probe tablebases */
-    if (!is_root && worker->state->probe_wdl &&
-        (BITCOUNT(pos->bb_all) <= (int)TB_LARGEST)) {
-        if (probe_wdl_tables(worker, alpha, beta, &tb_score)) {
-            return tb_score;
+    if (!is_root && worker->state->probe_wdl && egtb_should_probe(pos)) {
+        if (egtb_probe_wdl_tables(pos, &tb_score)) {
+            worker->tbhits++;
+            if (check_tb_cutoff(tb_score, alpha, beta)) {
+                return tb_score;
+            }
         }
     }
 
