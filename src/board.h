@@ -46,6 +46,23 @@ void board_start_position(struct position *pos);
 bool board_setup_from_fen(struct position *pos, char *fenstr);
 
 /*
+ * Convert a move into a string representation.
+ *
+ * @param move The move.
+ * @param str Pointer to store the string representation at.
+ */
+void board_move2str(uint32_t move, char *str);
+
+/*
+ * Convert a move in algebraic notation to the internal move format.
+ *
+ * @param str A move in algebraic notation.
+ * @param pos The current chess position.
+ * @return Returns the move in our internal representation.
+ */
+uint32_t board_str2move(char *str, struct position *pos);
+
+/*
  * Tests if a player is in check.
  *
  * @param pos The chess board.

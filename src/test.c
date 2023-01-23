@@ -133,7 +133,7 @@ void test_run_divide(struct position *pos, int depth)
         nleafs = 0;
         perft(pos, depth-1, &nleafs);
         ntotal += nleafs;
-        move2str(list.moves[k], movestr);
+        board_move2str(list.moves[k], movestr);
         printf("%s %u\n", movestr, nleafs);
         board_unmake_move(pos);
     }

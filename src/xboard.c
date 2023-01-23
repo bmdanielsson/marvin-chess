@@ -241,7 +241,7 @@ static void make_engine_move(struct gamestate *state)
         (void)board_make_move(&state->pos, best_move);
 
         /* Send move */
-        move2str(best_move, best_movestr);
+        board_move2str(best_move, best_movestr);
         engine_write_command("move %s", best_movestr);
 		tc_stop_clock();
 
@@ -339,7 +339,7 @@ static void xboard_cmd_bk(struct gamestate *state)
     }
 
     for (k=0;k<nentries;k++) {
-        move2str(entries[k].move, movestr);
+        board_move2str(entries[k].move, movestr);
         engine_write_command(" %s %.0f%%", movestr,
                              ((float)entries[k].weight/(float)sum)*100.0f);
     }
@@ -655,7 +655,7 @@ static void xboard_cmd_usermove(char *cmd, struct gamestate *state,
         engine_write_command("Error (malformed command): %s", cmd);
         return;
     }
-    move = str2move(iter+1, &state->pos);
+    move = board_str2move(iter+1, &state->pos);
     if (move == NOMOVE) {
         engine_write_command("Illegal move: %s", cmd);
         return;
@@ -861,7 +861,7 @@ bool xboard_check_input(struct search_worker *worker)
                 return false;
             }
             iter++;
-            move2str(pondering_on, movestr);
+            board_move2str(pondering_on, movestr);
             if (!strcmp(movestr, iter) && (strlen(movestr) == strlen(iter))) {
                 pondering_on = NOMOVE;
             } else {
@@ -913,7 +913,7 @@ void xboard_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
     pv = &pvinfo->pv;
     for (k=0;k<pv->size;k++) {
         strcat(buffer, " ");
-        move2str(pv->moves[k], movestr);
+        board_move2str(pv->moves[k], movestr);
         strcat(buffer, movestr);
     }
     engine_write_command(buffer);

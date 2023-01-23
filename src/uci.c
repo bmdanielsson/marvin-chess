@@ -182,7 +182,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             if (temp != NULL) {
                 *temp = '\0';
             }
-            move = str2move(iter, &state->pos);
+            move = board_str2move(iter, &state->pos);
             if (move != NOMOVE) {
                 if (board_make_move(&state->pos, move)) {
                     board_unmake_move(&state->pos);
@@ -218,9 +218,9 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
                            own_book_mode && !skip_book, &ponder_move);
 
     /* Send the best move */
-    move2str(best_move, best_movestr);
+    board_move2str(best_move, best_movestr);
     if (ponder_mode && (ponder_move != NOMOVE)) {
-        move2str(ponder_move, ponder_movestr);
+        board_move2str(ponder_move, ponder_movestr);
         engine_write_command("bestmove %s ponder %s", best_movestr,
                              ponder_movestr);
     } else {
@@ -296,7 +296,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
         /* Play all moves on the internal board */
         while (iter != NULL) {
             movestr = skip_whitespace(iter);
-            move = str2move(movestr, &state->pos);
+            move = board_str2move(movestr, &state->pos);
             if (!board_make_move(&state->pos, move)) {
                 /* Illegal move */
                 return;
@@ -561,7 +561,7 @@ void uci_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
             nodes, msec, nps, tbhits, hash_tt_usage(), score);
     for (k=0;k<pvinfo->pv.size;k++) {
         strcat(buffer, " ");
-        move2str(pvinfo->pv.moves[k], movestr);
+        board_move2str(pvinfo->pv.moves[k], movestr);
         strcat(buffer, movestr);
     }
 
@@ -614,7 +614,7 @@ void uci_send_move_info(struct search_worker *worker, int movenumber,
     }
 
     /* Send command */
-    move2str(move, movestr);
+    board_move2str(move, movestr);
     engine_write_command("info depth %d currmove %s currmovenumber %d",
                          worker->depth, movestr, movenumber);
 }
@@ -670,7 +670,7 @@ void uci_send_multipv_info(struct search_worker *worker)
                 nodes, msec, nps, tbhits, ttusage, sorted_mpv_lines[k].score);
         for (l=0;l<sorted_mpv_lines[k].pv.size;l++) {
             strcat(buffer, " ");
-            move2str(sorted_mpv_lines[k].pv.moves[l], movestr);
+            board_move2str(sorted_mpv_lines[k].pv.moves[l], movestr);
             strcat(buffer, movestr);
         }
 

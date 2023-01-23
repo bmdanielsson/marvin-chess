@@ -173,7 +173,7 @@ void dbg_print_move(uint32_t move)
 {
     char movestr[MAX_MOVESTR_LENGTH];
 
-    move2str(move, movestr);
+    board_move2str(move, movestr);
     printf("%s\n", movestr);
 }
 
@@ -186,7 +186,7 @@ void dbg_print_movelist(struct movelist *list)
         if ((k != 0) && (k%10) == 0) {
             printf("\n");
         }
-        move2str(list->moves[k], movestr);
+        board_move2str(list->moves[k], movestr);
         printf("%s ", movestr);
     }
     printf("\n");

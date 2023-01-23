@@ -134,7 +134,6 @@ endif
 # Sources
 SOURCES = src/bitboard.c \
           src/board.c \
-          src/chess.c \
           src/data.c \
           src/debug.c \
           src/egtb.c \
