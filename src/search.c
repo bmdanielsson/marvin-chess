@@ -212,6 +212,16 @@ static void update_pv(struct search_worker *worker, uint32_t move)
                                     worker->pv_table[pos->height+1].size + 1;
 }
 
+void copy_pv(struct movelist *from, struct movelist *to)
+{
+    int k;
+
+    to->size = from->size;
+    for (k=0;k<from->size;k++) {
+        to->moves[k] = from->moves[k];
+    }
+}
+
 static void checkup(struct search_worker *worker)
 {
     /* Check if the worker is requested to stop */

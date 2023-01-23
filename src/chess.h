@@ -699,12 +699,4 @@ void move2str(uint32_t move, char *str);
  */
 uint32_t str2move(char *str, struct position *pos);
 
-/*
- * Copy a principle variation.
- *
- * @param from The source pv.
- * @param to The destination pv.
- */
-void copy_pv(struct movelist *from, struct movelist *to);
-
 #endif

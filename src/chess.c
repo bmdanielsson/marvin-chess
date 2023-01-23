@@ -529,13 +529,3 @@ check_move:
 
     return NOMOVE;
 }
-
-void copy_pv(struct movelist *from, struct movelist *to)
-{
-    int k;
-
-    to->size = from->size;
-    for (k=0;k<from->size;k++) {
-        to->moves[k] = from->moves[k];
-    }
-}
