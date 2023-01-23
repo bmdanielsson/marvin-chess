@@ -496,7 +496,6 @@ struct search_worker {
 
     /* Data for the worker thread */
     thread_t thread;
-    int action;
     jmp_buf env;
 
     /* Pointer to the active game state */

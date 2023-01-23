@@ -34,11 +34,6 @@
 #include "history.h"
 #include "nnue.h"
 
-/* Worker actions */
-#define ACTION_IDLE 0
-#define ACTION_EXIT 1
-#define ACTION_RUN 2
-
 /* Lock for updating the state struct during search */
 static mutex_t state_lock;
 
@@ -95,9 +90,6 @@ static void prepare_worker(struct search_worker *worker,
     worker->state = state;
     worker->pos.state = state;
     worker->pos.worker = worker;
-
-    /* Worker is initiallly idle */
-    worker->action = ACTION_IDLE;
 }
 
 static void reset_worker(struct search_worker *worker)
