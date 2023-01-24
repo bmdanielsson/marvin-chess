@@ -15,26 +15,26 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef BOARD_H
-#define BOARD_H
+#ifndef POSITION_H
+#define POSITION_H
 
 #include <stdbool.h>
 
 #include "types.h"
 
 /*
- * Reset a chess board structure.
+ * Reset a chess position structure.
  *
  * @param pos The chess position.
  */
-void board_reset(struct position *pos);
+void pos_reset(struct position *pos);
 
 /*
  * Initialize a board structure to the chess starting posuition.
  *
  * @param pos The chess position.
  */
-void board_start_position(struct position *pos);
+void pos_setup_start_position(struct position *pos);
 
 /*
  * Initialize a board structure to the chess position in FEN notation.
@@ -43,7 +43,7 @@ void board_start_position(struct position *pos);
  * @param fenstr Chess position in FEN notation.
  * @return Returns true if the position was sucessfully setup, false otherwise.
  */
-bool board_setup_from_fen(struct position *pos, char *fenstr);
+bool pos_setup_from_fen(struct position *pos, char *fenstr);
 
 /*
  * Convert a move into a string representation.
@@ -51,7 +51,7 @@ bool board_setup_from_fen(struct position *pos, char *fenstr);
  * @param move The move.
  * @param str Pointer to store the string representation at.
  */
-void board_move2str(uint32_t move, char *str);
+void pos_move2str(uint32_t move, char *str);
 
 /*
  * Convert a move in algebraic notation to the internal move format.
@@ -60,7 +60,7 @@ void board_move2str(uint32_t move, char *str);
  * @param pos The current chess position.
  * @return Returns the move in our internal representation.
  */
-uint32_t board_str2move(char *str, struct position *pos);
+uint32_t pos_str2move(char *str, struct position *pos);
 
 /*
  * Tests if a player is in check.
@@ -69,7 +69,7 @@ uint32_t board_str2move(char *str, struct position *pos);
  * @param side The player to test.
  * @return Returns true if the player is in check.
  */
-bool board_in_check(struct position *pos, int side);
+bool pos_in_check(struct position *pos, int side);
 
 /*
  * Make a move.
@@ -80,28 +80,28 @@ bool board_in_check(struct position *pos, int side);
  *        true otherwise. If the move was illegal the it is automatically
  *        undone.
  */
-bool board_make_move(struct position *pos, uint32_t move);
+bool pos_make_move(struct position *pos, uint32_t move);
 
 /*
  * Undo the last move.
  *
  * @param pos The chess board.
  */
-void board_unmake_move(struct position *pos);
+void pos_unmake_move(struct position *pos);
 
 /*
  * Make a null-move.
  *
  * @param pos The chess board.
  */
-void board_make_null_move(struct position *pos);
+void pos_make_null_move(struct position *pos);
 
 /*
  * Undo a null move.
  *
  * @param pos The chess board.
  */
-void board_unmake_null_move(struct position *pos);
+void pos_unmake_null_move(struct position *pos);
 
 /*
  * Check if the current board position is a repeat of a previous position.
@@ -109,7 +109,7 @@ void board_unmake_null_move(struct position *pos);
  * @param pos The chess board.
  * @return Returns true if this position is a repeat.
  */
-bool board_is_repetition(struct position *pos);
+bool pos_is_repetition(struct position *pos);
 
 /*
  * Check if a specific player has a non-pawn, non-king piece.
@@ -117,7 +117,7 @@ bool board_is_repetition(struct position *pos);
  * @param pos The chess board.
  * @param side The side to check.
  */
-bool board_has_non_pawn(struct position *pos, int side);
+bool pos_has_non_pawn(struct position *pos, int side);
 
 /*
  * Check if a move is at least pseudo-legal in a given position. Pseudo-legal
@@ -126,7 +126,7 @@ bool board_has_non_pawn(struct position *pos, int side);
  * @param pos The chess board.
  * @param move The move to check.
  */
-bool board_is_move_pseudo_legal(struct position *pos, uint32_t move);
+bool pos_is_move_pseudo_legal(struct position *pos, uint32_t move);
 
 /*
  * Check if a move is a checking move.
@@ -134,15 +134,7 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move);
  * @param pos The chess board.
  * @param move The move to check.
  */
-bool board_move_gives_check(struct position *pos, uint32_t move);
-
-/* Calcualte the point value balance for a position.
- *
- * @param pos The position.
- * @return Returns the point value balance from the side to
- *         moves point of view.
- */
-int board_point_value(struct position *pos);
+bool pos_move_gives_check(struct position *pos, uint32_t move);
 
 /*
  * Check if castling is allowed in a given position.
@@ -151,6 +143,6 @@ int board_point_value(struct position *pos);
  * @param type The type of castling to check.
  * @return Returns true if castling is allowed, false otherwise.
  */
-bool board_is_castling_allowed(struct position *pos, int type);
+bool pos_is_castling_allowed(struct position *pos, int type);
 
 #endif

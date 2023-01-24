@@ -405,7 +405,7 @@ void nnue_destroy(void)
     }
 }
 
-void nnue_reset_state(struct position *pos)
+void nnue_reset_accumulator(struct position *pos)
 {
     int k;
 

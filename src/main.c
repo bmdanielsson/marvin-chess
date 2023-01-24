@@ -23,7 +23,7 @@
 
 #include "utils.h"
 #include "types.h"
-#include "board.h"
+#include "position.h"
 #include "bitboard.h"
 #include "debug.h"
 #include "movegen.h"

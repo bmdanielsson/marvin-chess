@@ -24,7 +24,7 @@
 #include "bitboard.h"
 #include "validation.h"
 #include "eval.h"
-#include "board.h"
+#include "position.h"
 #include "data.h"
 
 /* Returns true if c is a digit between '0' and '8'. */

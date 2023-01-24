@@ -28,7 +28,7 @@
 #include "config.h"
 #include "hash.h"
 #include "movegen.h"
-#include "board.h"
+#include "position.h"
 #include "thread.h"
 #include "data.h"
 
@@ -173,7 +173,7 @@ void dbg_print_move(uint32_t move)
 {
     char movestr[MAX_MOVESTR_LENGTH];
 
-    board_move2str(move, movestr);
+    pos_move2str(move, movestr);
     printf("%s\n", movestr);
 }
 
@@ -186,7 +186,7 @@ void dbg_print_movelist(struct movelist *list)
         if ((k != 0) && (k%10) == 0) {
             printf("\n");
         }
-        board_move2str(list->moves[k], movestr);
+        pos_move2str(list->moves[k], movestr);
         printf("%s ", movestr);
     }
     printf("\n");

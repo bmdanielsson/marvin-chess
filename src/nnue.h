@@ -29,11 +29,11 @@ void nnue_init(void);
 void nnue_destroy(void);
 
 /*
- * Reset the NNUE state for a position.
+ * Reset the NNUE accumulator for a position.
  *
  * @param pos The position.
  */
-void nnue_reset_state(struct position *pos);
+void nnue_reset_accumulator(struct position *pos);
 
 /*
  * Load a NNUE net.

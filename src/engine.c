@@ -35,7 +35,7 @@
 #include "timectl.h"
 #include "thread.h"
 #include "smp.h"
-#include "board.h"
+#include "position.h"
 
 /* Size of the receive buffer */
 #define RX_BUFFER_SIZE 4096
@@ -159,8 +159,8 @@ struct gamestate* engine_create_game_state(void)
         return NULL;
     }
     memset(state, 0, sizeof(struct gamestate));
-    board_reset(&state->pos);
-    board_start_position(&state->pos);
+    pos_reset(&state->pos);
+    pos_setup_start_position(&state->pos);
     state->multipv = 1;
 
     return state;

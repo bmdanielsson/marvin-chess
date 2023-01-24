@@ -19,7 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "board.h"
+#include "position.h"
 #include "data.h"
 #include "fen.h"
 #include "key.h"
@@ -132,7 +132,15 @@ static struct unmake* pop_history(struct position *pos)
     return &pos->history[pos->ply];
 }
 
-void board_reset(struct position *pos)
+void pos_setup_start_position(struct position *pos)
+{
+    assert(pos != NULL);
+
+    (void)pos_setup_from_fen(pos, FEN_STARTPOS);
+    assert(valid_position(pos));
+}
+
+void pos_reset(struct position *pos)
 {
     int k;
 
@@ -158,18 +166,10 @@ void board_reset(struct position *pos)
     pos->height = 0;
     pos->fifty = 0;
 
-    nnue_reset_state(pos);
+    nnue_reset_accumulator(pos);
 }
 
-void board_start_position(struct position *pos)
-{
-    assert(pos != NULL);
-
-    (void)board_setup_from_fen(pos, FEN_STARTPOS);
-    assert(valid_position(pos));
-}
-
-bool board_setup_from_fen(struct position *pos, char *fenstr)
+bool pos_setup_from_fen(struct position *pos, char *fenstr)
 {
     uint64_t pieces;
     int      sq;
@@ -178,7 +178,7 @@ bool board_setup_from_fen(struct position *pos, char *fenstr)
     assert(pos != NULL);
     assert(fenstr != NULL);
 
-    board_reset(pos);
+    pos_reset(pos);
     if (!fen_setup_board(pos, fenstr) || !valid_position(pos)) {
         return false;
     }
@@ -191,10 +191,11 @@ bool board_setup_from_fen(struct position *pos, char *fenstr)
         update_material(pos, piece, true);
     }
 
+
     return true;
 }
 
-void board_move2str(uint32_t move, char *str)
+void pos_move2str(uint32_t move, char *str)
 {
     int from;
     int to;
@@ -266,7 +267,7 @@ void board_move2str(uint32_t move, char *str)
     }
 }
 
-uint32_t board_str2move(char *str, struct position *pos)
+uint32_t pos_str2move(char *str, struct position *pos)
 {
     uint32_t        move;
     struct movelist list;
@@ -359,7 +360,7 @@ check_move:
     return NOMOVE;
 }
 
-bool board_in_check(struct position *pos, int side)
+bool pos_in_check(struct position *pos, int side)
 {
     assert(valid_position(pos));
     assert(valid_side(side));
@@ -368,7 +369,7 @@ bool board_in_check(struct position *pos, int side)
                           FLIP_COLOR(side));
 }
 
-bool board_make_move(struct position *pos, uint32_t move)
+bool pos_make_move(struct position *pos, uint32_t move)
 {
     struct unmake *elem;
     int           capture;
@@ -380,7 +381,7 @@ bool board_make_move(struct position *pos, uint32_t move)
 
     assert(valid_position(pos));
     assert(valid_move(move));
-    assert(board_is_move_pseudo_legal(pos, move));
+    assert(pos_is_move_pseudo_legal(pos, move));
     assert(pos->ply < MAX_MOVES);
 
     from = FROM(move);
@@ -485,8 +486,8 @@ bool board_make_move(struct position *pos, uint32_t move)
      * If the king was left in check then the move
      * was illegal and should be undone.
      */
-    if (board_in_check(pos, FLIP_COLOR(pos->stm))) {
-        board_unmake_move(pos);
+    if (pos_in_check(pos, FLIP_COLOR(pos->stm))) {
+        pos_unmake_move(pos);
         return false;
     }
 
@@ -496,7 +497,7 @@ bool board_make_move(struct position *pos, uint32_t move)
     return true;
 }
 
-void board_unmake_move(struct position *pos)
+void pos_unmake_move(struct position *pos)
 {
     struct unmake *elem;
     uint32_t      move;
@@ -577,12 +578,12 @@ void board_unmake_move(struct position *pos)
     assert(valid_position(pos));
 }
 
-void board_make_null_move(struct position *pos)
+void pos_make_null_move(struct position *pos)
 {
     struct unmake *elem;
 
     assert(valid_position(pos));
-    assert(!board_in_check(pos, pos->stm));
+    assert(!pos_in_check(pos, pos->stm));
 
     /* Update the history */
     elem = push_history(pos);
@@ -616,7 +617,7 @@ void board_make_null_move(struct position *pos)
     assert(valid_position(pos));
 }
 
-void board_unmake_null_move(struct position *pos)
+void pos_unmake_null_move(struct position *pos)
 {
     struct unmake *elem;
 
@@ -640,7 +641,7 @@ void board_unmake_null_move(struct position *pos)
     assert(valid_position(pos));
 }
 
-bool board_is_repetition(struct position *pos)
+bool pos_is_repetition(struct position *pos)
 {
     int idx;
 
@@ -666,7 +667,7 @@ bool board_is_repetition(struct position *pos)
     return false;
 }
 
-bool board_has_non_pawn(struct position *pos, int side)
+bool pos_has_non_pawn(struct position *pos, int side)
 {
     assert(valid_position(pos));
     assert(valid_side(side));
@@ -675,7 +676,7 @@ bool board_has_non_pawn(struct position *pos, int side)
                 pos->bb_pieces[ROOK+side]|pos->bb_pieces[QUEEN+side]) != 0ULL;
 }
 
-bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
+bool pos_is_move_pseudo_legal(struct position *pos, uint32_t move)
 {
     uint64_t bb;
     int      from;
@@ -752,7 +753,7 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
                 (to == rooksq[pos->stm]) &&
                 (pos->pieces[kingsq[pos->stm]] == (KING+pos->stm)) &&
                 (pos->pieces[rooksq[pos->stm]] == (ROOK+pos->stm)) &&
-                board_is_castling_allowed(pos, KINGSIDE_CASTLE));
+                pos_is_castling_allowed(pos, KINGSIDE_CASTLE));
     } else if (ISQUEENSIDECASTLE(move)) {
         const int kingsq[NSIDES] = {LSB(pos->bb_pieces[WHITE_KING]),
                                     LSB(pos->bb_pieces[BLACK_KING])};
@@ -762,7 +763,7 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
                 (to == rooksq[pos->stm]) &&
                 (pos->pieces[kingsq[pos->stm]] == (KING+pos->stm)) &&
                 (pos->pieces[rooksq[pos->stm]] == (ROOK+pos->stm)) &&
-                board_is_castling_allowed(pos, QUEENSIDE_CASTLE));
+                pos_is_castling_allowed(pos, QUEENSIDE_CASTLE));
     }
 
     /*
@@ -824,7 +825,7 @@ bool board_is_move_pseudo_legal(struct position *pos, uint32_t move)
     return (bb&sq_mask[to]) != 0ULL;
 }
 
-bool board_move_gives_check(struct position *pos, uint32_t move)
+bool pos_move_gives_check(struct position *pos, uint32_t move)
 {
     bool gives_check;
     int  from;
@@ -841,11 +842,11 @@ bool board_move_gives_check(struct position *pos, uint32_t move)
     if (ISENPASSANT(move) ||
         ISKINGSIDECASTLE(move) ||
         ISQUEENSIDECASTLE(move)) {
-        if (!board_make_move(pos, move)) {
+        if (!pos_make_move(pos, move)) {
             return false;
         }
-        gives_check = board_in_check(pos, pos->stm);
-        board_unmake_move(pos);
+        gives_check = pos_in_check(pos, pos->stm);
+        pos_unmake_move(pos);
         return gives_check;
     }
 
@@ -904,7 +905,7 @@ bool board_move_gives_check(struct position *pos, uint32_t move)
     return gives_check;
 }
 
-bool board_is_castling_allowed(struct position *pos, int type)
+bool pos_is_castling_allowed(struct position *pos, int type)
 {
     int      king_start;
     int      king_stop;

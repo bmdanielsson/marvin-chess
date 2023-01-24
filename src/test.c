@@ -23,7 +23,7 @@
 #include "config.h"
 #include "utils.h"
 #include "types.h"
-#include "board.h"
+#include "position.h"
 #include "search.h"
 #include "hash.h"
 #include "fen.h"
@@ -87,11 +87,11 @@ static void perft(struct position *pos, int depth, uint32_t *nleafs)
     /* Search all moves */
     gen_moves(pos, &list);
     for (k=0;k<list.size;k++) {
-        if (!board_make_move(pos, list.moves[k])) {
+        if (!pos_make_move(pos, list.moves[k])) {
             continue;
         }
         perft(pos, depth-1, nleafs);
-        board_unmake_move(pos);
+        pos_unmake_move(pos);
     }
 }
 
@@ -127,15 +127,15 @@ void test_run_divide(struct position *pos, int depth)
     ntotal = 0;
     gen_moves(pos, &list);
     for (k=0;k<list.size;k++) {
-        if (!board_make_move(pos, list.moves[k])) {
+        if (!pos_make_move(pos, list.moves[k])) {
             continue;
         }
         nleafs = 0;
         perft(pos, depth-1, &nleafs);
         ntotal += nleafs;
-        board_move2str(list.moves[k], movestr);
+        pos_move2str(list.moves[k], movestr);
         printf("%s %u\n", movestr, nleafs);
-        board_unmake_move(pos);
+        pos_unmake_move(pos);
     }
 
     printf("Moves: %d\n", list.size);
@@ -172,7 +172,7 @@ void test_run_benchmark(void)
     total = 0;
     npos = sizeof(positions)/sizeof(char*);
     for (k=0;k<npos;k++) {
-        board_setup_from_fen(&state->pos, positions[k]);
+        pos_setup_from_fen(&state->pos, positions[k]);
         tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
         smp_newgame();
         state->sd = BENCH_DEPTH;

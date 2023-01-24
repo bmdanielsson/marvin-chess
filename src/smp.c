@@ -30,7 +30,7 @@
 #include "validation.h"
 #include "polybook.h"
 #include "bitboard.h"
-#include "board.h"
+#include "position.h"
 #include "history.h"
 #include "nnue.h"
 

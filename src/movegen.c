@@ -18,7 +18,7 @@
 #include <assert.h>
 
 #include "movegen.h"
-#include "board.h"
+#include "position.h"
 #include "bitboard.h"
 #include "validation.h"
 #include "debug.h"
@@ -68,7 +68,7 @@ static void gen_kingside_castling_moves(struct position *pos,
     int king_start = LSB(pos->bb_pieces[KING+pos->stm]);
     int rook_start = (pos->stm == WHITE)?pos->castle_wk:pos->castle_bk;
 
-    if (!board_is_castling_allowed(pos, KINGSIDE_CASTLE)) {
+    if (!pos_is_castling_allowed(pos, KINGSIDE_CASTLE)) {
         return;
     }
 
@@ -81,7 +81,7 @@ static void gen_queenside_castling_moves(struct position *pos,
     int king_start = LSB(pos->bb_pieces[KING+pos->stm]);
     int rook_start = (pos->stm == WHITE)?pos->castle_wq:pos->castle_bq;
 
-    if (!board_is_castling_allowed(pos, QUEENSIDE_CASTLE)) {
+    if (!pos_is_castling_allowed(pos, QUEENSIDE_CASTLE)) {
         return;
     }
 
@@ -238,7 +238,7 @@ void gen_moves(struct position *pos, struct movelist *list)
     list->size = 0;
 
     /* If the side to move is in check then generate evasions */
-    if (board_in_check(pos, pos->stm)) {
+    if (pos_in_check(pos, pos->stm)) {
         gen_check_evasions(pos, list);
         return;
     }
@@ -263,10 +263,10 @@ void gen_legal_moves(struct position *pos, struct movelist *list)
     gen_moves(pos, &temp_list);
     for (k=0;k<temp_list.size;k++) {
         move = temp_list.moves[k];
-        if (board_make_move(pos, move)) {
+        if (pos_make_move(pos, move)) {
             list->moves[count++] = move;
             list->size++;
-            board_unmake_move(pos);
+            pos_unmake_move(pos);
         }
     }
 }

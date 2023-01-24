@@ -21,7 +21,7 @@
 #include "bitboard.h"
 #include "key.h"
 #include "movegen.h"
-#include "board.h"
+#include "position.h"
 #include "eval.h"
 #include "search.h"
 #include "moveselect.h"

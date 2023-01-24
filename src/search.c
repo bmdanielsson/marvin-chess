@@ -26,7 +26,7 @@
 #include "search.h"
 #include "engine.h"
 #include "timectl.h"
-#include "board.h"
+#include "position.h"
 #include "movegen.h"
 #include "moveselect.h"
 #include "eval.h"
@@ -314,7 +314,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     worker->pv_table[pos->height].size = 0;
 
     /* Check if we should considered the game as a draw */
-    if (board_is_repetition(pos) || (pos->fifty >= 100)) {
+    if (pos_is_repetition(pos) || (pos->fifty >= 100)) {
         return 0;
     }
 
@@ -331,7 +331,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
      * instance if the only available capture looses a queen then this move
      * would never be played.
      */
-    in_check = board_in_check(pos, pos->stm);
+    in_check = pos_in_check(pos, pos->stm);
     best_score = -INFINITE_SCORE;
     if (!in_check) {
         best_score = static_score;
@@ -372,21 +372,21 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
          * effort to search the move.
          */
         if (!in_check &&
-            board_has_non_pawn(pos, FLIP_COLOR(pos->stm)) &&
+            pos_has_non_pawn(pos, FLIP_COLOR(pos->stm)) &&
             !is_pawn_push(pos, move) &&
-            !board_move_gives_check(pos, move)) {
+            !pos_move_gives_check(pos, move)) {
             if ((static_score+material_gain(pos, move)+DELTA_MARGIN) < alpha) {
                 continue;
             }
         }
 
         /* Recursivly search the move */
-        if (!board_make_move(pos, move)) {
+        if (!pos_make_move(pos, move)) {
             continue;
         }
         found_move = true;
         score = -quiescence(worker, depth-1, -beta, -alpha);
-        board_unmake_move(pos);
+        pos_unmake_move(pos);
 
         /* Check if we have found a better move */
         if (score > best_score) {
@@ -478,7 +478,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * is hidden just beyond the horizon. Stopping early also allow us
      * to spend more time analyzing other positions.
      */
-    if (!is_root && (board_is_repetition(pos) || (pos->fifty >= 100))) {
+    if (!is_root && (pos_is_repetition(pos) || (pos->fifty >= 100))) {
         return 0;
     }
 
@@ -521,7 +521,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                         static_score > pos->eval_stack[pos->height-2].score);
 
     /* Find out if the side to move is in check */
-    in_check = board_in_check(pos, pos->stm);
+    in_check = pos_in_check(pos, pos->stm);
 
     /* Additional pruning for non-root nodes */
     is_singular = false;
@@ -529,7 +529,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     if (!is_root) {
         /* Reverse futility pruning */
         if ((depth <= FUTILITY_DEPTH) && !in_check && !pv_node &&
-            board_has_non_pawn(pos, pos->stm) &&
+            pos_has_non_pawn(pos, pos->stm) &&
             ((static_score-futility_margin[depth]) >= beta)) {
             return static_score;
         }
@@ -562,12 +562,12 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         if (try_null &&
             !in_check &&
             (depth > NULLMOVE_DEPTH) &&
-            board_has_non_pawn(pos, pos->stm)) {
+            pos_has_non_pawn(pos, pos->stm)) {
             reduction = NULLMOVE_BASE_REDUCTION + depth/NULLMOVE_DIVISOR;
-            board_make_null_move(pos);
+            pos_make_null_move(pos);
             score = -search(worker, depth-reduction-1, -beta, -beta+1, false,
                             NOMOVE);
-            board_unmake_null_move(pos);
+            pos_unmake_null_move(pos);
             if (score >= beta) {
                 /*
                  * Since the score is based on doing a null move a checkmate
@@ -584,7 +584,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
          * relativly safe to skip the search.
          */
         if (!pv_node && !in_check && (depth >= PROBCUT_DEPTH) &&
-            board_has_non_pawn(&worker->pos, pos->stm)) {
+            pos_has_non_pawn(&worker->pos, pos->stm)) {
             threshold = beta + PROBCUT_MARGIN;
 
             select_init_node(&ms, worker, true, in_check, tt_move);
@@ -604,12 +604,12 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                 }
 
                 /* Search the move */
-                if (!board_make_move(pos, move)) {
+                if (!pos_make_move(pos, move)) {
                     continue;
                 }
                 score = -search(worker, depth-PROBCUT_DEPTH+1, -threshold,
                                 -threshold+1, true, NOMOVE);
-                board_unmake_move(pos);
+                pos_unmake_move(pos);
                 if (score >= threshold) {
                     return score;
                 }
@@ -623,7 +623,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             (tt_item.type == TT_BETA) &&
             (tt_item.depth >= (depth-3)) &&
             (abs(beta) < KNOWN_WIN) &&
-            board_is_move_pseudo_legal(pos, tt_move)) {
+            pos_is_move_pseudo_legal(pos, tt_move)) {
             threshold = tt_score-2*depth;
 
             score = search(worker, depth/2, threshold-1, threshold, true,
@@ -670,7 +670,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         }
 
         /* Various move properties */
-        gives_check = board_move_gives_check(pos, move);
+        gives_check = pos_move_gives_check(pos, move);
         tactical = ISTACTICAL(move) || in_check || gives_check;
         history_get_scores(worker, move, &hist, &chist, &fhist);
 
@@ -746,7 +746,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         }
 
         /* Make the move */
-        if (!board_make_move(pos, move)) {
+        if (!pos_make_move(pos, move)) {
             continue;
         }
         movenumber++;
@@ -799,7 +799,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                                 NOMOVE);
             }
         }
-        board_unmake_move(pos);
+        pos_unmake_move(pos);
 
         /* Check if a new best move have been found */
         if (score > best_score) {
@@ -972,7 +972,7 @@ void search_find_best_move(struct search_worker *worker)
     assert(valid_position(&worker->pos));
 
     /* Reset NNUE state */
-    nnue_reset_state(&worker->pos);
+    nnue_reset_accumulator(&worker->pos);
 
     /* Setup the first iteration */
     depth = 1 + worker->id%2;

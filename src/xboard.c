@@ -25,7 +25,7 @@
 #include "config.h"
 #include "utils.h"
 #include "types.h"
-#include "board.h"
+#include "position.h"
 #include "search.h"
 #include "hash.h"
 #include "fen.h"
@@ -169,7 +169,7 @@ static enum game_result is_game_over(struct position *pos)
 	/* Check for checkmate and stalemate */
     gen_legal_moves(pos, &list);
     if (list.size == 0) {
-        return board_in_check(pos, pos->stm)?RESULT_CHECKMATE:RESULT_STALEMATE;
+        return pos_in_check(pos, pos->stm)?RESULT_CHECKMATE:RESULT_STALEMATE;
     }
 
 	/* Check for draw by rul by rule */
@@ -233,15 +233,15 @@ static void make_engine_move(struct gamestate *state)
          * in order to handle the user move and restart the search.
          */
         if (pondering_on != NOMOVE) {
-            board_unmake_move(&state->pos);
+            pos_unmake_move(&state->pos);
             break;
         }
 
         /* Make move */
-        (void)board_make_move(&state->pos, best_move);
+        (void)pos_make_move(&state->pos, best_move);
 
         /* Send move */
-        board_move2str(best_move, best_movestr);
+        pos_move2str(best_move, best_movestr);
         engine_write_command("move %s", best_movestr);
 		tc_stop_clock();
 
@@ -259,9 +259,9 @@ static void make_engine_move(struct gamestate *state)
              * Make the pondering move. If the move causes
              * the game to finish then cancel pondering.
             */
-            (void)board_make_move(&state->pos, ponder_move);
+            (void)pos_make_move(&state->pos, ponder_move);
             if (is_game_over(&state->pos) != RESULT_UNDETERMINED) {
-                board_unmake_move(&state->pos);
+                pos_unmake_move(&state->pos);
                 break;
             }
 
@@ -339,7 +339,7 @@ static void xboard_cmd_bk(struct gamestate *state)
     }
 
     for (k=0;k<nentries;k++) {
-        board_move2str(entries[k].move, movestr);
+        pos_move2str(entries[k].move, movestr);
         engine_write_command(" %s %.0f%%", movestr,
                              ((float)entries[k].weight/(float)sum)*100.0f);
     }
@@ -500,7 +500,7 @@ static void xboard_cmd_memory(char *cmd)
 
 static void xboard_cmd_new(struct gamestate *state)
 {
-    board_start_position(&state->pos);
+    pos_setup_start_position(&state->pos);
     hash_tt_clear_table();
     smp_newgame();
 
@@ -564,8 +564,8 @@ static void xboard_cmd_protover(void)
 static void xboard_cmd_remove(struct gamestate *state)
 {
     if (state->pos.ply >= 2) {
-        board_unmake_move(&state->pos);
-        board_unmake_move(&state->pos);
+        pos_unmake_move(&state->pos);
+        pos_unmake_move(&state->pos);
     }
 
     game_over = is_game_over(&state->pos) != RESULT_UNDETERMINED;
@@ -593,7 +593,7 @@ static void xboard_cmd_setboard(char *cmd, struct gamestate *state)
         return;
     }
 
-    if (!board_setup_from_fen(&state->pos, iter+1)) {
+    if (!pos_setup_from_fen(&state->pos, iter+1)) {
         engine_write_command("tellusererror Illegal position");
     }
 }
@@ -632,7 +632,7 @@ static void xboard_cmd_undo(struct gamestate *state)
 {
     if (force_mode || analyze_mode) {
         if (state->pos.ply >= 1) {
-            board_unmake_move(&state->pos);
+            pos_unmake_move(&state->pos);
         }
     } else {
         engine_write_command("Error (command not legal now): undo");
@@ -655,14 +655,14 @@ static void xboard_cmd_usermove(char *cmd, struct gamestate *state,
         engine_write_command("Error (malformed command): %s", cmd);
         return;
     }
-    move = board_str2move(iter+1, &state->pos);
+    move = pos_str2move(iter+1, &state->pos);
     if (move == NOMOVE) {
         engine_write_command("Illegal move: %s", cmd);
         return;
     }
 
     /* Make the move */
-    if (!board_make_move(&state->pos, move)) {
+    if (!pos_make_move(&state->pos, move)) {
         engine_write_command("Illegal move: %s", cmd);
         return;
     }
@@ -861,7 +861,7 @@ bool xboard_check_input(struct search_worker *worker)
                 return false;
             }
             iter++;
-            board_move2str(pondering_on, movestr);
+            pos_move2str(pondering_on, movestr);
             if (!strcmp(movestr, iter) && (strlen(movestr) == strlen(iter))) {
                 pondering_on = NOMOVE;
             } else {
@@ -913,7 +913,7 @@ void xboard_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
     pv = &pvinfo->pv;
     for (k=0;k<pv->size;k++) {
         strcat(buffer, " ");
-        board_move2str(pv->moves[k], movestr);
+        pos_move2str(pv->moves[k], movestr);
         strcat(buffer, movestr);
     }
     engine_write_command(buffer);

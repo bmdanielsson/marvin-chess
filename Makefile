@@ -133,7 +133,6 @@ endif
 
 # Sources
 SOURCES = src/bitboard.c \
-          src/board.c \
           src/data.c \
           src/debug.c \
           src/egtb.c \
@@ -149,6 +148,7 @@ SOURCES = src/bitboard.c \
           src/moveselect.c \
           src/nnue.c \
           src/polybook.c \
+          src/position.c \
           src/search.c \
           src/see.c \
           src/simd.c \

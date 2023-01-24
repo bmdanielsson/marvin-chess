@@ -23,7 +23,7 @@
 #include "see.h"
 #include "hash.h"
 #include "eval.h"
-#include "board.h"
+#include "position.h"
 #include "history.h"
 
 /*
@@ -196,7 +196,7 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
         ms->phase++;
         killer = ms->killer;
         if ((killer != NOMOVE) && (killer != ms->ttmove) &&
-            board_is_move_pseudo_legal(pos, killer)) {
+            pos_is_move_pseudo_legal(pos, killer)) {
             *move = killer;
             return true;
         }
@@ -206,7 +206,7 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
         counter = ms->counter;
         if ((counter != NOMOVE) && (counter != ms->ttmove) &&
             (counter != ms->killer) &&
-            board_is_move_pseudo_legal(pos, counter)) {
+            pos_is_move_pseudo_legal(pos, counter)) {
             *move = counter;
             return true;
         }
@@ -260,7 +260,7 @@ void select_init_node(struct moveselector *ms, struct search_worker *worker,
     ms->phase = PHASE_TT;
     ms->tactical_only = tactical_only;
     ms->underpromote = !tactical_only;
-    if ((ttmove == NOMOVE) || !board_is_move_pseudo_legal(pos, ttmove)) {
+    if ((ttmove == NOMOVE) || !pos_is_move_pseudo_legal(pos, ttmove)) {
         ms->ttmove = NOMOVE;
     } else if (tactical_only && !in_check && !ISTACTICAL(ttmove)) {
         ms->ttmove = NOMOVE;

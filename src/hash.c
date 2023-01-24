@@ -25,7 +25,7 @@
 #include "hash.h"
 #include "validation.h"
 #include "search.h"
-#include "board.h"
+#include "position.h"
 #include "utils.h"
 #include "smp.h"
 #include "config.h"
