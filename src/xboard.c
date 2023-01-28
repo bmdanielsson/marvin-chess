@@ -184,9 +184,9 @@ static enum game_result is_game_over(struct position *pos)
 
 static void make_engine_move(struct gamestate *state)
 {
-    uint32_t         best_move;
+    uint32_t         best_move = NOMOVE;
     char             best_movestr[MAX_MOVESTR_LENGTH];
-    uint32_t         ponder_move;
+    uint32_t         ponder_move = NOMOVE;
     enum game_result result;
     bool             ponder;
     int              flags;
@@ -223,9 +223,14 @@ static void make_engine_move(struct gamestate *state)
         tc_configure_time_control(engine_time_left, engine_time_increment,
                                   moves_to_time_control, flags);
 
-        /* Search the position to find the best move */
-        best_move = smp_search(state, ponder_mode && ponder, true,
-                               &ponder_move);
+        /* Try to find a move in the opening book */
+        best_move = polybook_probe(&state->pos);
+
+        /* Search the position for a move */
+        if (best_move == NOMOVE) {
+            best_move = search_position(state, ponder_mode && ponder,
+                                        &ponder_move);
+        }
 
         /*
          * If the search finishes while the engine is pondering
@@ -290,7 +295,7 @@ static void xboard_cmd_analyze(struct gamestate *state)
         tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
 
         /* Search until told otherwise */
-        (void)smp_search(state, false, false, NULL);
+        (void)search_position(state, false, NULL);
 
         /* Exit analyze mode if there is no pending command */
         cmd = engine_get_pending_command();

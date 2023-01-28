@@ -46,10 +46,14 @@
 void search_init(void);
 
 /*
- * Called to starta search for a specific worker.
+ * Search the position..
  *
- * @param worker The worker.
+ * @param state The current game state.
+ * @param pondering Flag indicating if a ponder search should be done.
+ * @param ponder_move Optional location to store a ponder move at.
+ * @return Returns the best move in the position.
  */
-void search_find_best_move(struct search_worker *worker);
+uint32_t search_position(struct gamestate *state, bool pondering,
+                         uint32_t *ponder_move);
 
 #endif

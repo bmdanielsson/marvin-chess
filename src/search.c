@@ -41,6 +41,7 @@
 #include "history.h"
 #include "nnue.h"
 #include "data.h"
+#include "smp.h"
 
 /* Calculates if it is time to check the clock and poll for commands */
 #define CHECKUP(n) (((n)&1023)==0)
@@ -951,23 +952,12 @@ static void search_aspiration_window(struct search_worker *worker, int depth,
     }
 }
 
-void search_init(void)
+static thread_retval_t worker_search_func(void *data)
 {
-    int k;
-    int l;
-
-    for (k=1;k<64;k++) {
-        for (l=1;l<64;l++) {
-            lmr_reductions[k][l] = 0.5 + log(k)*log(l)/2.0;
-        }
-    }
-}
-
-void search_find_best_move(struct search_worker *worker)
-{
-    int score;
-    int depth;
-    int mpvidx;
+    struct search_worker *worker = data;
+    int                  score;
+    int                  depth;
+    int                  mpvidx;
 
     assert(valid_position(&worker->pos));
 
@@ -1047,4 +1037,161 @@ void search_find_best_move(struct search_worker *worker)
 			smp_stop_all();
 		}
 	}
+
+    return (thread_retval_t)0;
+}
+
+void search_init(void)
+{
+    int k;
+    int l;
+
+    for (k=1;k<64;k++) {
+        for (l=1;l<64;l++) {
+            lmr_reductions[k][l] = 0.5 + log(k)*log(l)/2.0;
+        }
+    }
+}
+
+uint32_t search_position(struct gamestate *state, bool pondering,
+                         uint32_t *ponder_move)
+{
+    int                  k;
+    struct search_worker *worker;
+    struct pvinfo        *best_pv;
+    struct movelist      legal;
+    bool                 send_pv;
+    uint32_t             best_move;
+    uint32_t             move;
+
+    assert(state != NULL);
+    assert(valid_position(&state->pos));
+    assert(smp_number_of_workers() > 0);
+
+    /* Reset the best move information */
+    best_move = NOMOVE;
+    if (ponder_move != NULL) {
+        *ponder_move = NOMOVE;
+    }
+
+	/*
+	 * Allocate time for the search. In pondering mode time
+     * is allocated when the engine stops pondering and
+     * enters the normal search.
+	 */
+	if (!pondering) {
+		tc_allocate_time();
+	}
+
+    /* Prepare for search */
+    hash_tt_age_table();
+    state->probe_wdl = true;
+    state->root_in_tb = false;
+    state->root_tb_score = 0;
+    state->pondering = pondering;
+    state->pos.height = 0;
+    state->completed_depth = 0;
+
+    /* Probe tablebases for the root position */
+    if (egtb_should_probe(&state->pos) &&
+        (state->move_filter.size == 0) &&
+        (state->multipv == 1)) {
+        state->root_in_tb = egtb_probe_dtz_tables(&state->pos, &move,
+                                                  &state->root_tb_score);
+        if (state->root_in_tb) {
+            state->move_filter.moves[0] = move;
+            state->move_filter.size = 1;
+        }
+        state->probe_wdl = !state->root_in_tb;
+    }
+
+    /*
+     * Initialize the best move to the first legal root
+     * move to make sure a legal move is always returned.
+     */
+    gen_legal_moves(&state->pos, &legal);
+    if (legal.size == 0) {
+        return NOMOVE;
+    }
+    if (state->move_filter.size == 0) {
+        best_move = legal.moves[0];
+    } else {
+        best_move = state->move_filter.moves[0];
+    }
+
+    /* Check if the number of multipv lines have to be reduced */
+    state->multipv = MIN(state->multipv, legal.size);
+    if (state->move_filter.size > 0) {
+        state->multipv = MIN(state->multipv, state->move_filter.size);
+    }
+
+    /*
+     * If there is only one legal move then there is no
+     * need to do a search. Instead save the time for later.
+     */
+    if ((legal.size == 1) &&
+        !state->pondering &&
+        ((tc_get_flags()&TC_TIME_LIMIT) != 0) &&
+        ((tc_get_flags()&(TC_INFINITE_TIME|TC_FIXED_TIME)) == 0)) {
+        return best_move;
+    }
+
+    /* Prepare workers for a new search */
+    smp_prepare_workers(state);
+
+    /* Start helpers */
+    for (k=1;k<smp_number_of_workers();k++) {
+        smp_start_worker(smp_get_worker(k), (thread_func_t)worker_search_func);
+    }
+
+    /* Start the master worker thread */
+    (void)worker_search_func(smp_get_worker(0));
+
+    /* Wait for all helpers to finish */
+    for (k=1;k<smp_number_of_workers();k++) {
+        smp_wait_for_worker(smp_get_worker(k));
+    }
+
+    /* Find the worker with the best move */
+    worker = smp_get_worker(0);
+    best_pv = &worker->mpv_lines[0];
+    send_pv = false;
+    if (state->multipv == 1) {
+        for (k=1;k<smp_number_of_workers();k++) {
+            worker = smp_get_worker(k);
+            if (worker->mpv_lines[0].pv.size < 1) {
+                continue;
+            }
+            if ((worker->mpv_lines[0].depth >= best_pv->depth) ||
+                ((worker->mpv_lines[0].depth == best_pv->depth) &&
+                 (worker->mpv_lines[0].score > best_pv->score))) {
+                best_pv = &worker->mpv_lines[0];
+                send_pv = true;
+            }
+        }
+    }
+
+    /*
+     * If the best worker is not the first worker then send
+     * an extra pv line to the GUI.
+     */
+    if (send_pv) {
+        engine_send_pv_info(state, best_pv);
+    }
+
+    /* Get the best move and the ponder move */
+    if (best_pv->pv.size >= 1) {
+        best_move = best_pv->pv.moves[0];
+        if (ponder_move != NULL) {
+            *ponder_move = (best_pv->pv.size > 1)?best_pv->pv.moves[1]:NOMOVE;
+        }
+    }
+
+    /* Reset move filter since it's not needed anymore */
+    state->move_filter.size = 0;
+
+    /* Reset workers */
+    smp_reset_workers();
+
+    return best_move;
 }

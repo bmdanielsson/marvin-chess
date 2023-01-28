@@ -28,7 +28,6 @@
 #include "search.h"
 #include "engine.h"
 #include "validation.h"
-#include "polybook.h"
 #include "bitboard.h"
 #include "position.h"
 #include "history.h"
@@ -44,60 +43,6 @@ static atomic_bool should_stop = false;
 /* Data for worker threads */
 static int number_of_workers = 0;
 static struct search_worker *workers = NULL;
-
-static thread_retval_t worker_thread_func(void *data)
-{
-    struct search_worker *worker = data;
-
-    search_find_best_move(worker);
-
-    return (thread_retval_t)0;
-}
-
-static void prepare_worker(struct search_worker *worker,
-                           struct gamestate *state)
-{
-    int mpvidx;
-
-    /* Copy data from game state */
-    worker->pos = state->pos;
-
-    /* Clear tables */
-    killer_clear_table(worker);
-    counter_clear_table(worker);
-
-    /* Clear statistics */
-    worker->nodes = 0;
-    worker->qnodes = 0;
-    worker->tbhits = 0ULL;
-
-    /* Clear best move information */
-    for (mpvidx=0;mpvidx<state->multipv;mpvidx++) {
-        worker->mpv_moves[mpvidx] = NOMOVE;
-        worker->mpv_lines[mpvidx].score = -INFINITE_SCORE;
-        worker->mpv_lines[mpvidx].pv.size = 0;
-        worker->mpv_lines[mpvidx].depth = 0;
-        worker->mpv_lines[mpvidx].seldepth = 0;
-    }
-
-    /* Clear multipv information */
-    worker->multipv = state->multipv;
-
-    /* Initialize helper variables */
-    worker->resolving_root_fail = false;
-
-    /* Setup parent pointers */
-    worker->state = state;
-    worker->pos.state = state;
-    worker->pos.worker = worker;
-}
-
-static void reset_worker(struct search_worker *worker)
-{
-    worker->state = NULL;
-    worker->pos.state = NULL;
-    worker->pos.worker = NULL;
-}
 
 void smp_init(void)
 {
@@ -138,9 +83,84 @@ void smp_destroy_workers(void)
     number_of_workers = 0;
 }
 
+void smp_prepare_workers(struct gamestate *state)
+{
+    struct search_worker *worker;
+    int                  mpvidx;
+    int                  k;
+
+    should_stop = false;
+    for (k=0;k<number_of_workers;k++) {
+        worker = &workers[k];
+
+        /* Copy data from game state */
+        worker->pos = state->pos;
+
+        /* Clear tables */
+        killer_clear_table(worker);
+        counter_clear_table(worker);
+
+        /* Clear statistics */
+        worker->nodes = 0;
+        worker->qnodes = 0;
+        worker->tbhits = 0ULL;
+
+        /* Clear best move information */
+        for (mpvidx=0;mpvidx<state->multipv;mpvidx++) {
+            worker->mpv_moves[mpvidx] = NOMOVE;
+            worker->mpv_lines[mpvidx].score = -INFINITE_SCORE;
+            worker->mpv_lines[mpvidx].pv.size = 0;
+            worker->mpv_lines[mpvidx].depth = 0;
+            worker->mpv_lines[mpvidx].seldepth = 0;
+        }
+
+        /* Clear multipv information */
+        worker->multipv = state->multipv;
+
+        /* Initialize helper variables */
+        worker->resolving_root_fail = false;
+
+        /* Setup parent pointers */
+        worker->state = state;
+        worker->pos.state = state;
+        worker->pos.worker = worker;
+    }
+}
+
+void smp_reset_workers(void)
+{
+    struct search_worker *worker;
+    int                  k;
+
+    for (k=0;k<number_of_workers;k++) {
+        worker = &workers[k];
+
+        worker->state = NULL;
+        worker->pos.state = NULL;
+        worker->pos.worker = NULL;
+    }
+}
+
+struct search_worker* smp_get_worker(int idx)
+{
+    assert((idx > 0) && (idx < number_of_workers));
+
+    return &workers[idx];
+}
+
 int smp_number_of_workers(void)
 {
     return number_of_workers;
+}
+
+void smp_start_worker(struct search_worker *worker, thread_func_t func)
+{
+    thread_create(&worker->thread, func, worker);
+}
+
+void smp_wait_for_worker(struct search_worker *worker)
+{
+    thread_join(&worker->thread);
 }
 
 void smp_newgame(void)
@@ -150,163 +170,6 @@ void smp_newgame(void)
     for (k=0;k<number_of_workers;k++) {
         history_clear_tables(&workers[k]);
     }
-}
-
-uint32_t smp_search(struct gamestate *state, bool pondering, bool use_book,
-                    uint32_t *ponder_move)
-{
-    int                  k;
-    struct search_worker *worker;
-    struct pvinfo        *best_pv;
-    struct movelist      legal;
-    bool                 send_pv;
-    uint32_t             best_move;
-    uint32_t             move;
-
-    assert(valid_position(&state->pos));
-    assert(number_of_workers > 0);
-    assert(workers != NULL);
-
-    /* Reset the best move information */
-    best_move = NOMOVE;
-    if (ponder_move != NULL) {
-        *ponder_move = NOMOVE;
-    }
-
-    /* Try to find a move in the opening book */
-    if (use_book) {
-        best_move = polybook_probe(&state->pos);
-        if (best_move != NOMOVE) {
-            return best_move;
-        }
-    }
-
-	/*
-	 * Allocate time for the search. In pondering mode time
-     * is allocated when the engine stops pondering and
-     * enters the normal search.
-	 */
-	if (!pondering) {
-		tc_allocate_time();
-	}
-
-    /* Prepare for search */
-    hash_tt_age_table();
-    state->probe_wdl = true;
-    state->root_in_tb = false;
-    state->root_tb_score = 0;
-    state->pondering = pondering;
-    state->pos.height = 0;
-    state->completed_depth = 0;
-
-    /* Probe tablebases for the root position */
-    if (egtb_should_probe(&state->pos) &&
-        (state->move_filter.size == 0) &&
-        (state->multipv == 1)) {
-        state->root_in_tb = egtb_probe_dtz_tables(&state->pos, &move,
-                                                  &state->root_tb_score);
-        if (state->root_in_tb) {
-            state->move_filter.moves[0] = move;
-            state->move_filter.size = 1;
-        }
-        state->probe_wdl = !state->root_in_tb;
-    }
-
-    /*
-     * Initialize the best move to the first legal root
-     * move to make sure a legal move is always returned.
-     */
-    gen_legal_moves(&state->pos, &legal);
-    if (legal.size == 0) {
-        return NOMOVE;
-    }
-    if (state->move_filter.size == 0) {
-        best_move = legal.moves[0];
-    } else {
-        best_move = state->move_filter.moves[0];
-    }
-
-    /* Check if the number of multipv lines have to be reduced */
-    state->multipv = MIN(state->multipv, legal.size);
-    if (state->move_filter.size > 0) {
-        state->multipv = MIN(state->multipv, state->move_filter.size);
-    }
-
-    /*
-     * If there is only one legal move then there is no
-     * need to do a search. Instead save the time for later.
-     */
-    if ((legal.size == 1) &&
-        !state->pondering &&
-        ((tc_get_flags()&TC_TIME_LIMIT) != 0) &&
-        ((tc_get_flags()&(TC_INFINITE_TIME|TC_FIXED_TIME)) == 0)) {
-        return best_move;
-    }
-
-    /* Prepare workers for a new search */
-    for (k=0;k<number_of_workers;k++) {
-        prepare_worker(&workers[k], state);
-    }
-
-    /* Start helpers */
-    should_stop = false;
-    for (k=1;k<number_of_workers;k++) {
-        thread_create(&workers[k].thread, (thread_func_t)worker_thread_func,
-                      &workers[k]);
-    }
-
-    /* Start the master worker thread */
-    search_find_best_move(&workers[0]);
-
-    /* Wait for all helpers to finish */
-    for (k=1;k<number_of_workers;k++) {
-        thread_join(&workers[k].thread);
-    }
-
-    /* Find the worker with the best move */
-    worker = &workers[0];
-    best_pv = &worker->mpv_lines[0];
-    send_pv = false;
-    if (state->multipv == 1) {
-        for (k=1;k<number_of_workers;k++) {
-            worker = &workers[k];
-            if (worker->mpv_lines[0].pv.size < 1) {
-                continue;
-            }
-            if ((worker->mpv_lines[0].depth >= best_pv->depth) ||
-                ((worker->mpv_lines[0].depth == best_pv->depth) &&
-                 (worker->mpv_lines[0].score > best_pv->score))) {
-                best_pv = &worker->mpv_lines[0];
-                send_pv = true;
-            }
-        }
-    }
-
-    /*
-     * If the best worker is not the first worker then send
-     * an extra pv line to the GUI.
-     */
-    if (send_pv) {
-        engine_send_pv_info(state, best_pv);
-    }
-
-    /* Get the best move and the ponder move */
-    if (best_pv->pv.size >= 1) {
-        best_move = best_pv->pv.moves[0];
-        if (ponder_move != NULL) {
-            *ponder_move = (best_pv->pv.size > 1)?best_pv->pv.moves[1]:NOMOVE;
-        }
-    }
-
-    /* Reset move filter since it's not needed anymore */
-    state->move_filter.size = 0;
-
-    /* Reset workers */
-    for (k=0;k<number_of_workers;k++) {
-        reset_worker(&workers[k]);
-    }
-
-    return best_move;
 }
 
 uint64_t smp_nodes(void)

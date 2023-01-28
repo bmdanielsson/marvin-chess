@@ -181,7 +181,7 @@ void test_run_benchmark(void)
         state->exit_on_mate = true;
 
         start = get_current_time();
-        (void)smp_search(state, false, false, NULL);
+        (void)search_position(state, false, NULL);
         total += (get_current_time() - start);
         nodes += smp_nodes();
 

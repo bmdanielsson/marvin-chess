@@ -37,6 +37,7 @@
 #include "egtb.h"
 #include "smp.h"
 #include "nnue.h"
+#include "polybook.h"
 
 /* Different UCI modes */
 static bool ponder_mode = false;
@@ -67,8 +68,8 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     bool     ponder = false;
     uint32_t move;
     bool     skip_book = false;
-    uint32_t best_move;
-    uint32_t ponder_move;
+    uint32_t best_move = NOMOVE;
+    uint32_t ponder_move = NOMOVE;
 
     /* Start the clock */
     tc_start_clock();
@@ -213,9 +214,15 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     }
     tc_configure_time_control(movetime, moveinc, movestogo, flags);
 
+    /* Try to find a move in the opening book */
+    if (own_book_mode && !skip_book) {
+        best_move = polybook_probe(&state->pos);
+    }
+
     /* Search the position for a move */
-    best_move = smp_search(state, ponder && ponder_mode,
-                           own_book_mode && !skip_book, &ponder_move);
+    if (best_move == NOMOVE) {
+        best_move = search_position(state, ponder && ponder_mode, &ponder_move);
+    }
 
     /* Send the best move */
     pos_move2str(best_move, best_movestr);

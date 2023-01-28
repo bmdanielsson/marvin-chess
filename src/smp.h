@@ -19,6 +19,7 @@
 #define SMP_H
 
 #include "types.h"
+#include "thread.h"
 
 /* Initilaize the SMP component */
 void smp_init(void);
@@ -37,26 +38,47 @@ void smp_create_workers(int nthreads);
 void smp_destroy_workers(void);
 
 /*
+ * Prepare all workers for a new search.
+ *
+ * @param state The current game state.
+ */
+void smp_prepare_workers(struct gamestate *state);
+
+/* Reset all workers */
+void smp_reset_workers(void);
+
+/*
+ * Get a pointer to the worker at a given index.
+ *
+ * @param idx Index of the worker to get.
+ * @return Returns the worker at the spcified index.
+ */
+struct search_worker* smp_get_worker(int idx);
+
+/*
  * Get the number of workers being used.
  *
  * @return Returns the number of workers.
  */
 int smp_number_of_workers(void);
 
-/* Indicate the start of a new game */
-void smp_newgame(void);
+/*
+ * Start a worker.
+ *
+ * @param worker The worker to start.
+ * @param func The search function.
+ * */
+void smp_start_worker(struct search_worker *worker, thread_func_t func);
 
 /*
- * Start a new search.
+ * Wait for a worker to stop searching.
  *
- * @param state The game state.
- * @param pondering If a pindering search should be started.
- * @param use_book If the opening book should be used.
- * @param ponder_move Optional location to store ponder move at.
- * @return Returns the best move in the position.
- */
-uint32_t smp_search(struct gamestate *state, bool pondering, bool use_book,
-                    uint32_t *ponder_move);
+ * @param worker The worker to wait for.
+ * */
+void smp_wait_for_worker(struct search_worker *worker);
+
+/* Indicate the start of a new game */
+void smp_newgame(void);
 
 /*
  * The number of nodes searched.
