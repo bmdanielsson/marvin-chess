@@ -925,6 +925,7 @@ int eval_evaluate(struct position *pos, bool force_hce)
         if ((pos->worker == NULL) ||
             !hash_nnue_lookup(pos->worker, &nnue_score)) {
             nnue_score = nnue_evaluate(pos);
+            nnue_score = (nnue_score*361)/410;
             if (pos->worker != NULL) {
                 hash_nnue_store(pos->worker, nnue_score);
             }
