@@ -143,7 +143,7 @@ void smp_reset_workers(void)
 
 struct search_worker* smp_get_worker(int idx)
 {
-    assert((idx > 0) && (idx < number_of_workers));
+    assert((idx >= 0) && (idx < number_of_workers));
 
     return &workers[idx];
 }
