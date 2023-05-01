@@ -25,6 +25,9 @@
 #ifdef USE_AVX2
 #include <immintrin.h>
 #endif
+#ifdef USE_NEON
+#include <arm_neon.h>
+#endif
 
 #include "simd.h"
 #include "utils.h"
@@ -32,6 +35,8 @@
 #if defined(USE_AVX2)
 #define MIN_SIZE 32
 #elif defined(USE_SSE)
+#define MIN_SIZE 16
+#elif defined(USE_NEON)
 #define MIN_SIZE 16
 #else
 #define MIN_SIZE 1
@@ -124,6 +129,30 @@ void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
     for (;k<MIN_SIZE-(noutputs%MIN_SIZE);k++) {
         output[k] = 0;
     }
+#elif defined(USE_NEON)
+    int k;
+    int l;
+    int niterations = ninputs/16;
+
+    for (k=0;k<noutputs;k++) {
+        int8x8_t *pi = (int8x8_t*)input;
+        int8x8_t *pw = (int8x8_t*)&weights[k*ninputs];
+
+        int16x8_t temp = vmull_s8(*(pi++), *(pw++));
+        temp = vmlal_s8(temp, *(pi++), *(pw++));
+        int32x4_t vsum = vpaddlq_s16(temp);
+
+        for (l=1;l<niterations;l++) {
+            temp = vmull_s8(*(pi++), *(pw++));
+            temp = vmlal_s8(temp, *(pi++), *(pw++));
+            vsum = vpadalq_s16(vsum, temp);
+        }
+
+        output[k] = vaddvq_s32(vsum) + biases[k];
+    }
+    for (;k<MIN_SIZE-(noutputs%MIN_SIZE);k++) {
+        output[k] = 0;
+    }
 #else
     int k;
     int l;
@@ -147,7 +176,7 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
     __m256i *pi = (__m256i*)input;
     __m256i *po = (__m256i*)output;
 
-    __m256i c0 = _mm256_set1_epi8(0);
+    __m256i min = _mm256_set1_epi8(0);
     __m256i idx = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
 
     for (k=0;k<niterations/4;k++) {
@@ -163,7 +192,7 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
 
         __m256i v8 = _mm256_packs_epi16(v16_1, v16_2);
         __m256i s = _mm256_permutevar8x32_epi32(v8, idx);
-        s = _mm256_max_epi8(s, c0);
+        s = _mm256_max_epi8(s, min);
         _mm256_store_si256(po++, s);
     }
 #elif defined(USE_SSE)
@@ -173,34 +202,57 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
     __m128i *pi = (__m128i*)input;
     __m128i *po = (__m128i*)output;
 
-    __m128i c0 = _mm_set1_epi32(0);
-    __m128i c127 = _mm_set1_epi32((int)MAX_QUANTIZED_ACTIVATION);
+    __m128i min = _mm_set1_epi32(0);
+    __m128i max = _mm_set1_epi32((int)MAX_QUANTIZED_ACTIVATION);
 
     for (k=0;k<niterations/4;k++) {
         __m128i v1 = _mm_load_si128(pi++);
         v1 = _mm_srai_epi32(v1, shift);
-        v1 = _mm_max_epi32(v1, c0);
-        v1 = _mm_min_epi32(v1, c127);
+        v1 = _mm_max_epi32(v1, min);
+        v1 = _mm_min_epi32(v1, max);
 
         __m128i v2 = _mm_load_si128(pi++);
         v2 = _mm_srai_epi32(v2, shift);
-        v2 = _mm_max_epi32(v2, c0);
-        v2 = _mm_min_epi32(v2, c127);
+        v2 = _mm_max_epi32(v2, min);
+        v2 = _mm_min_epi32(v2, max);
 
         __m128i o1 =  _mm_packs_epi32(v1, v2);
         v1 = _mm_load_si128(pi++);
         v1 = _mm_srai_epi32(v1, shift);
-        v1 = _mm_max_epi32(v1, c0);
-        v1 = _mm_min_epi32(v1, c127);
+        v1 = _mm_max_epi32(v1, min);
+        v1 = _mm_min_epi32(v1, max);
 
         v2 = _mm_load_si128(pi++);
         v2 = _mm_srai_epi32(v2, shift);
-        v2 = _mm_max_epi32(v2, c0);
-        v2 = _mm_min_epi32(v2, c127);
+        v2 = _mm_max_epi32(v2, min);
+        v2 = _mm_min_epi32(v2, max);
 
         __m128i o2 =  _mm_packs_epi32(v1, v2);
         __m128i o =  _mm_packs_epi16(o1, o2);
         _mm_store_si128(po++, o);
+    }
+#elif defined(USE_NEON)
+    int k;
+    int niterations = nvalues/16;
+
+    int32x4_t *pi = (int32x4_t*)input;
+    int8x16_t *po = (int8x16_t*)output;
+
+    int16x8_t min = vmovq_n_s16(0);
+    int16x8_t max = vmovq_n_s16((int16_t)MAX_QUANTIZED_ACTIVATION);
+
+    for (k=0;k<niterations;k++) {
+        int16x8_t lower = vcombine_s16(vshrn_n_s32(*(pi++), shift),
+                                       vshrn_n_s32(*(pi++), shift));
+        lower = vminq_s16(lower, max);
+        lower = vmaxq_s16(lower, min);
+
+        int16x8_t upper = vcombine_s16(vshrn_n_s32(*(pi++), shift),
+                                       vshrn_n_s32(*(pi++), shift));
+        upper = vminq_s16(upper, max);
+        upper = vmaxq_s16(upper, min);
+
+        *(po++) = vcombine_s8(vmovn_s16(lower), vmovn_s16(upper));
     }
 #else
     int k;
@@ -220,14 +272,14 @@ void simd_clamp(int16_t *input, uint8_t *output, int nvalues)
     __m256i *pi = (__m256i*)input;
     __m256i *po = (__m256i*)output;
 
-    __m256i c0 = _mm256_set1_epi8(0);
+    __m256i min = _mm256_set1_epi8(0);
 
     for (k=0;k<niterations/2;k++) {
         __m256i v1 = _mm256_load_si256(pi++);
         __m256i v2 = _mm256_load_si256(pi++);
         __m256i v8 = _mm256_packs_epi16(v1, v2);
         __m256i s = _mm256_permute4x64_epi64(v8, 0xD8);
-        s = _mm256_max_epi8(s, c0);
+        s = _mm256_max_epi8(s, min);
         _mm256_store_si256(po++, s);
     }
 #elif defined(USE_SSE)
@@ -237,14 +289,33 @@ void simd_clamp(int16_t *input, uint8_t *output, int nvalues)
     __m128i *pi = (__m128i*)input;
     __m128i *po = (__m128i*)output;
 
-    __m128i c0 = _mm_set1_epi16(0);
+    __m128i min = _mm_set1_epi16(0);
 
     for (k=0;k<niterations/2;k++) {
         __m128i v1 = _mm_load_si128(pi++);
         __m128i v2 = _mm_load_si128(pi++);
         __m128i v8 = _mm_packs_epi16(v1, v2);
-        __m128i s = _mm_max_epi8(v8, c0);
+        __m128i s = _mm_max_epi8(v8, min);
         _mm_store_si128(po++, s);
+    }
+#elif defined(USE_NEON)
+    int k;
+    int niterations = nvalues/16;
+
+    int16x8_t *pi = (int16x8_t*)input;
+    int8x16_t *po = (int8x16_t*)output;
+
+    int16x8_t min = vmovq_n_s16(0);
+    int16x8_t max = vmovq_n_s16((int16_t)MAX_QUANTIZED_ACTIVATION);
+
+    for (k=0;k<niterations;k++) {
+        int16x8_t lower = vminq_s16(*(pi++), max);
+        lower = vmaxq_s16(lower, min);
+
+        int16x8_t upper = vminq_s16(*(pi++), max);
+        upper = vmaxq_s16(upper, min);
+
+        *(po++) = vcombine_s8(vmovn_s16(lower), vmovn_s16(upper));
     }
 #else
     int k;
@@ -277,6 +348,16 @@ void simd_copy(int16_t *from, int16_t *to, int nvalues)
     for (k=0;k<niterations;k++) {
         pt[k] = _mm_load_si128(pf++);
     }
+#elif defined(USE_NEON)
+    int k;
+    int niterations = nvalues/8;
+
+    int16x8_t *pt = (int16x8_t*)to;
+
+    for (k=0;k<niterations;k++) {
+        pt[k] = vld1q_s16(from);
+        from += 8;
+    }
 #else
     int k;
 
@@ -308,6 +389,16 @@ void simd_add(int16_t *from, int16_t *to, int nvalues)
     for (k=0;k<niterations;k++) {
         pt[k] = _mm_add_epi16(pf[k], pt[k]);
     }
+#elif defined(USE_NEON)
+    int k;
+    int niterations = nvalues/8;
+
+    int16x8_t *pf = (int16x8_t*)from;
+    int16x8_t *pt = (int16x8_t*)to;
+
+    for (k=0;k<niterations;k++) {
+        pt[k] = vaddq_s16(pt[k], pf[k]);
+    }
 #else
     int k;
 
@@ -338,6 +429,16 @@ void simd_sub(int16_t *from, int16_t *to, int nvalues)
 
     for (k=0;k<niterations;k++) {
         pt[k] = _mm_sub_epi16(pt[k], pf[k]);
+    }
+#elif defined(USE_NEON)
+    int k;
+    int niterations = nvalues/8;
+
+    int16x8_t *pf = (int16x8_t*)from;
+    int16x8_t *pt = (int16x8_t*)to;
+
+    for (k=0;k<niterations;k++) {
+        pt[k] = vsubq_s16(pt[k], pf[k]);
     }
 #else
     int k;

@@ -10,26 +10,32 @@ sse2 = no
 ssse3 = no
 sse41 = no
 avx2 = no
-popcnt = no
 
 # Set options based on selected architecture
 .PHONY : arch
 ifeq ($(arch), generic-64)
     APP_ARCH = \"generic-64\"
+    CPPFLAGS += -DIS_64BIT -DTB_NO_HW_POP_COUNT
+    CFLAGS += -m64
+    LDFLAGS += -m64
 else
 ifeq ($(arch), x86-64)
     sse = yes
     sse2 = yes
     APP_ARCH = \"x86-64\"
+    CPPFLAGS += -DIS_64BIT -DTB_NO_HW_POP_COUNT
+    CFLAGS += -m64
+    LDFLAGS += -m64
 else
 ifeq ($(arch), x86-64-modern)
     sse = yes
     sse2 = yes
     ssse3 = yes
     sse41 = yes
-    popcnt = yes
     APP_ARCH = \"x86-64-modern\"
-    CPPFLAGS += -DUSE_SSE
+    CPPFLAGS += -DUSE_SSE -DIS_64BIT -DUSE_POPCNT
+    CFLAGS += -m64 -msse3 -mpopcnt
+    LDFLAGS += -m64
 else
 ifeq ($(arch), x86-64-avx2)
     sse = yes
@@ -39,19 +45,23 @@ ifeq ($(arch), x86-64-avx2)
     avx2 = yes
     popcnt = yes
     APP_ARCH = \"x86-64-avx2\"
-    CPPFLAGS += -DUSE_AVX2
+    CPPFLAGS += -DUSE_AVX2 -DIS_64BIT -DUSE_POPCNT
+    CFLAGS += -m64 -msse3 -mpopcnt
+    LDFLAGS += -m64
+else
+ifeq ($(arch), aarch64)
+    APP_ARCH = \"aarch64\"
+    CPPFLAGS += -DIS_64BIT -DUSE_POPCNT -DUSE_NEON
+endif
 endif
 endif
 endif
 endif
 
 # Common flags
-ARCH += -m64
 CPPFLAGS += -DAPP_ARCH=$(APP_ARCH)
 CPPFLAGS += -DNETFILE_NAME=\"$(nnuenet)\"
 CPPFLAGS += -DAPP_VERSION=\"$(version)\"
-CFLAGS += -m64 -DIS_64BIT
-LDFLAGS += -m64
 
 # Set compiler flags based on options
 .PHONY : sse
@@ -73,13 +83,6 @@ endif
 .PHONY : avx2
 ifeq ($(avx2), yes)
     CFLAGS += -mavx2
-endif
-.PHONY : popcnt
-ifeq ($(popcnt), yes)
-    CPPFLAGS += -DUSE_POPCNT
-    CFLAGS += -msse3 -mpopcnt
-else
-    CPPFLAGS += -DTB_NO_HW_POP_COUNT
 endif
 
 # Update flags based on build variant
@@ -128,7 +131,11 @@ CFLAGS += -Iimport/fathom -Iimport/incbin -Isrc
 ifeq ($(OS), Windows_NT)
     CC = gcc
 else
+ifeq ($(arch), aarch64)
+    CC = gcc
+else
     CC = clang
+endif
 endif
 
 # Sources
