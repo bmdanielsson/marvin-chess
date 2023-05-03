@@ -380,10 +380,10 @@ struct nnue_update {
 #define NNUE_NUM_INPUT_FEATURES 64*64*10
 #define NNUE_MAX_ACTIVE_FEATURES 30
 #define NNUE_NUM_LAYERS 4
-#define NNUE_HALFKX_LAYER_SIZE 256
+#define NNUE_TRANSFORMER_SIZE 256
 struct nnue_accumulator {
     /* Accumulator data */
-    alignas(64) int16_t data[NSIDES][NNUE_HALFKX_LAYER_SIZE];
+    alignas(64) int16_t data[NSIDES][NNUE_TRANSFORMER_SIZE];
     /*
      * Updates that has to be applied to the accumulator to make
      * it up to date for the current position.

@@ -29,7 +29,7 @@
 int simd_pad_size(int size);
 
 /*
- * SIMD implementation of a forward pass of a linear layer.
+ * SIMD implementation of a forward pass of a fully connected layer.
  * 
  * @param input The layer input. 
  * @param output The layer output. 
@@ -38,8 +38,8 @@ int simd_pad_size(int size);
  * @param biases Layer biases.
  * @param weights Layer weights.
  */
-void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
-                         int noutputs, int32_t *biases, int8_t *weights);
+void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
+                     int noutputs, int32_t *biases, int8_t *weights);
 
 
 /*
@@ -54,10 +54,41 @@ void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
 void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
                           int nvalues);
 
+/*
+ * SIMD implementation of a clamp operation. Values and the clamped between 0
+ * and 127.
+ *
+ * @param input Input values.
+ * @param output Output values.
+ * @param nvalues The number of values.
+ */
 void simd_clamp(int16_t *input, uint8_t *output, int nvalues);
 
-void simd_copy(int16_t *from, int16_t *to, int nvalues);
-void simd_add(int16_t *from, int16_t *to, int nvalues);
-void simd_sub(int16_t *from, int16_t *to, int nvalues);
+/*
+ * SIMD implementation of a copy operation.
+ *
+ * @param input Input values.
+ * @param output Output values.
+ * @param nvalues The number of values.
+ */
+void simd_copy(int16_t *input, int16_t *output, int nvalues);
+
+/*
+ * SIMD implementation of an add operation.
+ *
+ * @param input Input values.
+ * @param output Output values.
+ * @param nvalues The number of values.
+ */
+void simd_add(int16_t *input, int16_t *output, int nvalues);
+
+/*
+ * SIMD implementation of a sub operation.
+ *
+ * @param input Input values.
+ * @param output Output values.
+ * @param nvalues The number of values.
+ */
+void simd_sub(int16_t *input, int16_t *output, int nvalues);
 
 #endif

@@ -67,8 +67,8 @@ int simd_pad_size(int size)
     return ((size%MIN_SIZE) == 0)?size:((size/MIN_SIZE)+1)*MIN_SIZE;
 }
 
-void simd_linear_forward(uint8_t *input, int32_t *output, int ninputs,
-                         int noutputs, int32_t *biases, int8_t *weights)
+void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
+                     int noutputs, int32_t *biases, int8_t *weights)
 {
 #if defined(USE_AVX2)
     int k;
@@ -326,125 +326,125 @@ void simd_clamp(int16_t *input, uint8_t *output, int nvalues)
 #endif
 }
 
-void simd_copy(int16_t *from, int16_t *to, int nvalues)
+void simd_copy(int16_t *input, int16_t *output, int nvalues)
 {
 #if defined(USE_AVX2)
     int k;
     int niterations = nvalues/16;
 
-    __m256i *pf = (__m256i*)from;
-    __m256i *pt = (__m256i*)to;
+    __m256i *pi = (__m256i*)input;
+    __m256i *po = (__m256i*)output;
 
     for (k=0;k<niterations;k++) {
-        pt[k] = _mm256_load_si256(pf++);
+        po[k] = _mm256_load_si256(pi++);
     }
 #elif defined(USE_SSE)
     int k;
     int niterations = nvalues/8;
 
-    __m128i *pf = (__m128i*)from;
-    __m128i *pt = (__m128i*)to;
+    __m128i *pi = (__m128i*)input;
+    __m128i *po = (__m128i*)output;
 
     for (k=0;k<niterations;k++) {
-        pt[k] = _mm_load_si128(pf++);
+        po[k] = _mm_load_si128(pi++);
     }
 #elif defined(USE_NEON)
     int k;
     int niterations = nvalues/8;
 
-    int16x8_t *pt = (int16x8_t*)to;
+    int16x8_t *po = (int16x8_t*)output;
 
     for (k=0;k<niterations;k++) {
-        pt[k] = vld1q_s16(from);
-        from += 8;
+        po[k] = vld1q_s16(input);
+        input += 8;
     }
 #else
     int k;
 
     for (k=0;k<nvalues;k++) {
-        to[k] = from[k];
+        output[k] = input[k];
     }
 #endif
 }
 
-void simd_add(int16_t *from, int16_t *to, int nvalues)
+void simd_add(int16_t *input, int16_t *output, int nvalues)
 {
 #if defined(USE_AVX2)
     int k;
     int niterations = nvalues/16;
 
-    __m256i *pf = (__m256i*)from;
-    __m256i *pt = (__m256i*)to;
+    __m256i *pi = (__m256i*)input;
+    __m256i *po = (__m256i*)output;
 
     for (k=0;k<niterations;k++) {
-        pt[k] = _mm256_add_epi16(pf[k], pt[k]);
+        po[k] = _mm256_add_epi16(po[k], pi[k]);
     }
 #elif defined(USE_SSE)
     int k;
     int niterations = nvalues/8;
 
-    __m128i *pf = (__m128i*)from;
-    __m128i *pt = (__m128i*)to;
+    __m128i *pi = (__m128i*)input;
+    __m128i *po = (__m128i*)output;
 
     for (k=0;k<niterations;k++) {
-        pt[k] = _mm_add_epi16(pf[k], pt[k]);
+        po[k] = _mm_add_epi16(po[k], pi[k]);
     }
 #elif defined(USE_NEON)
     int k;
     int niterations = nvalues/8;
 
-    int16x8_t *pf = (int16x8_t*)from;
-    int16x8_t *pt = (int16x8_t*)to;
+    int16x8_t *pi = (int16x8_t*)input;
+    int16x8_t *po = (int16x8_t*)output;
 
     for (k=0;k<niterations;k++) {
-        pt[k] = vaddq_s16(pt[k], pf[k]);
+        po[k] = vaddq_s16(po[k], pi[k]);
     }
 #else
     int k;
 
     for (k=0;k<nvalues;k++) {
-        to[k] += from[k];
+        output[k] += input[k];
     }
 #endif
 }
 
-void simd_sub(int16_t *from, int16_t *to, int nvalues)
+void simd_sub(int16_t *input, int16_t *output, int nvalues)
 {
 #if defined(USE_AVX2)
     int k;
     int niterations = nvalues/16;
 
-    __m256i *pf = (__m256i*)from;
-    __m256i *pt = (__m256i*)to;
+    __m256i *pi = (__m256i*)input;
+    __m256i *po = (__m256i*)output;
 
     for (k=0;k<niterations;k++) {
-        pt[k] = _mm256_sub_epi16(pt[k], pf[k]);
+        po[k] = _mm256_sub_epi16(po[k], pi[k]);
     }
 #elif defined(USE_SSE)
     int k;
     int niterations = nvalues/8;
 
-    __m128i *pf = (__m128i*)from;
-    __m128i *pt = (__m128i*)to;
+    __m128i *pi = (__m128i*)input;
+    __m128i *po = (__m128i*)output;
 
     for (k=0;k<niterations;k++) {
-        pt[k] = _mm_sub_epi16(pt[k], pf[k]);
+        po[k] = _mm_sub_epi16(po[k], pi[k]);
     }
 #elif defined(USE_NEON)
     int k;
     int niterations = nvalues/8;
 
-    int16x8_t *pf = (int16x8_t*)from;
-    int16x8_t *pt = (int16x8_t*)to;
+    int16x8_t *pi = (int16x8_t*)input;
+    int16x8_t *po = (int16x8_t*)output;
 
     for (k=0;k<niterations;k++) {
-        pt[k] = vsubq_s16(pt[k], pf[k]);
+        po[k] = vsubq_s16(po[k], pi[k]);
     }
 #else
     int k;
 
     for (k=0;k<nvalues;k++) {
-        to[k] -= from[k];
+        output[k] -= input[k];
     }
 #endif
 }

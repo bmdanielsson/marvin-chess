@@ -46,7 +46,7 @@ INCBIN(nnue_net, NETFILE_NAME);
 #define NET_VERSION 0x00000007
 #define NET_HEADER_SIZE 4
 static int model_layer_sizes[NNUE_NUM_LAYERS] =
-                                        {NNUE_HALFKX_LAYER_SIZE*2, 8, 16, 1};
+                                        {NNUE_TRANSFORMER_SIZE*2, 8, 16, 1};
 
 /*
  * Struct holding information about a layer in the network. The size
@@ -66,8 +66,8 @@ struct layer {
 
 /* Struct for holding data during a forward pass */
 struct net_data {
-    alignas(64) int32_t intermediate[NNUE_HALFKX_LAYER_SIZE*2];
-    alignas(64) uint8_t output[NNUE_HALFKX_LAYER_SIZE*2];
+    alignas(64) int32_t intermediate[NNUE_TRANSFORMER_SIZE*2];
+    alignas(64) uint8_t output[NNUE_TRANSFORMER_SIZE*2];
 };
 
 /* The network */
@@ -180,7 +180,7 @@ static bool accumulator_refresh_required(struct position *pos, int side)
     return pos->eval_stack[pos->height].accumulator.refresh[side];
 }
 
-static void halfkx_layer_forward(struct position *pos, struct net_data *data)
+static void transformer_forward(struct position *pos, struct net_data *data)
 {
     int16_t  *acc_data;
     int16_t  *prev_acc_data;
@@ -226,11 +226,11 @@ static void halfkx_layer_forward(struct position *pos, struct net_data *data)
     simd_clamp(half, dest+size, size);
 }
 
-static void linear_layer_forward(int idx, struct net_data *data, bool output)
+static void fc_layer_forward(int idx, struct net_data *data, bool output)
 {
-    simd_linear_forward(data->output, data->intermediate, layer_sizes[idx-1],
-                        model_layer_sizes[idx], layers[idx].biases.i32,
-                        layers[idx].weights.i8);
+    simd_fc_forward(data->output, data->intermediate, layer_sizes[idx-1],
+                    model_layer_sizes[idx], layers[idx].biases.i32,
+                    layers[idx].weights.i8);
     if (!output) {
         simd_scale_and_clamp(data->intermediate, data->output,
                              WEIGHT_SCALE_BITS, layer_sizes[idx]);
@@ -241,11 +241,11 @@ static void network_forward(struct position *pos, struct net_data *data)
 {
     int k;
 
-    halfkx_layer_forward(pos, data);
+    transformer_forward(pos, data);
     for (k=1;k<NNUE_NUM_LAYERS-1;k++) {
-        linear_layer_forward(k, data, false);
+        fc_layer_forward(k, data, false);
     }
-    linear_layer_forward(k, data, true);
+    fc_layer_forward(k, data, true);
 }
 
 static bool parse_header(uint8_t **data)
@@ -261,7 +261,7 @@ static bool parse_header(uint8_t **data)
     return version == NET_VERSION;
 }
 
-static uint8_t* read_halfkx_layer(uint8_t *iter, struct layer *layer)
+static uint8_t* read_transformer(uint8_t *iter, struct layer *layer)
 {
     int k;
     int half;
@@ -286,7 +286,7 @@ static uint8_t* read_halfkx_layer(uint8_t *iter, struct layer *layer)
     return iter;
 }
 
-static uint8_t* read_linear_layer(uint8_t *iter, int idx, struct layer *layer)
+static uint8_t* read_fc_layer(uint8_t *iter, int idx, struct layer *layer)
 {
     int k;
     int l;
@@ -336,12 +336,12 @@ static bool parse_network(uint8_t **data)
     uint8_t *iter = *data;
     int   k;
 
-    /* Read biases and weights for the HalfKX layer */
-    iter = read_halfkx_layer(iter, &layers[0]);
+    /* Read biases and weights for the transformer */
+    iter = read_transformer(iter, &layers[0]);
 
     /* Read biases and weights for each hidden layer */
     for (k=1;k<NNUE_NUM_LAYERS-1;k++) {
-        iter = read_linear_layer(iter, k, &layers[k]);
+        iter = read_fc_layer(iter, k, &layers[k]);
     }
 
     /* Read biases and weights for the output layer */
@@ -359,8 +359,8 @@ static uint32_t calculate_net_size(void)
 
     size += NET_HEADER_SIZE;
 
-    size += NNUE_HALFKX_LAYER_SIZE*sizeof(int16_t);
-    size += NNUE_HALFKX_LAYER_SIZE*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t);
+    size += NNUE_TRANSFORMER_SIZE*sizeof(int16_t);
+    size += NNUE_TRANSFORMER_SIZE*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t);
 
     for (k=1;k<NNUE_NUM_LAYERS;k++) {
         size += model_layer_sizes[k]*sizeof(int32_t);
@@ -375,7 +375,7 @@ void nnue_init(void)
     int k;
 
     /* Allocate space for layers */
-    layer_sizes[0] = simd_pad_size(NNUE_HALFKX_LAYER_SIZE)*2;
+    layer_sizes[0] = simd_pad_size(NNUE_TRANSFORMER_SIZE)*2;
     layers[0].weights.i16 = aligned_malloc(64,
                     layer_sizes[0]*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t));
     layers[0].biases.i16 = aligned_malloc(64, layer_sizes[0]*sizeof(int16_t));
