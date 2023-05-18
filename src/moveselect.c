@@ -174,7 +174,7 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
         /* Generate all possible captures for this position */
         list.size = 0;
         if (ms->in_check) {
-            gen_check_evasion_tactical(pos, &list);
+            gen_tactical_check_evasions(pos, &list);
         } else {
             gen_capture_moves(pos, &list);
             gen_promotion_moves(pos, &list, ms->underpromote);
@@ -215,7 +215,7 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
         /* Generate all possible moves for this position */
         list.size = 0;
         if (ms->in_check) {
-            gen_check_evasion_quiet(pos, &list);
+            gen_quiet_check_evasions(pos, &list);
         } else {
             gen_quiet_moves(pos, &list);
         }

@@ -54,7 +54,7 @@ void gen_check_evasions(struct position *pos, struct movelist *list);
  * @param list The list to store the moves in. Moves are appended to the list
  *             so it must be initialized before first use.
  */
-void gen_check_evasion_quiet(struct position *pos, struct movelist *list);
+void gen_quiet_check_evasions(struct position *pos, struct movelist *list);
 
 /*
  * Generate all capture and promotion check evasions.
@@ -63,7 +63,7 @@ void gen_check_evasion_quiet(struct position *pos, struct movelist *list);
  * @param list The list to store the moves in. Moves are appended to the list
  *             so it must be initialized before first use.
  */
-void gen_check_evasion_tactical(struct position *pos, struct movelist *list);
+void gen_tactical_check_evasions(struct position *pos, struct movelist *list);
 
 /*
  * Generate all normal moves. Normal moves are all moves except captures,

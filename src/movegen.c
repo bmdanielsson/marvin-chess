@@ -278,11 +278,11 @@ void gen_check_evasions(struct position *pos, struct movelist *list)
 
     list->size = 0;
 
-    gen_check_evasion_quiet(pos, list);
-    gen_check_evasion_tactical(pos, list);
+    gen_quiet_check_evasions(pos, list);
+    gen_tactical_check_evasions(pos, list);
 }
 
-void gen_check_evasion_quiet(struct position *pos, struct movelist *list)
+void gen_quiet_check_evasions(struct position *pos, struct movelist *list)
 {
     int      kingsq;
     int      to;
@@ -373,7 +373,7 @@ void gen_check_evasion_quiet(struct position *pos, struct movelist *list)
     }
 }
 
-void gen_check_evasion_tactical(struct position *pos, struct movelist *list)
+void gen_tactical_check_evasions(struct position *pos, struct movelist *list)
 {
     int      kingsq;
     int      to;
