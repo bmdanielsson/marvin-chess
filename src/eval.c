@@ -179,7 +179,7 @@ static void evaluate_threats(struct position *pos, struct eval *eval, int side)
 
     /* Give a bonus for attacks on opponent pieces following a safe pawn push */
     pawn_push = bb_pawn_pushes(pos->bb_pieces[PAWN+side], pos->bb_all, side);
-    pawn_push &= ((side==WHITE)?(~rank_mask[RANK_8]):(~rank_mask[RANK_1]));
+    pawn_push &= (~relative_rank_mask[pos->stm][RANK_8]);
     pawn_push &= (~eval->attacked_by[PAWN+oside]);
     pawn_push &= ((~eval->attacked[oside])|eval->attacked[side]);
     count = BITCOUNT(bb_pawn_attacks(pawn_push, side)&pos->bb_sides[oside]);

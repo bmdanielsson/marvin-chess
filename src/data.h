@@ -34,6 +34,9 @@ extern uint64_t black_square_mask;
 /* Masks for all ranks */
 extern uint64_t rank_mask[NRANKS];
 
+/* Mask for all ranks realtive to each side */
+extern uint64_t relative_rank_mask[NSIDES][NRANKS];
+
 /* Masks for all files */
 extern uint64_t file_mask[NFILES];
 

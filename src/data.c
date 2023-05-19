@@ -26,6 +26,8 @@ uint64_t black_square_mask;
 
 uint64_t rank_mask[NRANKS];
 
+uint64_t relative_rank_mask[NSIDES][NRANKS];
+
 uint64_t file_mask[NFILES];
 
 uint64_t a1h8_masks[NDIAGONALS];
@@ -187,6 +189,8 @@ void data_init(void)
         for (l=0;l<NFILES;l++) {
             rank_mask[k] |= sq_mask[SQUARE(l, k)];
         }
+        relative_rank_mask[WHITE][k] = rank_mask[k];
+        relative_rank_mask[BLACK][NRANKS-1-k] = rank_mask[k];
     }
 
     /* Initialize file masks */

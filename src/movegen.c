@@ -123,7 +123,7 @@ static void gen_pawn_moves(struct position *pos, struct movelist *list,
     int      sq;
 
     pieces = pos->bb_pieces[PAWN+pos->stm];
-    pieces &= (pos->stm == WHITE)?(~rank_mask[RANK_7]):(~rank_mask[RANK_2]);
+    pieces &= (~relative_rank_mask[pos->stm][RANK_7]);
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         add_moves(list, sq, bb_pawn_moves(pos->bb_all, sq, pos->stm)&mask, 0);
@@ -137,7 +137,7 @@ static void gen_pawn_captures(struct position *pos, struct movelist *list,
     int      sq;
 
     pieces = pos->bb_pieces[PAWN+pos->stm];
-    pieces &= (pos->stm == WHITE)?(~rank_mask[RANK_7]):(~rank_mask[RANK_2]);
+    pieces &= (~relative_rank_mask[pos->stm][RANK_7]);
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         add_moves(list, sq, bb_pawn_attacks_from(sq, pos->stm)&mask, CAPTURE);
@@ -151,7 +151,7 @@ static void gen_promotions(struct position *pos, struct movelist *list,
     int      sq;
 
     pieces = pos->bb_pieces[PAWN+pos->stm];
-    pieces &= (pos->stm == WHITE)?rank_mask[RANK_7]:rank_mask[RANK_2];
+    pieces &= relative_rank_mask[pos->stm][RANK_7];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         add_promotion_moves(pos, list, sq,
@@ -167,7 +167,7 @@ static void gen_capture_promotions(struct position *pos, struct movelist *list,
     int      sq;
 
     pieces = pos->bb_pieces[PAWN+pos->stm];
-    pieces &= (pos->stm == WHITE)?rank_mask[RANK_7]:rank_mask[RANK_2];
+    pieces &= relative_rank_mask[pos->stm][RANK_7];
     while (pieces != 0ULL) {
         sq = POPBIT(&pieces);
         add_promotion_moves(pos, list, sq,
