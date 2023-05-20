@@ -162,92 +162,95 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
     uint32_t        counter;
     struct position *pos = &worker->pos;
 
-    switch (ms->phase) {
-    case PHASE_TT:
-        ms->phase++;
-        if (ms->ttmove != NOMOVE) {
-            *move = ms->ttmove;
-            return true;
+    do {
+        switch (ms->phase) {
+        case PHASE_TT:
+            ms->phase++;
+            if (ms->ttmove != NOMOVE) {
+                *move = ms->ttmove;
+                return true;
+            }
+            /* Fall through */
+        case PHASE_GEN_TACTICAL:
+            /* Generate all possible captures for this position */
+            list.size = 0;
+            if (ms->in_check) {
+                gen_tactical_check_evasions(pos, &list);
+            } else {
+                gen_capture_moves(pos, &list);
+                gen_promotion_moves(pos, &list, ms->underpromote);
+            }
+            add_moves(worker, ms, &list);
+            ms->phase++;
+            ms->idx = 0;
+            /* Fall through */
+        case PHASE_GOOD_TACTICAL:
+            if (ms->idx < ms->last_idx) {
+                break;
+            }
+            if (ms->tactical_only && !ms->in_check) {
+                break;
+            }
+            ms->phase++;
+            /* Fall through */
+        case PHASE_KILLER:
+            ms->phase++;
+            killer = ms->killer;
+            if ((killer != NOMOVE) && (killer != ms->ttmove) &&
+                pos_is_move_pseudo_legal(pos, killer)) {
+                *move = killer;
+                return true;
+            }
+            /* Fall through */
+        case PHASE_COUNTER:
+            ms->phase++;
+            counter = ms->counter;
+            if ((counter != NOMOVE) && (counter != ms->ttmove) &&
+                (counter != ms->killer) &&
+                pos_is_move_pseudo_legal(pos, counter)) {
+                *move = counter;
+                return true;
+            }
+            /* Fall through */
+        case PHASE_GEN_MOVES:
+            /* Generate all possible moves for this position */
+            list.size = 0;
+            if (ms->in_check) {
+                gen_quiet_check_evasions(pos, &list);
+            } else {
+                gen_quiet_moves(pos, &list);
+            }
+            add_moves(worker, ms, &list);
+            ms->phase++;
+            /* Fall through */
+        case PHASE_MOVES:
+            if (ms->idx < ms->last_idx) {
+                break;
+            }
+            ms->phase++;
+            /* Fall through */
+        case PHASE_ADD_BAD_TACTICAL:
+            ms->last_idx = MAX_MOVES;
+            ms->idx = MAX_MOVES - ms->nbadtacticals;
+            ms->phase++;
+            /* Fall through */
+        case PHASE_BAD_TACTICAL:
+            if (ms->idx < ms->last_idx) {
+                break;
+            }
+            ms->phase++;
+            /* Fall through */
+        default:
+            /* All moves have been searched */
+            *move = NOMOVE;
+            return false;
         }
-        /* Fall through */
-    case PHASE_GEN_TACTICAL:
-        /* Generate all possible captures for this position */
-        list.size = 0;
-        if (ms->in_check) {
-            gen_tactical_check_evasions(pos, &list);
-        } else {
-            gen_capture_moves(pos, &list);
-            gen_promotion_moves(pos, &list, ms->underpromote);
-        }
-        add_moves(worker, ms, &list);
-        ms->phase++;
-        ms->idx = 0;
-        /* Fall through */
-    case PHASE_GOOD_TACTICAL:
-        if (ms->idx < ms->last_idx) {
-            break;
-        }
-        if (ms->tactical_only && !ms->in_check) {
-            break;
-        }
-        ms->phase++;
-        /* Fall through */
-    case PHASE_KILLER:
-        ms->phase++;
-        killer = ms->killer;
-        if ((killer != NOMOVE) && (killer != ms->ttmove) &&
-            pos_is_move_pseudo_legal(pos, killer)) {
-            *move = killer;
-            return true;
-        }
-        /* Fall through */
-    case PHASE_COUNTER:
-        ms->phase++;
-        counter = ms->counter;
-        if ((counter != NOMOVE) && (counter != ms->ttmove) &&
-            (counter != ms->killer) &&
-            pos_is_move_pseudo_legal(pos, counter)) {
-            *move = counter;
-            return true;
-        }
-        /* Fall through */
-    case PHASE_GEN_MOVES:
-        /* Generate all possible moves for this position */
-        list.size = 0;
-        if (ms->in_check) {
-            gen_quiet_check_evasions(pos, &list);
-        } else {
-            gen_quiet_moves(pos, &list);
-        }
-        add_moves(worker, ms, &list);
-        ms->phase++;
-        /* Fall through */
-    case PHASE_MOVES:
-        if (ms->idx < ms->last_idx) {
-            break;
-        }
-        ms->phase++;
-        /* Fall through */
-    case PHASE_ADD_BAD_TACTICAL:
-        ms->last_idx = MAX_MOVES;
-        ms->idx = MAX_MOVES - ms->nbadtacticals;
-        ms->phase++;
-        /* Fall through */
-    case PHASE_BAD_TACTICAL:
-        if (ms->idx < ms->last_idx) {
-            break;
-        }
-        ms->phase++;
-        /* Fall through */
-    default:
-        /* All moves have been searched */
-        *move = NOMOVE;
-        return false;
-    }
 
-    /* Select the next move to search */
-    *move = select_move(ms);
-    ms->idx++;
+        /* Select the next move to search */
+        *move = select_move(ms);
+        ms->idx++;
+        break;
+    } while (true);
 
     return *move != NOMOVE;
 }
