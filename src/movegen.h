@@ -66,7 +66,7 @@ void gen_quiet_check_evasions(struct position *pos, struct movelist *list);
 void gen_tactical_check_evasions(struct position *pos, struct movelist *list);
 
 /*
- * Generate all normal moves. Normal moves are all moves except captures,
+ * Generate all quiet moves. Quiet moves are all moves except captures,
  * en-passant and promotions.
  *
  * @param pos The board structure.
@@ -95,5 +95,15 @@ void gen_capture_moves(struct position *pos, struct movelist *list);
  */
 void gen_promotion_moves(struct position *pos, struct movelist *list,
                          bool underpromote);
+
+/*
+ * Generate all quiet checking moves. Quiet moves are all moves except captures,
+ * en-passant and promotions.
+ *
+ * @param pos The board structure.
+ * @param list The list to store the moves in. Moves are appended to the list
+ *             so it must be initialized before first use.
+ */
+void gen_quiet_checks(struct position *pos, struct movelist *list);
 
 #endif

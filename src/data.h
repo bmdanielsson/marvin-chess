@@ -154,6 +154,13 @@ extern int queenside_castle_to[NSIDES];
 /* Phase independent material values used during search */
 extern int material_values[NPIECES];
 
+/*
+ * Bitboards for the rank, file or diagonal where both squares are
+ * located. If the squares are not on the same rank, file or diagonal
+ * then the bitboard is empty.
+ */
+extern uint64_t line_mask[NSQUARES][NSQUARES];
+
 /* Initialize global data */
 void data_init(void);
 

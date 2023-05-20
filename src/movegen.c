@@ -537,3 +537,121 @@ void gen_promotion_moves(struct position *pos, struct movelist *list,
 
     gen_promotions(pos, list, underpromote, ~pos->bb_all);
 }
+
+void gen_quiet_checks(struct position *pos, struct movelist *list)
+{
+    int      king_sq;
+    int      from;
+    uint64_t straight_attacks;
+    uint64_t diagonal_attacks;
+    uint64_t pawn_attacks;
+    uint64_t knight_attacks;
+    uint64_t attackers;
+    uint64_t blockers;
+    uint64_t moves;
+
+    assert(valid_position(pos));
+    assert(list != NULL);
+   
+    /* Find the opponents king */
+    king_sq = LSB(pos->bb_pieces[FLIP_COLOR(pos->stm)+KING]);
+
+    /* Keep track of pieces that potentially block or deliver checks */
+    blockers = 0ULL;
+    attackers = pos->bb_sides[pos->stm];
+
+    /*
+     * Find all squares where pieces can reach the king. Occupied squares
+     * are excluded since we only want to find quiet moves. Also find all
+     * friendly pieces that can trigger discovered checks.
+     */
+    straight_attacks = bb_rook_moves(pos->bb_all, king_sq);
+    blockers |= straight_attacks&pos->bb_sides[pos->stm];
+    straight_attacks &= (~pos->bb_all);
+    diagonal_attacks = bb_bishop_moves(pos->bb_all, king_sq);
+    blockers |= diagonal_attacks&pos->bb_sides[pos->stm];
+    diagonal_attacks &= (~pos->bb_all);
+    pawn_attacks = bb_pawn_attacks_to(king_sq, pos->stm)&(~pos->bb_all);
+    knight_attacks = bb_knight_moves(king_sq)&(~pos->bb_all);
+
+    /*
+     * Find discovered checks. Pieces that trigger discovered
+     * checks are removed from the list of attackers in order
+     * to not include moves twice.
+     */
+    while (!ISEMPTY(blockers)) {
+        from = POPBIT(&blockers);
+
+        /*
+         * See if the opponents king can be captured
+         * if this blocker is removed.
+         */
+        moves = bb_bishop_moves(pos->bb_all&(~sq_mask[from]), king_sq) &
+            (pos->bb_pieces[pos->stm+BISHOP]|pos->bb_pieces[pos->stm+QUEEN]);
+        moves |= (bb_rook_moves(pos->bb_all&(~sq_mask[from]), king_sq) &
+            (pos->bb_pieces[pos->stm+ROOK]|pos->bb_pieces[pos->stm+QUEEN]));
+
+        /*
+         * If the king can be captured then generate all moves for
+         * this blocker. Exclude tactical moves, as well as moves
+         * along the same rank, file or diagonal as the blocker and
+         * the king since those moves will just continue blocking
+         * the check.
+         */
+        if (!ISEMPTY(moves)) {
+            attackers &= (~sq_mask[from]);
+            moves = bb_moves_for_piece(pos->bb_all, from, pos->pieces[from]);
+            if (pos->pieces[from] == (pos->stm+PAWN)) {
+                moves &= (~relative_rank_mask[pos->stm][RANK_8]);
+            }
+            moves &= (~pos->bb_all);
+            moves &= (~line_mask[king_sq][from]);
+            add_moves(list, from, moves, 0);
+        }
+    }
+
+    /*
+     * Find direct checks. Direct checks by blockers are
+     * excluded since they are handled later.
+     */
+    while (!ISEMPTY(attackers)) {
+        from = POPBIT(&attackers);
+        switch (VALUE(pos->pieces[from])) {
+        case PAWN:
+            moves = bb_pawn_moves(pos->bb_all, from, pos->stm);
+            moves &= pawn_attacks;
+            add_moves(list, from, moves, 0);
+            break;     
+        case KNIGHT:
+            moves = bb_knight_moves(from);
+            moves &= knight_attacks;
+            add_moves(list, from, moves, 0);
+            break;     
+        case BISHOP:
+            moves = bb_bishop_moves(pos->bb_all, from);
+            moves &= diagonal_attacks;
+            add_moves(list, from, moves, 0);
+            break;     
+        case ROOK:
+            moves = bb_rook_moves(pos->bb_all, from);
+            moves &= straight_attacks;
+            add_moves(list, from, moves, 0);
+            break;     
+        case QUEEN:
+            moves = bb_queen_moves(pos->bb_all, from);
+            moves &= (straight_attacks|diagonal_attacks);
+            add_moves(list, from, moves, 0);
+            break;     
+        default:
+            break;
+        }
+    }
+
+    /* Consider castling moves */
+    if (!ISEMPTY(straight_attacks&sq_mask[kingside_castle_to[pos->stm]-1])) {
+        gen_kingside_castling_moves(pos, list);
+    }
+    if (!ISEMPTY(straight_attacks&sq_mask[queenside_castle_to[pos->stm]+1])) {
+        gen_queenside_castling_moves(pos, list);
+    }
+}
