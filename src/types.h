@@ -298,6 +298,12 @@ struct moveselector {
      * considered for this search.
      */
     bool tactical_only;
+    /* Flag indicating if checks should be included in the quiscence search */
+    bool qchecks;
+    /* The destination square of the previous move if it was a capture */
+    int recap_sq;
+    /* The current search depth */
+    int depth;
 };
 
 /* Struct for unmaking a move */

@@ -247,6 +247,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     struct tt_item      tt_item;
     struct position     *pos = &worker->pos;
     struct moveselector ms;
+    struct unmake       *prev = &pos->history[pos->ply-1];
 
     /* Update search statistics */
     if (depth < 0) {
@@ -303,10 +304,12 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
             return score;
         }
     }
-    
+
     /* Search all moves */
     found_move = false;
-    select_init_node(&ms, worker, true, in_check, tt_found?tt_item.move:NOMOVE);
+    select_init_node(&ms, worker, true, in_check, tt_found?tt_item.move:NOMOVE,
+                     depth==0, ISCAPTURE(prev->move)?TO(prev->move):NO_SQUARE,
+                     depth);
     while (select_get_move(&ms, worker, &move)) {
         /*
          * Don't bother searching captures that
@@ -314,6 +317,9 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
          */
         if (!in_check && ISCAPTURE(move) &&
             select_is_bad_capture_phase(&ms)) {
+            continue;
+        }
+        if (!in_check && !ISTACTICAL(move) && !see_ge(pos, move, 0)) {
             continue;
         }
 
@@ -524,7 +530,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             pos_has_non_pawn(&worker->pos, pos->stm)) {
             threshold = beta + PROBCUT_MARGIN;
 
-            select_init_node(&ms, worker, true, in_check, tt_move);
+            select_init_node(&ms, worker, true, in_check, tt_move, false, NO_SQUARE, depth);
             while (select_get_move(&ms, worker, &move)) {
                 /*
                  * Skip non-captures and captures that are not
@@ -588,7 +594,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     best_score = -INFINITE_SCORE;
     movenumber = 0;
     found_move = false;
-    select_init_node(&ms, worker, false, in_check, tt_move);
+    select_init_node(&ms, worker, false, in_check, tt_move, false, NO_SQUARE, depth);
     while (select_get_move(&ms, worker, &move)) {
         if (is_root && (worker->multipv > 1) && is_multipv_move(worker, move)) {
             continue;

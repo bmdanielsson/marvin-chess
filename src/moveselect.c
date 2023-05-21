@@ -27,6 +27,12 @@
 #include "history.h"
 
 /*
+ * The depth after which only recaptures are considered
+ * in the quiscence search.
+ */
+#define RECAPTURE_ONLY_DEPTH -4
+
+/*
  * Different move generation phases.
  */
 enum {
@@ -39,6 +45,9 @@ enum {
     PHASE_MOVES,
     PHASE_ADD_BAD_TACTICAL,
     PHASE_BAD_TACTICAL,
+    PHASE_GEN_QCHECKS,
+    PHASE_QCHECKS,
+    PHASE_DONE
 };
 
 /*
@@ -89,6 +98,11 @@ static void add_moves(struct search_worker *worker, struct moveselector *ms,
             (move == ms->killer) ||
             (move == ms->counter)) {
             continue;
+        }
+        if (ms->tactical_only && !ms->in_check &&
+            (ms->depth <= RECAPTURE_ONLY_DEPTH) &&
+            (!ISCAPTURE(move) || (TO(move) != ms->recap_sq))) {
+           continue;
         }
 
         /*
@@ -188,7 +202,7 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
             if (ms->idx < ms->last_idx) {
                 break;
             }
-            if (ms->tactical_only && !ms->in_check) {
+            if (ms->tactical_only && !ms->in_check && !ms->qchecks) {
                 break;
             }
             ms->phase++;
@@ -198,8 +212,12 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
             killer = ms->killer;
             if ((killer != NOMOVE) && (killer != ms->ttmove) &&
                 pos_is_move_pseudo_legal(pos, killer)) {
-                *move = killer;
-                return true;
+                if ((!ms->qchecks || ms->in_check) ||
+                    (ms->qchecks && !ms->in_check &&
+                    pos_move_gives_check(pos, ms->killer))) {
+                    *move = killer;
+                    return true;
+                }
             }
             /* Fall through */
         case PHASE_COUNTER:
@@ -208,8 +226,16 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
             if ((counter != NOMOVE) && (counter != ms->ttmove) &&
                 (counter != ms->killer) &&
                 pos_is_move_pseudo_legal(pos, counter)) {
-                *move = counter;
-                return true;
+                if ((!ms->qchecks || ms->in_check) ||
+                    (ms->qchecks && !ms->in_check &&
+                    pos_move_gives_check(pos, ms->counter))) {
+                    *move = counter;
+                    return true;
+                }
+            }
+            if (ms->tactical_only && !ms->in_check && ms->qchecks) {
+                ms->phase = PHASE_GEN_QCHECKS;
+                continue; 
             }
             /* Fall through */
         case PHASE_GEN_MOVES:
@@ -238,8 +264,21 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
             if (ms->idx < ms->last_idx) {
                 break;
             }
+            ms->phase = PHASE_DONE;
+            continue;
+        case PHASE_GEN_QCHECKS:
+            list.size = 0;
+            gen_quiet_checks(pos, &list);
+            add_moves(worker, ms, &list);
             ms->phase++;
             /* Fall through */
+        case PHASE_QCHECKS:
+            if (ms->idx < ms->last_idx) {
+                break;
+            }
+            ms->phase = PHASE_DONE;
+            continue;
+        case PHASE_DONE:
         default:
             /* All moves have been searched */
             *move = NOMOVE;
@@ -256,7 +295,8 @@ static bool get_move(struct moveselector *ms, struct search_worker *worker,
 }
 
 void select_init_node(struct moveselector *ms, struct search_worker *worker,
-                      bool tactical_only, bool in_check, uint32_t ttmove)
+                      bool tactical_only, bool in_check, uint32_t ttmove,
+                      bool qchecks, int recap_sq, int depth)
 {
     struct position *pos = &worker->pos;
 
@@ -265,7 +305,8 @@ void select_init_node(struct moveselector *ms, struct search_worker *worker,
     ms->underpromote = !tactical_only;
     if ((ttmove == NOMOVE) || !pos_is_move_pseudo_legal(pos, ttmove)) {
         ms->ttmove = NOMOVE;
-    } else if (tactical_only && !in_check && !ISTACTICAL(ttmove)) {
+    } else if (tactical_only && !in_check && !ISTACTICAL(ttmove) &&
+               (!qchecks || !pos_move_gives_check(pos, ttmove))) {
         ms->ttmove = NOMOVE;
     } else {
         ms->ttmove = ttmove;
@@ -276,6 +317,9 @@ void select_init_node(struct moveselector *ms, struct search_worker *worker,
     ms->nbadtacticals = 0;
     ms->killer = killer_get_move(worker);
     ms->counter = counter_get_move(worker);
+    ms->qchecks = qchecks;
+    ms->recap_sq = recap_sq;
+    ms->depth = depth;
 }
 
 bool select_get_move(struct moveselector *ms, struct search_worker *worker,

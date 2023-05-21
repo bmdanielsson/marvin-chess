@@ -29,9 +29,17 @@
  *                      and promotoions, should be considered.
  * @param in_check Is the side to move in check.
  * @param ttmove Transposition table move for this position.
+ * @param qchecks Flag indicating if checks should be included in the quiscence
+ *                search.
+ * @param recap_sq If the last move was a capture then this is set to the
+ *                 destination square of the move, otherwise it is set to
+ *                 NO_SQUARE.
+ * @param depth The current search depth. For quiscence search the depth will
+ *              be negative.
  */
 void select_init_node(struct moveselector *ms, struct search_worker *worker,
-                      bool tactical_only, bool in_check, uint32_t ttmove);
+                      bool tactical_only, bool in_check, uint32_t ttmove,
+                      bool qchecks, int recap_sq, int depth);
 
 /*
  * Get the next move to search.
