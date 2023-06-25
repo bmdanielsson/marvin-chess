@@ -171,7 +171,7 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
 {
 #if defined(USE_AVX2)
     int k;
-    int niterations = nvalues/8;
+    int niterations = nvalues/32;
 
     __m256i *pi = (__m256i*)input;
     __m256i *po = (__m256i*)output;
@@ -179,7 +179,7 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
     __m256i min = _mm256_set1_epi8(0);
     __m256i idx = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
 
-    for (k=0;k<niterations/4;k++) {
+    for (k=0;k<niterations;k++) {
         __m256i v1 = _mm256_load_si256(pi++);
         __m256i v2 = _mm256_load_si256(pi++);
         __m256i v16_1 = _mm256_packs_epi32(v1, v2);
@@ -197,7 +197,7 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
     }
 #elif defined(USE_SSE)
     int k;
-    int niterations = nvalues/4;
+    int niterations = nvalues/16;
 
     __m128i *pi = (__m128i*)input;
     __m128i *po = (__m128i*)output;
@@ -205,7 +205,7 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
     __m128i min = _mm_set1_epi32(0);
     __m128i max = _mm_set1_epi32((int)MAX_QUANTIZED_ACTIVATION);
 
-    for (k=0;k<niterations/4;k++) {
+    for (k=0;k<niterations;k++) {
         __m128i v1 = _mm_load_si128(pi++);
         v1 = _mm_srai_epi32(v1, shift);
         v1 = _mm_max_epi32(v1, min);
@@ -267,14 +267,14 @@ void simd_clamp(int16_t *input, uint8_t *output, int nvalues)
 {
 #if defined(USE_AVX2)
     int k;
-    int niterations = nvalues/16;
+    int niterations = nvalues/32;
 
     __m256i *pi = (__m256i*)input;
     __m256i *po = (__m256i*)output;
 
     __m256i min = _mm256_set1_epi8(0);
 
-    for (k=0;k<niterations/2;k++) {
+    for (k=0;k<niterations;k++) {
         __m256i v1 = _mm256_load_si256(pi++);
         __m256i v2 = _mm256_load_si256(pi++);
         __m256i v8 = _mm256_packs_epi16(v1, v2);
@@ -284,14 +284,14 @@ void simd_clamp(int16_t *input, uint8_t *output, int nvalues)
     }
 #elif defined(USE_SSE)
     int k;
-    int niterations = nvalues/8;
+    int niterations = nvalues/16;
 
     __m128i *pi = (__m128i*)input;
     __m128i *po = (__m128i*)output;
 
     __m128i min = _mm_set1_epi16(0);
 
-    for (k=0;k<niterations/2;k++) {
+    for (k=0;k<niterations;k++) {
         __m128i v1 = _mm_load_si128(pi++);
         __m128i v2 = _mm_load_si128(pi++);
         __m128i v8 = _mm_packs_epi16(v1, v2);
