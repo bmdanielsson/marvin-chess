@@ -32,9 +32,11 @@
 /* The maximum depth used for history scores */
 #define MAX_HISTORY_DEPTH 20
 
-/* Constants for scaling history scores */
-#define UP   32
-#define DOWN 512
+static void update_history_score(int *score, int delta)
+{
+    *score += 32*delta - *score*abs(delta)/512;
+    *score = MIN(*score, MAX_HISTORY_SCORE);
+}
 
 void history_clear_tables(struct search_worker *worker)
 {
@@ -54,7 +56,6 @@ void history_update_tables(struct search_worker *worker, struct movelist *list,
     int             piece;
     int             k;
     int             delta;
-    int             score;
     uint32_t        move_c;
     uint32_t        move_f;
     int             prev_to;
@@ -92,73 +93,39 @@ void history_update_tables(struct search_worker *worker, struct movelist *list,
         delta = (move != best_move)?-(depth*depth):depth*depth;
 
         /* Update history table */
-        score = worker->history_table[piece][to];
-        score = UP*delta - score*abs(delta)/DOWN;
-        worker->history_table[piece][to] = MIN(score, MAX_HISTORY_SCORE);
+        update_history_score(&worker->history_table[piece][to], delta);
 
         /* Update counter history table */
         if (move_c != NOMOVE) {
             prev_to = TO_CASTLE(move_c);
             prev_piece = pos->history[pos->ply-1].piece;
-            score = worker->counter_history[prev_piece][prev_to][piece][to];
-            score += UP*delta - score*abs(delta)/DOWN;
-            worker->counter_history[prev_piece][prev_to][piece][to] =
-                                                MIN(score, MAX_HISTORY_SCORE);
+            update_history_score(
+                    &worker->counter_history[prev_piece][prev_to][piece][to],
+                    delta);
         }
 
         /* Update follow up history table */
         if (move_f != NOMOVE) {
             prev_to = TO_CASTLE(move_f);
             prev_piece = pos->history[pos->ply-2].piece;
-            score = worker->follow_history[prev_piece][prev_to][piece][to];
-            score += UP*delta - score*abs(delta)/DOWN;
-            worker->follow_history[prev_piece][prev_to][piece][to] =
-                                                MIN(score, MAX_HISTORY_SCORE);
+            update_history_score(
+                    &worker->follow_history[prev_piece][prev_to][piece][to],
+                    delta);
         }
     }
 }
 
 int history_get_score(struct search_worker *worker, uint32_t move)
 {
-    struct position *pos;
-    int             score;
-    int             to;
-    int             piece;
-    int             prev_move;
-    int             prev_to;
-    int             prev_piece;
+    int hist;
+    int chist;
+    int fhist;
 
     assert(valid_move(move));
 
-    pos = &worker->pos;
-    piece = pos->pieces[FROM(move)];
-    to = TO_CASTLE(move);
+    history_get_scores(worker, move, &hist, &chist, &fhist);
 
-    /* Add score from history table */
-    score = worker->history_table[piece][to];
-
-    /* Add score from counter history table */
-    prev_move = ((pos->ply >= 1) &&
-                !ISNULLMOVE(pos->history[pos->ply-1].move))?
-                pos->history[pos->ply-1].move:NOMOVE;
-    if (prev_move != NOMOVE) {
-        prev_to = TO_CASTLE(prev_move);
-        prev_piece = pos->history[pos->ply-1].piece;
-        score += worker->counter_history[prev_piece][prev_to][piece][to];
-    }
-
-    /* Add score from follow up history table */
-    prev_move = ((pos->ply >= 2) &&
-                !ISNULLMOVE(pos->history[pos->ply-1].move) &&
-                !ISNULLMOVE(pos->history[pos->ply-2].move))?
-                pos->history[pos->ply-2].move:NOMOVE;
-    if (prev_move != NOMOVE) {
-        prev_to = TO_CASTLE(prev_move);
-        prev_piece = pos->history[pos->ply-2].piece;
-        score += worker->follow_history[prev_piece][prev_to][piece][to];
-    }
-
-    return score;
+    return hist + chist + fhist;;
 }
 
 void history_get_scores(struct search_worker *worker, uint32_t move,
