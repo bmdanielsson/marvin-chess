@@ -27,15 +27,19 @@
 #include "data.h"
 
 /* The maximum allowed history score */
-#define MAX_HISTORY_SCORE (INT_MAX/3)
+#define MAX_HISTORY_SCORE 16384
 
-/* The maximum depth used for history scores */
-#define MAX_HISTORY_DEPTH 20
+static int calc_update_delta(int depth, bool best)
+{
+    int delta;
+
+    delta = 32*depth*depth;
+    return best ? delta: -delta;
+}
 
 static void update_history_score(int *score, int delta)
 {
-    *score += 32*delta - *score*abs(delta)/512;
-    *score = MIN(*score, MAX_HISTORY_SCORE);
+    *score += delta - *score*abs(delta)/MAX_HISTORY_SCORE;
 }
 
 void history_clear_tables(struct search_worker *worker)
@@ -68,9 +72,6 @@ void history_update_tables(struct search_worker *worker, struct movelist *list,
 
     pos = &worker->pos;
 
-    /* Limit the depth used for bonus/penalty calculations */
-    depth = MIN(depth, MAX_HISTORY_DEPTH);
-
     /* Get the opponents previous move */
     move_c = ((pos->ply >= 1) &&
              !ISNULLMOVE(pos->history[pos->ply-1].move))?
@@ -90,7 +91,7 @@ void history_update_tables(struct search_worker *worker, struct movelist *list,
         to = TO_CASTLE(move);
 
         /* Calculate the bonus to apply */
-        delta = (move != best_move)?-(depth*depth):depth*depth;
+        delta = calc_update_delta(depth, move == best_move);
 
         /* Update history table */
         update_history_score(&worker->history_table[piece][to], delta);
