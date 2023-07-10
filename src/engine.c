@@ -36,6 +36,11 @@
 #include "thread.h"
 #include "smp.h"
 #include "position.h"
+#include "hash.h"
+#include "egtb.h"
+
+/* The maximum length of a line in the configuration file */
+#define CFG_MAX_LINE_LENGTH 1024
 
 /* Size of the receive buffer */
 #define RX_BUFFER_SIZE 4096
@@ -148,6 +153,41 @@ static void cmd_perft(char *cmd, struct gamestate *state)
 static void cmd_bench(void)
 {
     test_run_benchmark();
+}
+
+void engine_read_config_file(char *cfgfile)
+{
+    FILE *fp;
+    char buffer[CFG_MAX_LINE_LENGTH];
+    char *line;
+    int  int_val;
+
+    /* Initialise */
+    fp = fopen(cfgfile, "r");
+    if (fp == NULL) {
+        return;
+    }
+
+    /* Parse the file line by line */
+    line = fgets(buffer, CFG_MAX_LINE_LENGTH, fp);
+    while (line != NULL) {
+        if (sscanf(line, "HASH_SIZE=%d", &int_val) == 1) {
+            engine_default_hash_size = CLAMP(int_val, MIN_MAIN_HASH_SIZE,
+                                             hash_tt_max_size());
+        } else if (sscanf(line, "LOG_LEVEL=%d", &int_val) == 1) {
+            dbg_set_log_level(int_val);
+        } else if (sscanf(line, "SYZYGY_PATH=%s", engine_syzygy_path) == 1) {
+            egtb_init(engine_syzygy_path);
+        } else if (sscanf(line, "NUM_THREADS=%d", &int_val) == 1) {
+            engine_default_num_threads = CLAMP(int_val, 1, MAX_WORKERS);
+        }
+
+        /* Next line */
+        line = fgets(buffer, CFG_MAX_LINE_LENGTH, fp);
+    }
+
+    /* Clean up */
+    fclose(fp);
 }
 
 struct gamestate* engine_create_game_state(void)

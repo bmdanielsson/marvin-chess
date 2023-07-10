@@ -31,7 +31,6 @@
 #include "polybook.h"
 #include "config.h"
 #include "test.h"
-#include "egtb.h"
 #include "smp.h"
 #include "hash.h"
 #include "see.h"
@@ -39,48 +38,9 @@
 #include "nnue.h"
 #include "data.h"
 
-/* The maximum length of a line in the configuration file */
-#define CFG_MAX_LINE_LENGTH 1024
-
-/* Configration values */
 static void cleanup(void)
 {
     dbg_log_close();
-}
-
-static void read_config_file(void)
-{
-    FILE *fp;
-    char buffer[CFG_MAX_LINE_LENGTH];
-    char *line;
-    int  int_val;
-
-	/* Initialise */
-    fp = fopen(CONFIGFILE_NAME, "r");
-	if (fp == NULL) {
-		return;
-    }
-
-	/* Parse the file line by line */
-	line = fgets(buffer, CFG_MAX_LINE_LENGTH, fp);
-	while (line != NULL) {
-	    if (sscanf(line, "HASH_SIZE=%d", &int_val) == 1) {
-            engine_default_hash_size = CLAMP(int_val, MIN_MAIN_HASH_SIZE,
-                                             hash_tt_max_size());
-        } else if (sscanf(line, "LOG_LEVEL=%d", &int_val) == 1) {
-            dbg_set_log_level(int_val);
-        } else if (sscanf(line, "SYZYGY_PATH=%s", engine_syzygy_path) == 1) {
-            egtb_init(engine_syzygy_path);
-        } else if (sscanf(line, "NUM_THREADS=%d", &int_val) == 1) {
-            engine_default_num_threads = CLAMP(int_val, 1, MAX_WORKERS);
-        }
-
-        /* Next line */
-		line = fgets(buffer, CFG_MAX_LINE_LENGTH, fp);
-    }
-
-	/* Clean up */
-	fclose(fp);
 }
 
 static void print_version(void)
@@ -116,7 +76,7 @@ int main(int argc, char *argv[])
     engine_using_nnue = engine_loaded_net;
 
     /* Read configuration file */
-    read_config_file();
+    engine_read_config_file(CONFIGFILE_NAME);
 
     /* Initialize components */
     data_init();

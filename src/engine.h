@@ -50,6 +50,13 @@ extern bool engine_loaded_net;
 extern char engine_eval_file[MAX_PATH_LENGTH+1];
 
 /*
+ * Read and parse a config file.
+ *
+ * @param cfgfile The file to read.
+ */
+void engine_read_config_file(char *cfgfile);
+
+/*
  * Create a new game state object.
  *
  * @return Returns the new object.
