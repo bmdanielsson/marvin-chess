@@ -48,11 +48,9 @@ void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
  *
  * @param input Input values.
  * @param output Output values.
- * @param shift Value to scale with.
  * @param nvalues The number of values.
  */
-void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
-                          int nvalues);
+void simd_scale_and_clamp(int32_t *input, uint8_t *output, int nvalues);
 
 /*
  * SIMD implementation of a clamp operation. Values and the clamped between 0

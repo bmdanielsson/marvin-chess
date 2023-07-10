@@ -42,6 +42,7 @@
 #define MIN_SIZE 1
 #endif
 
+#define WEIGHT_SCALE_BITS 6
 #define MAX_QUANTIZED_ACTIVATION 127.0f
 
 #if defined(USE_AVX2) || defined(USE_SSE)
@@ -166,8 +167,7 @@ void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
 #endif
 }
 
-void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
-                          int nvalues)
+void simd_scale_and_clamp(int32_t *input, uint8_t *output, int nvalues)
 {
 #if defined(USE_AVX2)
     int k;
@@ -183,12 +183,12 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
         __m256i v1 = _mm256_load_si256(pi++);
         __m256i v2 = _mm256_load_si256(pi++);
         __m256i v16_1 = _mm256_packs_epi32(v1, v2);
-        v16_1 = _mm256_srai_epi16(v16_1, shift);
+        v16_1 = _mm256_srai_epi16(v16_1, WEIGHT_SCALE_BITS);
 
         v1 = _mm256_loadu_si256(pi++);
         v2 = _mm256_loadu_si256(pi++);
         __m256i v16_2 = _mm256_packs_epi32(v1, v2);
-        v16_2 = _mm256_srai_epi16(v16_2, shift);
+        v16_2 = _mm256_srai_epi16(v16_2, WEIGHT_SCALE_BITS);
 
         __m256i v8 = _mm256_packs_epi16(v16_1, v16_2);
         __m256i s = _mm256_permutevar8x32_epi32(v8, idx);
@@ -207,23 +207,23 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
 
     for (k=0;k<niterations;k++) {
         __m128i v1 = _mm_load_si128(pi++);
-        v1 = _mm_srai_epi32(v1, shift);
+        v1 = _mm_srai_epi32(v1, WEIGHT_SCALE_BITS);
         v1 = _mm_max_epi32(v1, min);
         v1 = _mm_min_epi32(v1, max);
 
         __m128i v2 = _mm_load_si128(pi++);
-        v2 = _mm_srai_epi32(v2, shift);
+        v2 = _mm_srai_epi32(v2, WEIGHT_SCALE_BITS);
         v2 = _mm_max_epi32(v2, min);
         v2 = _mm_min_epi32(v2, max);
 
         __m128i o1 =  _mm_packs_epi32(v1, v2);
         v1 = _mm_load_si128(pi++);
-        v1 = _mm_srai_epi32(v1, shift);
+        v1 = _mm_srai_epi32(v1, WEIGHT_SCALE_BITS);
         v1 = _mm_max_epi32(v1, min);
         v1 = _mm_min_epi32(v1, max);
 
         v2 = _mm_load_si128(pi++);
-        v2 = _mm_srai_epi32(v2, shift);
+        v2 = _mm_srai_epi32(v2, WEIGHT_SCALE_BITS);
         v2 = _mm_max_epi32(v2, min);
         v2 = _mm_min_epi32(v2, max);
 
@@ -242,13 +242,13 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
     int16x8_t max = vmovq_n_s16((int16_t)MAX_QUANTIZED_ACTIVATION);
 
     for (k=0;k<niterations;k++) {
-        int16x8_t lower = vcombine_s16(vshrn_n_s32(*(pi++), shift),
-                                       vshrn_n_s32(*(pi++), shift));
+        int16x8_t lower = vcombine_s16(vshrn_n_s32(*(pi++), WEIGHT_SCALE_BITS),
+                                       vshrn_n_s32(*(pi++), WEIGHT_SCALE_BITS));
         lower = vminq_s16(lower, max);
         lower = vmaxq_s16(lower, min);
 
-        int16x8_t upper = vcombine_s16(vshrn_n_s32(*(pi++), shift),
-                                       vshrn_n_s32(*(pi++), shift));
+        int16x8_t upper = vcombine_s16(vshrn_n_s32(*(pi++), WEIGHT_SCALE_BITS),
+                                       vshrn_n_s32(*(pi++), WEIGHT_SCALE_BITS));
         upper = vminq_s16(upper, max);
         upper = vmaxq_s16(upper, min);
 
@@ -258,7 +258,8 @@ void simd_scale_and_clamp(int32_t *input, uint8_t *output, int shift,
     int k;
 
     for (k=0;k<nvalues;k++) {
-        output[k] = CLAMP((input[k]>>shift), 0, (int)MAX_QUANTIZED_ACTIVATION);
+        output[k] = CLAMP((input[k]>>WEIGHT_SCALE_BITS), 0,
+                          (int)MAX_QUANTIZED_ACTIVATION);
     }
 #endif
 }

@@ -39,7 +39,6 @@
 INCBIN(nnue_net, NETFILE_NAME);
 
 /* NNUE quantization parameters */
-#define WEIGHT_SCALE_BITS 6
 #define OUTPUT_SCALE 16.0f
 
 /* Definition of the network architcechure */
@@ -233,7 +232,7 @@ static void fc_layer_forward(int idx, struct net_data *data, bool output)
                     layers[idx].weights.i8);
     if (!output) {
         simd_scale_and_clamp(data->intermediate, data->output,
-                             WEIGHT_SCALE_BITS, layer_sizes[idx]);
+                             layer_sizes[idx]);
     }
 }
 
