@@ -24,7 +24,7 @@ To compare the builds run Marvin in a terminal (or double-click on the exe-file 
 
 # Networks
 
-Starting from version 5.0.0 Marvin uses a neural network for evaluation. A network file is included in the binaries package and should be put in the same folder as the engine executable. Network files can also be downloaded [here](https://github.com/bmdanielsson/marvin-nets).
+Starting from version 5.0.0 Marvin uses a neural network for evaluation. As of version 6.0.0 the network file file is embedded in the executable so there is no need to downwload any extra files.
 
 # Building
 
