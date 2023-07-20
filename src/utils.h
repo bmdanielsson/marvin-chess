@@ -193,8 +193,8 @@ bool is64bit(void);
  * Get the size of a file in a portable way.
  *
  * @param file The file.
- * @return The size of the file, or 0xFFFFFFFF in case of error.
+ * @return The size of the file, or -1 in case of error.
  */
-uint32_t get_file_size(char *file);
+int64_t get_file_size(char *file);
 
 #endif

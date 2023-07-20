@@ -23,6 +23,7 @@
 #include <windows.h>
 #include <sys/timeb.h>
 #include <process.h>
+#include <io.h>
 #else
 #include <sys/time.h>
 #include <sys/types.h>
@@ -363,26 +364,33 @@ bool is64bit(void)
     return sizeof(dummy) == 8;
 }
 
-uint32_t get_file_size(char *file)
+int64_t get_file_size(char *file)
 {
     assert(file != NULL);
 
 #ifdef WINDOWS
-    HANDLE fh;
-    DWORD  size;
+    HANDLE        fh;
+    FILE          *fp;
+    LARGE_INTEGER size;
 
-    fh = CreateFile(file, GENERIC_READ, 0, NULL, OPEN_EXISTING,
-                    FILE_ATTRIBUTE_NORMAL, NULL);
-    size = GetFileSize(fh, NULL);
-    CloseHandle(fh);
+    fp = fopen(file, "rb");
+    if (fp == NULL) {
+        return -1;
+    }
+    fh = (HANDLE)_get_osfhandle(fileno(fp));
+    if (!GetFileSizeEx(fh, &size)) {
+        fclose(fp);
+        return -1;
+    }
+    fclose(fp);
 
-    return (uint32_t)size;
+    return (int64_t)size.QuadPart;
 #else
     struct stat sb;
 
     if (stat(file, &sb) != 0) {
-        return 0xFFFFFFFF;
+        return -1;
     }
-    return (uint32_t)sb.st_size;
+    return (int64_t)sb.st_size;
 #endif
 }

@@ -415,8 +415,8 @@ void nnue_reset_accumulator(struct position *pos)
 
 bool nnue_load_net(char *path)
 {
-    uint32_t size;
-    size_t   count;
+    int32_t  size;
+    int32_t  count;
     uint8_t  *data = NULL;
     uint8_t  *iter;
     FILE     *fh = NULL;
@@ -424,8 +424,12 @@ bool nnue_load_net(char *path)
 
     /* If an external net is specified then read the complete file */
     if (path != NULL) {
-        size = get_file_size(path);
-        if (size != calculate_net_size()) {
+        size = (int32_t)get_file_size(path);
+        if (size < 0) {
+            ret = false;
+            goto exit;
+        }
+        if (size != (int32_t)calculate_net_size()) {
             ret = false;
             goto exit;
         }
@@ -435,15 +439,15 @@ bool nnue_load_net(char *path)
             goto exit;
         }
         data = malloc(size);
-        count = fread(data, 1, size, fh);
+        count = (int32_t)fread(data, 1, size, fh);
         if (count != size) {
             ret = false;
             goto exit;
         }
     } else {
         data = (uint8_t*)nnue_net_data;
-        size = (uint32_t)nnue_net_size;
-        if (size != calculate_net_size()) {
+        size = (int32_t)nnue_net_size;
+        if (size != (int32_t)calculate_net_size()) {
             ret = false;
             goto exit;
         }
