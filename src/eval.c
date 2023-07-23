@@ -31,6 +31,7 @@
 #include "engine.h"
 #include "nnue.h"
 #include "data.h"
+#include "position.h"
 
 /* Phase valuse for different piece types */
 #define PAWN_PHASE      0
@@ -927,7 +928,7 @@ int eval_evaluate(struct position *pos, bool force_hce)
      * If no player have enough material left
      * to checkmate then it's a draw.
      */
-    if (eval_is_material_draw(pos)) {
+    if (!pos_has_mating_material(pos)) {
         return 0;
     }
 
@@ -991,57 +992,4 @@ void eval_update_material(struct position *pos, int piece, bool added)
     }
 
     pos->material += delta*material_values[piece];
-}
-
-/*
- * The following combination of pieces can never lead to chekmate:
- * - King vs King
- * - King+Knight vs King
- * - King+Bishops vs King (if the bishops operate on the same color squares)
- */
-bool eval_is_material_draw(struct position *pos)
-{
-    int wb;
-    int wn;
-    int bb;
-    int bn;
-
-    if ((pos->bb_pieces[WHITE_PAWN] != 0ULL) ||
-        (pos->bb_pieces[BLACK_PAWN] != 0ULL) ||
-        (pos->bb_pieces[WHITE_ROOK] != 0ULL) ||
-        (pos->bb_pieces[BLACK_ROOK] != 0ULL) ||
-        (pos->bb_pieces[WHITE_QUEEN] != 0ULL) ||
-        (pos->bb_pieces[BLACK_QUEEN] != 0ULL)) {
-        return false;
-    }
-
-    wn = BITCOUNT(pos->bb_pieces[WHITE_KNIGHT]);
-    bn = BITCOUNT(pos->bb_pieces[BLACK_KNIGHT]);
-    wb = BITCOUNT(pos->bb_pieces[WHITE_BISHOP]);
-    bb = BITCOUNT(pos->bb_pieces[BLACK_BISHOP]);
-
-    /* King vs King */
-    if ((wn == 0) && (bn == 0) && (wb == 0) && (bb == 0)) {
-        return true;
-    }
-    /* Knight+King vs King */
-    if ((wn == 1) && (bn == 0) && (wb == 0) && (bb == 0)) {
-        return true;
-    }
-    /* King vs King+Knight */
-    if ((wn == 0) && (bn == 1) && (wb == 0) && (bb == 0)) {
-        return true;
-    }
-    /* King+Bishops vs King */
-    if ((wn == 0) && (bn == 0) && (wb > 0) && (bb == 0)) {
-        return !(((pos->bb_pieces[WHITE_BISHOP]&white_square_mask) != 0ULL) &&
-                    ((pos->bb_pieces[WHITE_BISHOP]&black_square_mask) != 0ULL));
-    }
-    /* King vs King+Bishops */
-    if ((wn == 0) && (bn == 0) && (wb == 0) && (bb > 0)) {
-        return !(((pos->bb_pieces[BLACK_BISHOP]&white_square_mask) != 0ULL) &&
-                    ((pos->bb_pieces[BLACK_BISHOP]&black_square_mask) != 0ULL));
-    }
-
-    return false;
 }

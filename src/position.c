@@ -879,8 +879,8 @@ bool pos_move_gives_check(struct position *pos, uint32_t move)
 
     /* Check if opponent king is attacked */
     gives_check = bb_is_attacked(pos,
-                                LSB(pos->bb_pieces[KING+FLIP_COLOR(pos->stm)]),
-                                pos->stm);
+                                 LSB(pos->bb_pieces[KING+FLIP_COLOR(pos->stm)]),
+                                 pos->stm);
 
     /* Remove piece from the desination square */
     CLEARBIT(pos->bb_pieces[dest_piece], to);
@@ -1019,6 +1019,59 @@ bool pos_is_castling_allowed(struct position *pos, int type)
     }
     if (ISBITSET(occ, rook_stop)) {
         return false;
+    }
+
+    return true;
+}
+
+/*
+ * The following combination of pieces can never lead to chekmate:
+ * - King vs King
+ * - King+Knight vs King
+ * - King+Bishops vs King (if the bishops operate on the same color squares)
+ */
+bool pos_has_mating_material(struct position *pos)
+{
+    int wb;
+    int wn;
+    int bb;
+    int bn;
+
+    if ((pos->bb_pieces[WHITE_PAWN] != 0ULL) ||
+        (pos->bb_pieces[BLACK_PAWN] != 0ULL) ||
+        (pos->bb_pieces[WHITE_ROOK] != 0ULL) ||
+        (pos->bb_pieces[BLACK_ROOK] != 0ULL) ||
+        (pos->bb_pieces[WHITE_QUEEN] != 0ULL) ||
+        (pos->bb_pieces[BLACK_QUEEN] != 0ULL)) {
+        return true;
+    }
+
+    wn = BITCOUNT(pos->bb_pieces[WHITE_KNIGHT]);
+    bn = BITCOUNT(pos->bb_pieces[BLACK_KNIGHT]);
+    wb = BITCOUNT(pos->bb_pieces[WHITE_BISHOP]);
+    bb = BITCOUNT(pos->bb_pieces[BLACK_BISHOP]);
+
+    /* King vs King */
+    if ((wn == 0) && (bn == 0) && (wb == 0) && (bb == 0)) {
+        return false;
+    }
+
+    /* Knight+King vs King */
+    if ((wn == 1) && (bn == 0) && (wb == 0) && (bb == 0)) {
+        return false;
+    }
+    if ((wn == 0) && (bn == 1) && (wb == 0) && (bb == 0)) {
+        return false;
+    }
+
+    /* King+Bishops vs King */
+    if ((wn == 0) && (bn == 0) && (wb > 0) && (bb == 0)) {
+        return (((pos->bb_pieces[WHITE_BISHOP]&white_square_mask) != 0ULL) &&
+                    ((pos->bb_pieces[WHITE_BISHOP]&black_square_mask) != 0ULL));
+    }
+    if ((wn == 0) && (bn == 0) && (wb == 0) && (bb > 0)) {
+        return (((pos->bb_pieces[BLACK_BISHOP]&white_square_mask) != 0ULL) &&
+                    ((pos->bb_pieces[BLACK_BISHOP]&black_square_mask) != 0ULL));
     }
 
     return true;

@@ -175,7 +175,7 @@ static enum game_result is_game_over(struct position *pos)
 	/* Check for draw by rul by rule */
     if ((pos->fifty > 100) ||
         is_three_fold_repetition(pos) ||
-        eval_is_material_draw(pos)) {
+        !pos_has_mating_material(pos)) {
 		return RESULT_DRAW_BY_RULE;
     }
 

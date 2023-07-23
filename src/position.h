@@ -145,4 +145,13 @@ bool pos_move_gives_check(struct position *pos, uint32_t move);
  */
 bool pos_is_castling_allowed(struct position *pos, int type);
 
+/*
+ * Check if either side has mating material.
+ *
+ * @param pos The position.
+ * @return Return true if at least one side has mating material,
+ *         false otherwise.
+ */
+bool pos_has_mating_material(struct position *pos);
+
 #endif

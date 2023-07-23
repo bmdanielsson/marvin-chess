@@ -46,12 +46,4 @@ void eval_init_material(struct position *pos);
  */
 void eval_update_material(struct position *pos, int piece, bool added);
 
-/*
- * Check if the position is a draw by insufficient material.
- *
- * @param pos The board structure.
- * @return Returns true if the position is a draw.
- */
-bool eval_is_material_draw(struct position *pos);
-
 #endif
