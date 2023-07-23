@@ -524,3 +524,27 @@ uint64_t key_update_castling(uint64_t key, int old_castle, int new_castle)
     key ^= castle_values[new_castle];
     return key;
 }
+
+uint64_t key_set_piece(uint64_t key, int piece, int sq)
+{
+    key ^= piece_values[piece][sq];
+    return key;
+}
+
+uint64_t key_set_ep_square(uint64_t key, int ep_sq)
+{
+    key ^= ep_values[ep_sq];
+    return key;
+}
+
+uint64_t key_set_side(uint64_t key, int color)
+{
+    key ^= color_values[color];
+    return key;
+}
+
+uint64_t key_set_castling(uint64_t key, int castle)
+{
+    key ^= castle_values[castle];
+    return key;
+}

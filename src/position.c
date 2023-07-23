@@ -31,6 +31,7 @@
 #include "movegen.h"
 #include "engine.h"
 #include "nnue.h"
+#include "eval.h"
 
 static void update_material(struct position *pos, int piece, bool added)
 {
@@ -1075,4 +1076,58 @@ bool pos_has_mating_material(struct position *pos)
     }
 
     return true;
+}
+
+bool pos_is_draw_by_rule(struct position *pos)
+{
+    int idx;
+    int nreps;
+
+    /* Check fifty move rule */
+    if (pos->fifty >= 100) {
+        return true;
+    }
+
+    /* Check material */
+    if (!pos_has_mating_material(pos)) {
+        return true;
+    }
+
+    /*
+     * Check draw by 3-fold repetition. Pawn moves and captures are
+     * irreversible so there is no need to to check older positions for
+     * repetitions. Since the fifty counter already keeps track of this to
+     * handle the fifty move rule this counter can be used here as well.
+     *
+     * Also there is no need to consider position where the other side is to
+     * move so only check every other position in the history.
+     */
+    nreps = 1;
+    idx = pos->ply - 2;
+    while ((idx >= 0) && (idx >= (pos->ply - pos->fifty)) && (nreps < 3)) {
+        if (pos->history[idx].key == pos->key) {
+            nreps++;
+        }
+        idx -= 2;
+    }
+
+    return nreps >= 3;
+}
+
+enum game_result pos_get_game_result(struct position *pos)
+{
+    struct movelist list;
+
+    /* Check for draw by rule */
+    if (pos_is_draw_by_rule(pos)) {
+        return RESULT_DRAW_BY_RULE;
+    }
+
+    /* Check for checkmate and stalemate */
+    gen_legal_moves(pos, &list);
+    if (list.size == 0) {
+        return pos_in_check(pos, pos->stm)?RESULT_CHECKMATE:RESULT_STALEMATE;
+    }
+
+    return RESULT_UNDETERMINED;
 }

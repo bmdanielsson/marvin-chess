@@ -221,7 +221,8 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
 
     /* Search the position for a move */
     if (best_move == NOMOVE) {
-        best_move = search_position(state, ponder && ponder_mode, &ponder_move);
+        best_move = search_position(state, ponder && ponder_mode, &ponder_move,
+                                    NULL);
     }
 
     /* Send the best move */

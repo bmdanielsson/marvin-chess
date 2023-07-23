@@ -19,6 +19,7 @@
 #define UTILS_H
 
 #include <stdint.h>
+#include <stdio.h>
 #include <stdbool.h>
 #include <time.h>
 
@@ -196,5 +197,15 @@ bool is64bit(void);
  * @return The size of the file, or -1 in case of error.
  */
 int64_t get_file_size(char *file);
+
+/*
+ * Set the position in the file in as portable way.
+ *
+ * @param fp The file pointer.
+ * @param offset The offset to use.
+ * @param whence The point the offset is calculated from.
+ * @return Returns 0 in case of success or -1 in case of error.
+ */
+int set_file_position(FILE *fp, int64_t offset, int whence);
 
 #endif

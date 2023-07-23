@@ -996,7 +996,7 @@ void search_init(void)
 }
 
 uint32_t search_position(struct gamestate *state, bool pondering,
-                         uint32_t *ponder_move)
+                         uint32_t *ponder_move, int *score)
 {
     int                  k;
     struct search_worker *worker;
@@ -1124,6 +1124,9 @@ uint32_t search_position(struct gamestate *state, bool pondering,
     /* Get the best move and the ponder move */
     if (best_pv->pv.size >= 1) {
         best_move = best_pv->pv.moves[0];
+        if (score != NULL) {
+            *score = best_pv->score;
+        }
         if (ponder_move != NULL) {
             *ponder_move = (best_pv->pv.size > 1)?best_pv->pv.moves[1]:NOMOVE;
         }

@@ -39,14 +39,6 @@
 #include "egtb.h"
 #include "smp.h"
 
-/* Possible game results */
-enum game_result {
-    RESULT_UNDETERMINED,
-    RESULT_CHECKMATE,
-    RESULT_STALEMATE,
-    RESULT_DRAW_BY_RULE
-};
-
 /* Different Xboard modes */
 static bool analyze_mode = false;
 static bool force_mode = false;
@@ -127,61 +119,6 @@ static void write_result(struct gamestate *state, enum game_result result)
 	}
 }
 
-static bool is_three_fold_repetition(struct position *pos)
-{
-    int idx;
-    int nreps;
-
-    /*
-     * Pawn moves and captures are irreversible and so there is no need to
-     * to check older positions for repetitions. Since the fifty counter
-     * already keeps track of this to handle the fifty move rule this
-     * counter can be used here as well.
-     *
-     * Also there is no need to consider position where the other side is to
-     * move so only check every other position in the history.
-     */
-    nreps = 1;
-    idx = pos->ply - 2;
-    while ((idx >= 0) && (idx >= (pos->ply - pos->fifty)) && (nreps < 3)) {
-        if (pos->history[idx].key == pos->key) {
-            nreps++;
-        }
-        idx -= 2;
-    }
-
-    return nreps >= 3;
-}
-
-/*
- * Check if the last move resulted in a position that ends the game.
- * For each possible move, test if it result in a legal position.
- * If at least one move result in a legal position,
- * then the game is not over. If there is no legal move
- * and the player is in check then there is a checkmate,
- * otherwise it is a stalemate. If it is not checkmate or stalemate,
- * test for draw.
- */
-static enum game_result is_game_over(struct position *pos)
-{
-    struct movelist list;
-
-	/* Check for checkmate and stalemate */
-    gen_legal_moves(pos, &list);
-    if (list.size == 0) {
-        return pos_in_check(pos, pos->stm)?RESULT_CHECKMATE:RESULT_STALEMATE;
-    }
-
-	/* Check for draw by rul by rule */
-    if ((pos->fifty > 100) ||
-        is_three_fold_repetition(pos) ||
-        !pos_has_mating_material(pos)) {
-		return RESULT_DRAW_BY_RULE;
-    }
-
-    return RESULT_UNDETERMINED;
-}
-
 static void make_engine_move(struct gamestate *state)
 {
     uint32_t         best_move = NOMOVE;
@@ -228,7 +165,7 @@ static void make_engine_move(struct gamestate *state)
         /* Search the position for a move */
         if (best_move == NOMOVE) {
             best_move = search_position(state, ponder_mode && ponder,
-                                        &ponder_move);
+                                        &ponder_move, NULL);
         }
 
         /*
@@ -250,7 +187,7 @@ static void make_engine_move(struct gamestate *state)
 		tc_stop_clock();
 
         /* Check if the game is over */
-        result = is_game_over(&state->pos);
+        result = pos_get_game_result(&state->pos);
         if (result != RESULT_UNDETERMINED) {
             write_result(state, result);
             game_over = true;
@@ -264,7 +201,7 @@ static void make_engine_move(struct gamestate *state)
              * the game to finish then cancel pondering.
             */
             (void)pos_make_move(&state->pos, ponder_move);
-            if (is_game_over(&state->pos) != RESULT_UNDETERMINED) {
+            if (pos_get_game_result(&state->pos) != RESULT_UNDETERMINED) {
                 pos_unmake_move(&state->pos);
                 break;
             }
@@ -293,7 +230,7 @@ static void xboard_cmd_analyze(struct gamestate *state)
         tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
 
         /* Search until told otherwise */
-        (void)search_position(state, false, NULL);
+        (void)search_position(state, false, NULL, NULL);
 
         /* Exit analyze mode if there is no pending command */
         cmd = engine_get_pending_command();
@@ -571,7 +508,7 @@ static void xboard_cmd_remove(struct gamestate *state)
         pos_unmake_move(&state->pos);
     }
 
-    game_over = is_game_over(&state->pos) != RESULT_UNDETERMINED;
+    game_over = pos_get_game_result(&state->pos) != RESULT_UNDETERMINED;
 }
 
 static void xboard_cmd_sd(char *cmd)
@@ -642,7 +579,7 @@ static void xboard_cmd_undo(struct gamestate *state)
         return;
     }
 
-    game_over = is_game_over(&state->pos) != RESULT_UNDETERMINED;
+    game_over = pos_get_game_result(&state->pos) != RESULT_UNDETERMINED;
 }
 
 static void xboard_cmd_usermove(char *cmd, struct gamestate *state,
@@ -671,7 +608,7 @@ static void xboard_cmd_usermove(char *cmd, struct gamestate *state,
     }
 
     /* Check if the game is over */
-    result = is_game_over(&state->pos);
+    result = pos_get_game_result(&state->pos);
     if (result != RESULT_UNDETERMINED) {
         write_result(state, result);
         game_over = true;

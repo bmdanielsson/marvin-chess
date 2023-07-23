@@ -22,6 +22,14 @@
 
 #include "types.h"
 
+/* Possible game results */
+enum game_result {
+    RESULT_UNDETERMINED,
+    RESULT_CHECKMATE,
+    RESULT_STALEMATE,
+    RESULT_DRAW_BY_RULE
+};
+
 /*
  * Reset a chess position structure.
  *
@@ -153,5 +161,21 @@ bool pos_is_castling_allowed(struct position *pos, int type);
  *         false otherwise.
  */
 bool pos_has_mating_material(struct position *pos);
+
+/*
+ * Check if a position is a draw according to the rules of chess.
+ *
+ * @param pos The position.
+ * @return Return true if the position is a draw, false otherwise.
+ */
+bool pos_is_draw_by_rule(struct position *pos);
+
+/*
+ * Get the game result of a position.
+ *
+ * @param pos The position.
+ * @return Returns the game result.
+ */
+enum game_result pos_get_game_result(struct position *pos);
 
 #endif

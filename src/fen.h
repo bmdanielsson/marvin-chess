@@ -47,4 +47,12 @@ bool fen_setup_board(struct position *pos, char *fenstr);
  */
 void fen_build_string(struct position *pos, char *fenstr);
 
+/*
+ * Get the FEN string of an FRC starting position.
+ *
+ * @param id The id of the position.
+ * @return Returns the FEN string.
+ */
+char* fen_get_frc_start_position(int id);
+
 #endif

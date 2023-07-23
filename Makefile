@@ -158,6 +158,7 @@ SOURCES = src/bitboard.c \
           src/position.c \
           src/search.c \
           src/see.c \
+          src/sfen.c \
           src/simd.c \
           src/smp.c \
           src/test.c \

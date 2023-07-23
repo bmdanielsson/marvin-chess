@@ -37,6 +37,7 @@
 #include "search.h"
 #include "nnue.h"
 #include "data.h"
+#include "sfen.h"
 
 static void cleanup(void)
 {
@@ -100,6 +101,8 @@ int main(int argc, char *argv[])
                (MATCH(argv[1], "-v") || MATCH(argv[1], "--version"))) {
         print_version();
         return 0;
+    } else if ((argc >= 2) && (MATCH(argv[1], "--generate"))) {
+        return sfen_generate(argc, argv);
     }
 
     /* Create game state */

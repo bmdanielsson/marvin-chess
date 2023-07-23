@@ -394,3 +394,28 @@ int64_t get_file_size(char *file)
     return (int64_t)sb.st_size;
 #endif
 }
+
+/*
+ * Set the position in the file in as portable way.
+ *
+ * @param fp The file pointer.
+ * @param offset The offset to use.
+ * @param whence The point the offset is calculated from.
+ * @return Returns 0 in case of success or -1 in case of error.
+ */
+int set_file_position(FILE *fp, int64_t offset, int whence)
+{
+    assert(fp != NULL);
+
+#ifdef WINDOWS
+    int ret;
+
+	ret = _fseeki64(fp, offset, whence);
+    return ret >= 0?0:-1;
+#else
+    int ret;
+
+    ret = fseeko(fp, offset, whence);
+    return ret >= 0?0:-1;
+#endif
+}

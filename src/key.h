@@ -45,7 +45,7 @@ uint64_t key_update_piece(uint64_t key, int piece, int sq);
  *
  * @param key The key to update.
  * @param old_sq The old en-passant square.
-  * @param new_sq The new en-passant square.
+ * @param new_sq The new en-passant square.
  * @return Returns the updated key.
  */
 uint64_t key_update_ep_square(uint64_t key, int old_sq, int new_sq);
@@ -67,6 +67,44 @@ uint64_t key_update_side(uint64_t key, int new_color);
  * @param new_castle The new castling availability.
  * @return Returns the updated key.
  */
-uint64_t key_update_castling(uint64_t key, int old_castle, int new_castle);
+uint64_t key_update_castling(uint64_t key, int old_castle,
+                             int new_castle);
+
+/*
+ * Set a piece in the key.
+ *
+ * @param key The key to update.
+ * @param piece The piece to add/remove.
+ * @param sq The square.
+ * @return Returns the updated key.
+ */
+uint64_t key_set_piece(uint64_t key, int piece, int sq);
+
+/*
+ * Set the en passant square in the key.
+ *
+ * @param key The key to update.
+ * @param ep_sq The en-passant square.
+ * @return Returns the updated key.
+ */
+uint64_t key_set_ep_square(uint64_t key, int ep_sq);
+
+/*
+ * Set the side to move in the key.
+ *
+ * @param key The key to update.
+ * @param color The color.
+ * @return Returns the updated key.
+ */
+uint64_t key_set_side(uint64_t key, int color);
+
+/*
+ * Set the castling availability status in the key.
+ *
+ * @param key The key to update.
+ * @param castle The castling availability.
+ * @return Returns the updated key.
+ */
+uint64_t key_set_castling(uint64_t key, int castle);
 
 #endif
