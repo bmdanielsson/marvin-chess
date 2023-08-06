@@ -76,9 +76,6 @@ static int lmp_counts[] = {0, 4, 6, 8, 12, 17, 24, 33, 44, 57, 72};
 #define SEE_QUIET_MARGIN(d) (-100)*(d)
 #define SEE_TACTICAL_MARGIN(d) (-29)*(d)*(d)
 
-/* Margin used for delta pruning */
-#define DELTA_MARGIN 200
-
 /* Configuration constants for singular extensions */
 #define SE_DEPTH 8
 
@@ -145,30 +142,6 @@ static bool is_filtered_move(struct search_worker *worker, uint32_t move)
         if (move == worker->state->move_filter.moves[k]) {
             return true;
         }
-    }
-    return false;
-}
-
-static bool is_pawn_push(struct position *pos, uint32_t move)
-{
-    int from;
-    int to;
-    int piece;
-    int color;
-
-    from = FROM(move);
-    to = TO(move);
-    piece = pos->pieces[from];
-    color = COLOR(piece);
-
-    if (VALUE(pos->pieces[from]) != PAWN) {
-        return false;
-    }
-    if ((color == WHITE) && (RANKNR(to) >= RANK_6)) {
-        return true;
-    }
-    if ((color == BLACK) && (RANKNR(to) <= RANK_3)) {
-        return true;
     }
     return false;
 }
@@ -261,28 +234,6 @@ static void checkup(struct search_worker *worker)
     }
 }
 
-static int material_gain(struct position *pos, uint32_t move)
-{
-    int gain;
-
-    gain = 0;
-
-    /* Consider gain from capture moves */
-    if (ISCAPTURE(move)) {
-        gain += material_values[pos->pieces[TO(move)]];
-    } else if (ISENPASSANT(move)) {
-        gain += material_values[PAWN+FLIP_COLOR(pos->stm)];
-    }
-
-    /* Consider additional gain from promotion moves */
-    if (ISPROMOTION(move)) {
-        gain += material_values[PROMOTION(move)+pos->stm];
-        gain -= material_values[PAWN+pos->stm];
-    }
-
-    return gain;
-}
-
 static int quiescence(struct search_worker *worker, int depth, int alpha,
                       int beta)
 {
@@ -364,21 +315,6 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
         if (!in_check && ISCAPTURE(move) &&
             select_is_bad_capture_phase(&ms)) {
             continue;
-        }
-
-        /*
-         * Futility pruning for the quiescence search (also known as delta
-         * pruning). If the capture, even without a recapture, can't raise
-         * alpha (with a certain margin) then it's probably not worth the
-         * effort to search the move.
-         */
-        if (!in_check &&
-            pos_has_non_pawn(pos, FLIP_COLOR(pos->stm)) &&
-            !is_pawn_push(pos, move) &&
-            !pos_move_gives_check(pos, move)) {
-            if ((static_score+material_gain(pos, move)+DELTA_MARGIN) < alpha) {
-                continue;
-            }
         }
 
         /* Recursivly search the move */
