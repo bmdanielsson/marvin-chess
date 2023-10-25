@@ -933,12 +933,10 @@ int eval_evaluate(struct position *pos, bool force_hce)
     }
 
     /* Check if NNUE or classic eval should be used */
-    if (engine_using_nnue && engine_loaded_net && !force_hce &&
-        (abs(pos->material) < HYBRID_EVAL_THRESHOLD)) {
+    if (engine_using_nnue && engine_loaded_net && !force_hce) {
         if ((pos->worker == NULL) ||
             !hash_nnue_lookup(pos->worker, &nnue_score)) {
             nnue_score = nnue_evaluate(pos);
-            nnue_score = (nnue_score*361)/410;
             if (pos->worker != NULL) {
                 hash_nnue_store(pos->worker, nnue_score);
             }
