@@ -383,8 +383,8 @@ struct nnue_update {
 };
 
 /* Accumulator for NNUE input features for a position */
-#define NNUE_NUM_INPUT_FEATURES 64*64*10
-#define NNUE_MAX_ACTIVE_FEATURES 30
+#define NNUE_NUM_INPUT_FEATURES 64*12
+#define NNUE_MAX_ACTIVE_FEATURES 32
 #define NNUE_NUM_LAYERS 4
 #define NNUE_TRANSFORMER_SIZE 256
 struct nnue_accumulator {

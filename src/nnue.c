@@ -42,7 +42,7 @@ INCBIN(nnue_net, NETFILE_NAME);
 #define OUTPUT_SCALE 16.0f
 
 /* Definition of the network architcechure */
-#define NET_VERSION 0x00000007
+#define NET_VERSION 0x00000008
 #define NET_HEADER_SIZE 4
 static int model_layer_sizes[NNUE_NUM_LAYERS] =
                                         {NNUE_TRANSFORMER_SIZE*2, 8, 16, 1};
@@ -73,7 +73,7 @@ struct net_data {
 static struct layer layers[NNUE_NUM_LAYERS];
 static int layer_sizes[NNUE_NUM_LAYERS];
 
-static int feature_index(int sq, int piece, int king_sq, int side)
+static int feature_index(int sq, int piece, int side)
 {
     int piece_index;
 
@@ -85,13 +85,12 @@ static int feature_index(int sq, int piece, int king_sq, int side)
      */
     if (side == BLACK) {
         sq = MIRROR(sq);
-        king_sq = MIRROR(king_sq);
         piece_index = FLIP_COLOR(piece)*NSQUARES;
     } else {
         piece_index = piece*NSQUARES;
     }
 
-    return sq + piece_index + (NPIECES-2)*NSQUARES*king_sq;
+    return sq + piece_index;
 }
 
 static void accumulator_propagate(struct position *pos, bool update_stm)
@@ -115,18 +114,20 @@ static void accumulator_add(struct position *pos, bool update_stm,
 {
     struct nnue_accumulator *acc;
     int16_t                 *data;
+    int                     k;
     uint32_t                index;
     uint32_t                offset;
     int                     side;
     int                     king_sq;
 
     acc = &pos->eval_stack[pos->height].accumulator;
-    for (side=0;side<NSIDES;side++) {
-        if (update_stm || (side != pos->stm)) {
-            data = &acc->data[side][0];
-            king_sq = LSB(pos->bb_pieces[side+KING]);
-            index = feature_index(sq, piece, king_sq, side);
-            offset = (layer_sizes[0]/2)*index;
+    data = &acc->data[side][0];
+
+    /* Apply required updates to the accumulator */
+    for (k=0;k<acc->nupdates;k++) {
+        index = feature_index(acc->updates[k].sq, acc->updates[k].piece, side);
+        offset = (layer_sizes[0]/2)*index;
+        if (acc->updates[k].add) {
             simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
         }
     }
@@ -156,7 +157,6 @@ static void accumulator_remove(struct position *pos, bool update_stm,
 
 static void accumulator_refresh(struct position *pos, int side)
 {
-    int      king_sq;
     int      sq;
     uint32_t index;
     uint32_t offset;
@@ -169,16 +169,11 @@ static void accumulator_refresh(struct position *pos, int side)
     /* Add biases */
     simd_copy(layers[0].biases.i16, data, layer_sizes[0]/2);
 
-    /* Find the location of the friendly king */
-    king_sq = LSB(pos->bb_pieces[side+KING]);
-
-    /* Construct a bitboard of all pieces excluding the two kings */
-    bb = pos->bb_all&(~(pos->bb_pieces[WHITE_KING]|pos->bb_pieces[BLACK_KING]));
-
     /* Update the accumulator based on each piece */
+    bb = pos->bb_all;
     while (bb != 0ULL) {
         sq = POPBIT(&bb);
-        index = feature_index(sq, pos->pieces[sq], king_sq, side);
+        index = feature_index(sq, pos->pieces[sq], side);
         offset = (layer_sizes[0]/2)*index;
         simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
     }
