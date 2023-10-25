@@ -90,7 +90,7 @@ enum {
 /* The value of a piece */
 #define VALUE(p) ((p)&(~BLACK))
 
-/* Change WHITE to BLACK and vive versa. */
+/* Change WHITE to BLACK and vice versa. */
 #define FLIP_COLOR(c) ((c)^BLACK)
 
 /* Constants for the number of different squares/ranks/files */
@@ -375,22 +375,13 @@ struct nnue_cache_item {
     int score;
 };
 
-/* Update to apply to the NNUE accumulator */
-struct nnue_update {
-    uint8_t piece;
-    uint8_t sq;
-    bool add;
-};
-
 /* Accumulator for NNUE input features for a position */
-#define NNUE_NUM_INPUT_FEATURES 64*64*10
-#define NNUE_MAX_ACTIVE_FEATURES 30
+#define NNUE_NUM_INPUT_FEATURES 64*12
+#define NNUE_MAX_ACTIVE_FEATURES 32
 #define NNUE_NUM_LAYERS 4
 #define NNUE_TRANSFORMER_SIZE 256
 struct nnue_accumulator {
     alignas(64) int16_t data[NSIDES][NNUE_TRANSFORMER_SIZE];
-    bool refresh[NSIDES];
-    bool up2date;
 };
 
 /* Item in the evaluation stack */
