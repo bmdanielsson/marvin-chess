@@ -924,14 +924,6 @@ int eval_evaluate(struct position *pos, bool force_hce)
 
     assert(valid_position(pos));
 
-    /*
-     * If no player have enough material left
-     * to checkmate then it's a draw.
-     */
-    if (!pos_has_mating_material(pos)) {
-        return 0;
-    }
-
     /* Check if NNUE or classic eval should be used */
     if (engine_using_nnue && engine_loaded_net && !force_hce) {
         if ((pos->worker == NULL) ||

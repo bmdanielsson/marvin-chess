@@ -272,7 +272,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
     }
 
     /* Evaluate the position */
-    static_score = eval_evaluate(pos, false);
+    static_score = pos_has_mating_material(pos)?eval_evaluate(pos, false):0;
 
     /* If we have reached the maximum depth then we stop */
     if (pos->height >= (MAX_PLY-1)) {
@@ -459,7 +459,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * Evaluate the position in order to get a score
      * to use for pruning decisions.
      */
-    static_score = eval_evaluate(pos, false);
+    static_score = pos_has_mating_material(pos)?eval_evaluate(pos, false):0;
     improving = (pos->height >= 2 &&
                         static_score > pos->eval_stack[pos->height-2].score);
 
@@ -530,7 +530,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
             pos_has_non_pawn(&worker->pos, pos->stm)) {
             threshold = beta + PROBCUT_MARGIN;
 
-            select_init_node(&ms, worker, true, in_check, tt_move, false, NO_SQUARE, depth);
+            select_init_node(&ms, worker, true, in_check, tt_move, false,
+                             NO_SQUARE, depth);
             while (select_get_move(&ms, worker, &move)) {
                 /*
                  * Skip non-captures and captures that are not
@@ -594,7 +595,8 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     best_score = -INFINITE_SCORE;
     movenumber = 0;
     found_move = false;
-    select_init_node(&ms, worker, false, in_check, tt_move, false, NO_SQUARE, depth);
+    select_init_node(&ms, worker, false, in_check, tt_move, false, NO_SQUARE,
+                     depth);
     while (select_get_move(&ms, worker, &move)) {
         if (is_root && (worker->multipv > 1) && is_multipv_move(worker, move)) {
             continue;
