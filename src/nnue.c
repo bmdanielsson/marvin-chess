@@ -32,6 +32,7 @@
 #include "bitboard.h"
 #include "simd.h"
 #include "data.h"
+#include "hash.h"
 
 #define INCBIN_PREFIX
 #define INCBIN_STYLE INCBIN_STYLE_SNAKE
@@ -493,10 +494,20 @@ exit:
 
 int16_t nnue_evaluate(struct position *pos)
 {
+    int             score;
     struct net_data data;
+    
+    if ((pos->worker != NULL) && hash_nnue_lookup(pos->worker, &score)) {
+        return score;
+    }
 
     network_forward(pos, &data);
-    return data.intermediate[0]/OUTPUT_SCALE;
+    score = data.intermediate[0]/OUTPUT_SCALE;
+    if (pos->worker != NULL) {
+        hash_nnue_store(pos->worker, score);
+    }
+
+    return score;
 }
 
 void nnue_make_move(struct position *pos, uint32_t move)
