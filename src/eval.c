@@ -926,13 +926,7 @@ int eval_evaluate(struct position *pos, bool force_hce)
 
     /* Check if NNUE or classic eval should be used */
     if (engine_using_nnue && engine_loaded_net && !force_hce) {
-        if ((pos->worker == NULL) ||
-            !hash_nnue_lookup(pos->worker, &nnue_score)) {
-            nnue_score = nnue_evaluate(pos);
-            if (pos->worker != NULL) {
-                hash_nnue_store(pos->worker, nnue_score);
-            }
-        }
+        nnue_score = nnue_evaluate(pos);
         pos->eval_stack[pos->height].score = nnue_score;
         return nnue_score;
     }
