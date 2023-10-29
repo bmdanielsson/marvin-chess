@@ -1060,6 +1060,8 @@ bool pos_has_mating_material(struct position *pos)
     if ((wn == 1) && (bn == 0) && (wb == 0) && (bb == 0)) {
         return false;
     }
+
+    /* King vs King+Knight */
     if ((wn == 0) && (bn == 1) && (wb == 0) && (bb == 0)) {
         return false;
     }
@@ -1069,6 +1071,8 @@ bool pos_has_mating_material(struct position *pos)
         return (((pos->bb_pieces[WHITE_BISHOP]&white_square_mask) != 0ULL) &&
                     ((pos->bb_pieces[WHITE_BISHOP]&black_square_mask) != 0ULL));
     }
+
+    /* King vs King+Bishops */
     if ((wn == 0) && (bn == 0) && (wb == 0) && (bb > 0)) {
         return (((pos->bb_pieces[BLACK_BISHOP]&white_square_mask) != 0ULL) &&
                     ((pos->bb_pieces[BLACK_BISHOP]&black_square_mask) != 0ULL));
