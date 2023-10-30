@@ -273,6 +273,7 @@ static int quiescence(struct search_worker *worker, int depth, int alpha,
 
     /* Evaluate the position */
     static_score = pos_has_mating_material(pos)?eval_evaluate(pos, false):0;
+    pos->eval_stack[pos->height].score = static_score;
 
     /* If we have reached the maximum depth then we stop */
     if (pos->height >= (MAX_PLY-1)) {
@@ -460,6 +461,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
      * to use for pruning decisions.
      */
     static_score = pos_has_mating_material(pos)?eval_evaluate(pos, false):0;
+    pos->eval_stack[pos->height].score = static_score;
     improving = (pos->height >= 2 &&
                         static_score > pos->eval_stack[pos->height-2].score);
 
