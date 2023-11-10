@@ -180,7 +180,7 @@ static void accumulator_refresh(struct position *pos, int side)
     }
 }
 
-static bool accumulator_refresh_required(struct position *pos, int side)
+static bool accumulator_refresh_required(struct position *pos)
 {
     /*
      * If there is no worker associated with the position then
@@ -195,16 +195,8 @@ static bool accumulator_refresh_required(struct position *pos, int side)
      * If the state of the previous position is not valid
      * then a full refresh is required.
      */
-    if ((pos->height == 0) ||
-        !pos->eval_stack[pos->height-1].accumulator.up2date) {
-        return true;
-    }
-
-    /*
-     * If the king for this side has moved then all feature
-     * indeces are invalid and a refresh is required.
-     */
-    return pos->eval_stack[pos->height].accumulator.refresh[side];
+    return (pos->height == 0) ||
+            !pos->eval_stack[pos->height-1].accumulator.up2date;
 }
 
 static void transformer_forward(struct position *pos, struct net_data *data)
@@ -218,11 +210,20 @@ static void transformer_forward(struct position *pos, struct net_data *data)
      * Check if the accumulator is up to date. If it's
      * not then it has to be updated.
      */
-    if (!pos->eval_stack[pos->height].accumulator.up2date) {
+    if (accumulator_refresh_required(pos)) {
+        refresh_accumulator(pos, WHITE);
+        refresh_accumulator(pos, BLACK);
+        pos->eval_stack[pos->height].accumulator.up2date = true;
+    } else if (!pos->eval_stack[pos->height].accumulator.up2date) {
         for (side=0;side<NSIDES;side++) {
-            if (accumulator_refresh_required(pos, side)) {
-                accumulator_refresh(pos, side);
-            }
+            /* Copy accumulator data from the previous ply */
+            acc_data = &pos->eval_stack[pos->height].accumulator.data[side][0];
+            prev_acc_data =
+                &pos->eval_stack[pos->height-1].accumulator.data[side][0];
+            simd_copy(prev_acc_data, acc_data, layer_sizes[0]/2);
+
+            /* Apply required updates */
+            update_accumulator(pos, side);
         }
 
         /* Mark the accumulator as up to date */
@@ -531,43 +532,68 @@ void nnue_make_move(struct position *pos, uint32_t move)
      * then a full refresh is required.
      */
     acc = &pos->eval_stack[pos->height].accumulator;
-    if ((pos->height == 0) ||
-        !pos->eval_stack[pos->height-1].accumulator.up2date) {
-        acc->up2date = false;
-        return;
-    }
-
-    acc->refresh[WHITE] = piece == WHITE_KING;
-    acc->refresh[BLACK] = piece == BLACK_KING;
-    acc->up2date = !acc->refresh[WHITE] && !acc->refresh[BLACK];
-
-    /* Copy accumulator data from the previous ply */
-    accumulator_propagate(pos, update_stm);
+    acc->up2date = false;
+    acc->nupdates = 0;
 
     if (ISKINGSIDECASTLE(move)) {
-        accumulator_remove(pos, false, ROOK + pos->stm, to);
-        accumulator_add(pos, false, ROOK + pos->stm,
-                        KINGCASTLE_KINGMOVE(to) - 1);
+        acc->updates[acc->nupdates].piece = KING + pos->stm;
+        acc->updates[acc->nupdates].sq = from;
+        acc->updates[acc->nupdates].add = false;
+        acc->nupdates++;
+
+        acc->updates[acc->nupdates].piece = KING + pos->stm;
+        acc->updates[acc->nupdates].sq = KINGCASTLE_KINGMOVE(to);
+        acc->updates[acc->nupdates].add = true;
+        acc->nupdates++;
+
+        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
+        acc->updates[acc->nupdates].sq = to;
+        acc->updates[acc->nupdates].add = false;
+        acc->nupdates++;
+
+        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
+        acc->updates[acc->nupdates].sq = KINGCASTLE_KINGMOVE(to) - 1;
+        acc->updates[acc->nupdates].add = true;
+        acc->nupdates++;
     } else if (ISQUEENSIDECASTLE(move)) {
-        accumulator_remove(pos, false, ROOK + pos->stm, to);
-        accumulator_add(pos, false, ROOK + pos->stm,
-                        QUEENCASTLE_KINGMOVE(to) + 1);
+        acc->updates[acc->nupdates].piece = KING + pos->stm;
+        acc->updates[acc->nupdates].sq = from;
+        acc->updates[acc->nupdates].add = false;
+        acc->nupdates++;
+
+        acc->updates[acc->nupdates].piece = KING + pos->stm;
+        acc->updates[acc->nupdates].sq = QUEENCASTLE_KINGMOVE(to);
+        acc->updates[acc->nupdates].add = true;
+        acc->nupdates++;
+
+        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
+        acc->updates[acc->nupdates].sq = to;
+        acc->updates[acc->nupdates].add = false;
+        acc->nupdates++;
+
+        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
+        acc->updates[acc->nupdates].sq = QUEENCASTLE_KINGMOVE(to) + 1;
+        acc->updates[acc->nupdates].add = true;
+        acc->nupdates++;
     } else if (ISENPASSANT(move)) {
         accumulator_remove(pos, true, piece, from);
         accumulator_add(pos, true, piece, to);
         accumulator_remove(pos, true, PAWN + FLIP_COLOR(pos->stm),
                            (pos->stm == WHITE)?to-8:to+8);
     } else {
-        if (VALUE(piece) != KING) {
-            accumulator_remove(pos, update_stm, piece, from);
-        }
+        acc->updates[acc->nupdates].piece = piece;
+        acc->updates[acc->nupdates].sq = from;
+        acc->updates[acc->nupdates].add = false;
+        acc->nupdates++;
+
         if (ISCAPTURE(move)) {
             accumulator_remove(pos, update_stm, capture, to);
         }
-        if (VALUE(piece) != KING) {
-            accumulator_add(pos, update_stm, ISPROMOTION(move)?promotion:piece,
-                            to);
-        }
+
+        acc->updates[acc->nupdates].piece = ISPROMOTION(move)?promotion:piece;
+        acc->updates[acc->nupdates].sq = to;
+        acc->updates[acc->nupdates].add = true;
+        acc->nupdates++;
     }
 }
 

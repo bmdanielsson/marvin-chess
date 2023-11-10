@@ -90,7 +90,7 @@ enum {
 /* The value of a piece */
 #define VALUE(p) ((p)&(~BLACK))
 
-/* Change WHITE to BLACK and vive versa. */
+/* Change WHITE to BLACK and vice versa. */
 #define FLIP_COLOR(c) ((c)^BLACK)
 
 /* Constants for the number of different squares/ranks/files */
@@ -389,7 +389,13 @@ struct nnue_update {
 #define NNUE_TRANSFORMER_SIZE 256
 struct nnue_accumulator {
     alignas(64) int16_t data[NSIDES][NNUE_TRANSFORMER_SIZE];
-    bool refresh[NSIDES];
+    /*
+     * Updates that has to be applied to the accumulator to make
+     * it up to date for the current position.
+     */
+    struct nnue_update updates[6];
+    uint8_t nupdates;
+    /* Flag indicating if the accumulator data is up to date */
     bool up2date;
 };
 
