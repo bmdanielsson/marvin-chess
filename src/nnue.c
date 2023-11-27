@@ -94,65 +94,50 @@ static int feature_index(int sq, int piece, int side)
     return sq + piece_index;
 }
 
-static void accumulator_propagate(struct position *pos, bool update_stm)
+static void accumulator_propagate(struct position *pos)
 {
-    int16_t *prev_data;
-    int16_t *data;
-    int     side;
+    int16_t                 *prev_data;
+    int16_t                 *data;
+    int                     side;
 
     for (side=0;side<NSIDES;side++) {
-        if (update_stm || (side != pos->stm)) {
-            prev_data =
-                    &pos->eval_stack[pos->height-1].accumulator.data[side][0];
-            data = &pos->eval_stack[pos->height].accumulator.data[side][0];
-            simd_copy(prev_data, data, layer_sizes[0]/2);
-        }
+        prev_data = &pos->eval_stack[pos->height-1].accumulator.data[side][0];
+        data = &pos->eval_stack[pos->height].accumulator.data[side][0];
+        simd_copy(prev_data, data, layer_sizes[0]/2);
     }
 }
 
-static void accumulator_add(struct position *pos, bool update_stm,
-                            int piece, int sq)
+static void accumulator_add(struct position *pos, int piece, int sq)
 {
     struct nnue_accumulator *acc;
     int16_t                 *data;
-    int                     k;
     uint32_t                index;
     uint32_t                offset;
     int                     side;
-    int                     king_sq;
 
     acc = &pos->eval_stack[pos->height].accumulator;
-    data = &acc->data[side][0];
-
-    /* Apply required updates to the accumulator */
-    for (k=0;k<acc->nupdates;k++) {
-        index = feature_index(acc->updates[k].sq, acc->updates[k].piece, side);
+    for (side=0;side<NSIDES;side++) {
+        data = &acc->data[side][0];
+        index = feature_index(sq, piece, side);
         offset = (layer_sizes[0]/2)*index;
-        if (acc->updates[k].add) {
-            simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
-        }
+        simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
     }
 }
 
-static void accumulator_remove(struct position *pos, bool update_stm,
-                               int piece, int sq)
+static void accumulator_remove(struct position *pos, int piece, int sq)
 {
     struct nnue_accumulator *acc;
     int16_t                 *data;
     uint32_t                index;
     uint32_t                offset;
     int                     side;
-    int                     king_sq;
 
     acc = &pos->eval_stack[pos->height].accumulator;
     for (side=0;side<NSIDES;side++) {
-        if (update_stm || (side != pos->stm)) {
-            data = &acc->data[side][0];
-            king_sq = LSB(pos->bb_pieces[side+KING]);
-            index = feature_index(sq, piece, king_sq, side);
-            offset = (layer_sizes[0]/2)*index;
-            simd_sub(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
-        }
+        data = &acc->data[side][0];
+        index = feature_index(sq, piece, side);
+        offset = (layer_sizes[0]/2)*index;
+        simd_sub(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
     }
 }
 
@@ -180,55 +165,11 @@ static void accumulator_refresh(struct position *pos, int side)
     }
 }
 
-static bool accumulator_refresh_required(struct position *pos)
-{
-    /*
-     * If there is no worker associated with the position then
-     * the engine is not searching so it doesn't matter if a
-     * full update is done.
-     */
-    if (pos->worker == NULL) {
-        return true;
-    }
-
-    /*
-     * If the state of the previous position is not valid
-     * then a full refresh is required.
-     */
-    return (pos->height == 0) ||
-            !pos->eval_stack[pos->height-1].accumulator.up2date;
-}
-
 static void transformer_forward(struct position *pos, struct net_data *data)
 {
-    int      side;
     uint32_t size;
     uint8_t  *dest;
     int16_t  *half;
-
-    /*
-     * Check if the accumulator is up to date. If it's
-     * not then it has to be updated.
-     */
-    if (accumulator_refresh_required(pos)) {
-        refresh_accumulator(pos, WHITE);
-        refresh_accumulator(pos, BLACK);
-        pos->eval_stack[pos->height].accumulator.up2date = true;
-    } else if (!pos->eval_stack[pos->height].accumulator.up2date) {
-        for (side=0;side<NSIDES;side++) {
-            /* Copy accumulator data from the previous ply */
-            acc_data = &pos->eval_stack[pos->height].accumulator.data[side][0];
-            prev_acc_data =
-                &pos->eval_stack[pos->height-1].accumulator.data[side][0];
-            simd_copy(prev_acc_data, acc_data, layer_sizes[0]/2);
-
-            /* Apply required updates */
-            update_accumulator(pos, side);
-        }
-
-        /* Mark the accumulator as up to date */
-        pos->eval_stack[pos->height].accumulator.up2date = true;
-    }
 
     /*
      * Combine the two halves to form the inputs to the network. The
@@ -421,13 +362,10 @@ void nnue_destroy(void)
     }
 }
 
-void nnue_reset_accumulator(struct position *pos)
+void nnue_refresh_accumulator(struct position *pos)
 {
-    int k;
-
-    for (k=0;k<MAX_PLY;k++) {
-        pos->eval_stack[k].accumulator.up2date = false;
-    }
+    accumulator_refresh(pos, WHITE);
+    accumulator_refresh(pos, BLACK);
 }
 
 bool nnue_load_net(char *path)
@@ -513,87 +451,44 @@ int16_t nnue_evaluate(struct position *pos)
 
 void nnue_make_move(struct position *pos, uint32_t move)
 {
-    struct nnue_accumulator *acc;
-    int                     from = FROM(move);
-    int                     to = TO(move);
-    int                     promotion = PROMOTION(move);
-    int                     capture = pos->pieces[to];
-    int                     piece = pos->pieces[from];
-    bool                    update_stm = (piece != (pos->stm+KING));
+    int from = FROM(move);
+    int to = TO(move);
+    int promotion = PROMOTION(move);
+    int capture = pos->pieces[to];
+    int piece = pos->pieces[from];
 
-    assert(pos != NULL);
+    assert(pos->height > 0);
 
+    /* Only perform updates while searching */
     if (pos->worker == NULL) {
         return;
     }
 
-    /*
-     * If the state of the previous position is not valid
-     * then a full refresh is required.
-     */
-    acc = &pos->eval_stack[pos->height].accumulator;
-    acc->up2date = false;
-    acc->nupdates = 0;
+    /* Copy accumulator data from the previous ply */
+    accumulator_propagate(pos);
 
+    /* Update accumulator */
     if (ISKINGSIDECASTLE(move)) {
-        acc->updates[acc->nupdates].piece = KING + pos->stm;
-        acc->updates[acc->nupdates].sq = from;
-        acc->updates[acc->nupdates].add = false;
-        acc->nupdates++;
-
-        acc->updates[acc->nupdates].piece = KING + pos->stm;
-        acc->updates[acc->nupdates].sq = KINGCASTLE_KINGMOVE(to);
-        acc->updates[acc->nupdates].add = true;
-        acc->nupdates++;
-
-        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
-        acc->updates[acc->nupdates].sq = to;
-        acc->updates[acc->nupdates].add = false;
-        acc->nupdates++;
-
-        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
-        acc->updates[acc->nupdates].sq = KINGCASTLE_KINGMOVE(to) - 1;
-        acc->updates[acc->nupdates].add = true;
-        acc->nupdates++;
+        accumulator_remove(pos, KING + pos->stm, from);
+        accumulator_add(pos, KING + pos->stm, KINGCASTLE_KINGMOVE(to));
+        accumulator_remove(pos, ROOK + pos->stm, to);
+        accumulator_add(pos, ROOK + pos->stm, KINGCASTLE_KINGMOVE(to) - 1);
     } else if (ISQUEENSIDECASTLE(move)) {
-        acc->updates[acc->nupdates].piece = KING + pos->stm;
-        acc->updates[acc->nupdates].sq = from;
-        acc->updates[acc->nupdates].add = false;
-        acc->nupdates++;
-
-        acc->updates[acc->nupdates].piece = KING + pos->stm;
-        acc->updates[acc->nupdates].sq = QUEENCASTLE_KINGMOVE(to);
-        acc->updates[acc->nupdates].add = true;
-        acc->nupdates++;
-
-        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
-        acc->updates[acc->nupdates].sq = to;
-        acc->updates[acc->nupdates].add = false;
-        acc->nupdates++;
-
-        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
-        acc->updates[acc->nupdates].sq = QUEENCASTLE_KINGMOVE(to) + 1;
-        acc->updates[acc->nupdates].add = true;
-        acc->nupdates++;
+        accumulator_remove(pos, KING + pos->stm, from);
+        accumulator_add(pos, KING + pos->stm, QUEENCASTLE_KINGMOVE(to));
+        accumulator_remove(pos, ROOK + pos->stm, to);
+        accumulator_add(pos, ROOK + pos->stm, QUEENCASTLE_KINGMOVE(to) + 1);
     } else if (ISENPASSANT(move)) {
-        accumulator_remove(pos, true, piece, from);
-        accumulator_add(pos, true, piece, to);
-        accumulator_remove(pos, true, PAWN + FLIP_COLOR(pos->stm),
+        accumulator_remove(pos, piece, from);
+        accumulator_add(pos, piece, to);
+        accumulator_remove(pos, PAWN + FLIP_COLOR(pos->stm),
                            (pos->stm == WHITE)?to-8:to+8);
     } else {
-        acc->updates[acc->nupdates].piece = piece;
-        acc->updates[acc->nupdates].sq = from;
-        acc->updates[acc->nupdates].add = false;
-        acc->nupdates++;
-
+        accumulator_remove(pos, piece, from);
         if (ISCAPTURE(move)) {
-            accumulator_remove(pos, update_stm, capture, to);
+            accumulator_remove(pos, capture, to);
         }
-
-        acc->updates[acc->nupdates].piece = ISPROMOTION(move)?promotion:piece;
-        acc->updates[acc->nupdates].sq = to;
-        acc->updates[acc->nupdates].add = true;
-        acc->nupdates++;
+        accumulator_add(pos, ISPROMOTION(move)?promotion:piece, to);
     }
 }
 
@@ -601,15 +496,5 @@ void nnue_make_null_move(struct position *pos)
 {
     assert(pos != NULL);
 
-    if (pos->worker == NULL) {
-        return;
-    }
-
-    if ((pos->height > 0) &&
-        pos->eval_stack[pos->height-1].accumulator.up2date) {
-        pos->eval_stack[pos->height].accumulator =
-                                    pos->eval_stack[pos->height-1].accumulator;
-    } else {
-        pos->eval_stack[pos->height].accumulator.up2date = false;
-    }
+    accumulator_propagate(pos);
 }

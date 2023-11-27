@@ -375,13 +375,6 @@ struct nnue_cache_item {
     int score;
 };
 
-/* Update to apply to the NNUE accumulator */
-struct nnue_update {
-    uint8_t piece;
-    uint8_t sq;
-    bool add;
-};
-
 /* Accumulator for NNUE input features for a position */
 #define NNUE_NUM_INPUT_FEATURES 64*12
 #define NNUE_MAX_ACTIVE_FEATURES 32
@@ -389,14 +382,6 @@ struct nnue_update {
 #define NNUE_TRANSFORMER_SIZE 256
 struct nnue_accumulator {
     alignas(64) int16_t data[NSIDES][NNUE_TRANSFORMER_SIZE];
-    /*
-     * Updates that has to be applied to the accumulator to make
-     * it up to date for the current position.
-     */
-    struct nnue_update updates[6];
-    uint8_t nupdates;
-    /* Flag indicating if the accumulator data is up to date */
-    bool up2date;
 };
 
 /* Item in the evaluation stack */

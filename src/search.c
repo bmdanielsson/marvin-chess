@@ -907,9 +907,6 @@ static thread_retval_t worker_search_func(void *data)
 
     assert(valid_position(&worker->pos));
 
-    /* Reset NNUE state */
-    nnue_reset_accumulator(&worker->pos);
-
     /* Setup the first iteration */
     depth = 1 + worker->id%2;
 
@@ -1037,6 +1034,9 @@ uint32_t search_position(struct gamestate *state, bool pondering,
     state->pondering = pondering;
     state->pos.height = 0;
     state->completed_depth = 0;
+
+    /* Perform a full refresh of the accumulator */
+    nnue_refresh_accumulator(&state->pos);
 
     /* Probe tablebases for the root position */
     if (egtb_should_probe(&state->pos) &&

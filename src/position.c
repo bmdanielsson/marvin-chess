@@ -166,8 +166,6 @@ void pos_reset(struct position *pos)
     pos->ply = 0;
     pos->height = 0;
     pos->fifty = 0;
-
-    nnue_reset_accumulator(pos);
 }
 
 bool pos_setup_from_fen(struct position *pos, char *fenstr)
@@ -192,6 +190,7 @@ bool pos_setup_from_fen(struct position *pos, char *fenstr)
         update_material(pos, piece, true);
     }
 
+    nnue_refresh_accumulator(pos);
 
     return true;
 }
