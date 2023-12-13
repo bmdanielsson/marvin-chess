@@ -1262,7 +1262,6 @@ bool fen_setup_board(struct position *pos, char *fenstr)
     iter = skip_whitespace(iter);
     if (*iter != '\0' && IS_DIGIT_09(*iter)) {
         /* Halfmove counter field */
-        iter++;
         if (sscanf(iter, "%d", &pos->fifty) != 1) {
             return false;
         }
