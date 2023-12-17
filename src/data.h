@@ -159,7 +159,7 @@ extern int material_values[NPIECES];
  * located. If the squares are not on the same rank, file or diagonal
  * then the bitboard is empty.
  */
-extern uint64_t line_mask[NSQUARES][NSQUARES];
+extern uint64_t range_mask[NSQUARES][NSQUARES];
 
 /* Initialize global data */
 void data_init(void);
