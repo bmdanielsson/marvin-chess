@@ -96,7 +96,7 @@ int material_values[NPIECES] = {100,  100,      /* pawn */
                                 1381, 1381,     /* queen */
                                 0,    0};       /* king */
 
-uint64_t line_mask[NSQUARES][NSQUARES];
+uint64_t range_mask[NSQUARES][NSQUARES];
 
 static void init_king_zones(void)
 {
@@ -335,15 +335,15 @@ void data_init(void)
     for (k=0;k<NSQUARES;k++) {
         for (l=0;l<NSQUARES;l++) {
             if (RANKNR(k) == RANKNR(l)) {
-                line_mask[k][l] = rank_mask[RANKNR(k)];
+                range_mask[k][l] = rank_mask[RANKNR(k)];
             } else if (FILENR(k) == FILENR(l)) {
-                line_mask[k][l] = file_mask[FILENR(k)];
+                range_mask[k][l] = file_mask[FILENR(k)];
             } else if (sq2diag_a1h8[k] == sq2diag_a1h8[l]) {
-                line_mask[k][l] = a1h8_masks[sq2diag_a1h8[k]];
+                range_mask[k][l] = a1h8_masks[sq2diag_a1h8[k]];
             } else if (sq2diag_a8h1[k] == sq2diag_a8h1[l]) {
-                line_mask[k][l] = a8h1_masks[sq2diag_a8h1[k]];
+                range_mask[k][l] = a8h1_masks[sq2diag_a8h1[k]];
             } else {
-                line_mask[k][l] = 0ULL;
+                range_mask[k][l] = 0ULL;
             }
         }
     }

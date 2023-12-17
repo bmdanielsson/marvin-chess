@@ -605,7 +605,7 @@ void gen_quiet_checks(struct position *pos, struct movelist *list)
                 moves &= (~relative_rank_mask[pos->stm][RANK_8]);
             }
             moves &= (~pos->bb_all);
-            moves &= (~line_mask[king_sq][from]);
+            moves &= (~range_mask[king_sq][from]);
             add_moves(list, from, moves, 0);
         }
     }
