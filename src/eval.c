@@ -405,6 +405,7 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
 {
     uint64_t pieces;
     int      sq;
+    int      psq;
     int      file;
     int      rank;
     int      rel_rank;
@@ -429,8 +430,9 @@ static void evaluate_pawn_structure(struct position *pos, struct eval *eval)
         rel_rank = (side==WHITE)?rank:7-rank;
         attackspan = rear_attackspan[side][sq]|front_attackspan[side][sq];
 
-        eval->score[MIDDLEGAME][side] += PSQ_TABLE_PAWN_MG[sq];
-        eval->score[ENDGAME][side] += PSQ_TABLE_PAWN_EG[sq];
+        psq = (side == WHITE)?sq:MIRROR(sq);
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_PAWN_MG[psq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_PAWN_EG[psq];
         eval->score[MIDDLEGAME][side] += PAWN_BASE_VALUE;
         eval->score[ENDGAME][side] += PAWN_BASE_VALUE;
         eval->phase += material_phase_value[PAWN+side];
@@ -573,6 +575,7 @@ static void evaluate_knights(struct position *pos, struct eval *eval)
     uint64_t safe_moves;
     uint64_t attacks;
     int      sq;
+    int      psq;
     int      king_sq;
     int      side;
     int      opp_side;
@@ -587,8 +590,9 @@ static void evaluate_knights(struct position *pos, struct eval *eval)
         attacks = moves;
         moves &= (~pos->bb_sides[side]);
 
-        eval->score[MIDDLEGAME][side] += PSQ_TABLE_KNIGHT_MG[sq];
-        eval->score[ENDGAME][side] += PSQ_TABLE_KNIGHT_EG[sq];
+        psq = (side == WHITE)?sq:MIRROR(sq);
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_KNIGHT_MG[psq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_KNIGHT_EG[psq];
         eval->score[MIDDLEGAME][side] += KNIGHT_MATERIAL_VALUE_MG;
         eval->score[ENDGAME][side] += KNIGHT_MATERIAL_VALUE_EG;
         eval->phase += material_phase_value[KNIGHT+side];
@@ -628,6 +632,7 @@ static void evaluate_bishops(struct position *pos, struct eval *eval)
     uint64_t safe_moves;
     uint64_t attacks;
     int      sq;
+    int      psq;
     int      king_sq;
     int      side;
     int      opp_side;
@@ -657,8 +662,9 @@ static void evaluate_bishops(struct position *pos, struct eval *eval)
         attacks = moves;
         moves &= (~pos->bb_sides[side]);
 
-        eval->score[MIDDLEGAME][side] += PSQ_TABLE_BISHOP_MG[sq];
-        eval->score[ENDGAME][side] += PSQ_TABLE_BISHOP_EG[sq];
+        psq = (side == WHITE)?sq:MIRROR(sq);
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_BISHOP_MG[psq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_BISHOP_EG[psq];
         eval->score[MIDDLEGAME][side] += BISHOP_MATERIAL_VALUE_MG;
         eval->score[ENDGAME][side] += BISHOP_MATERIAL_VALUE_EG;
         eval->phase += material_phase_value[BISHOP+side];
@@ -692,6 +698,7 @@ static void evaluate_rooks(struct position *pos, struct eval *eval)
     uint64_t safe_moves;
     uint64_t attacks;
     int      sq;
+    int      psq;
     int      file;
     int      king_sq;
     int      side;
@@ -709,8 +716,9 @@ static void evaluate_rooks(struct position *pos, struct eval *eval)
         attacks = moves;
         moves &= (~pos->bb_sides[side]);
 
-        eval->score[MIDDLEGAME][side] += PSQ_TABLE_ROOK_MG[sq];
-        eval->score[ENDGAME][side] += PSQ_TABLE_ROOK_EG[sq];
+        psq = (side == WHITE)?sq:MIRROR(sq);
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_ROOK_MG[psq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_ROOK_EG[psq];
         eval->score[MIDDLEGAME][side] += ROOK_MATERIAL_VALUE_MG;
         eval->score[ENDGAME][side] += ROOK_MATERIAL_VALUE_EG;
         eval->phase += material_phase_value[ROOK+side];
@@ -765,6 +773,7 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
     uint64_t unsafe;
     int      opp_side;
     int      sq;
+    int      psq;
     int      file;
     int      king_sq;
     int      side;
@@ -785,8 +794,9 @@ static void evaluate_queens(struct position *pos, struct eval *eval)
                  eval->attacked_by[BISHOP+opp_side]|
                  eval->attacked_by[ROOK+opp_side];
 
-        eval->score[MIDDLEGAME][side] += PSQ_TABLE_QUEEN_MG[sq];
-        eval->score[ENDGAME][side] += PSQ_TABLE_QUEEN_EG[sq];
+        psq = (side == WHITE)?sq:MIRROR(sq);
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_QUEEN_MG[psq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_QUEEN_EG[psq];
         eval->score[MIDDLEGAME][side] += QUEEN_MATERIAL_VALUE_MG;
         eval->score[ENDGAME][side] += QUEEN_MATERIAL_VALUE_EG;
         eval->phase += material_phase_value[QUEEN+side];
@@ -824,6 +834,7 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
     int      nattackers;
     int      score;
     int      sq;
+    int      psq;
     int      side;
     uint64_t pieces;
 
@@ -832,8 +843,9 @@ static void evaluate_kings(struct position *pos, struct eval *eval)
         sq = POPBIT(&pieces);
         side = COLOR(pos->pieces[sq]);
 
-        eval->score[MIDDLEGAME][side] += PSQ_TABLE_KING_MG[sq];
-        eval->score[ENDGAME][side] += PSQ_TABLE_KING_EG[sq];
+        psq = (side == WHITE)?sq:MIRROR(sq);
+        eval->score[MIDDLEGAME][side] += PSQ_TABLE_KING_MG[psq];
+        eval->score[ENDGAME][side] += PSQ_TABLE_KING_EG[psq];
 
         /* Calculate preassure on the enemy king */
         nattackers = 0;
