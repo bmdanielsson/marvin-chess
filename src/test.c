@@ -144,14 +144,14 @@ void test_run_divide(struct position *pos, int depth)
 
 void test_run_benchmark(void)
 {
-    struct gamestate *state;
-    int              k;
-    int              npos;
-    uint64_t         nodes;
-    time_t           start;
-    time_t           total;
-    int              nworkers;
-    int              tt_size;
+    struct engine *engine;
+    int           k;
+    int           npos;
+    uint64_t      nodes;
+    time_t        start;
+    time_t        total;
+    int           nworkers;
+    int           tt_size;
 
     printf("%s %s (%s)\n", APP_NAME, APP_VERSION, APP_ARCH);
     if (engine_using_nnue) {
@@ -167,20 +167,20 @@ void test_run_benchmark(void)
     smp_destroy_workers();
     smp_create_workers(1);
 
-    state = engine_create_game_state();
+    engine = engine_create();
     nodes = 0ULL;
     total = 0;
     npos = sizeof(positions)/sizeof(char*);
     for (k=0;k<npos;k++) {
-        pos_setup_from_fen(&state->pos, positions[k]);
+        pos_setup_from_fen(&engine->pos, positions[k]);
         tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
         smp_newgame();
-        state->sd = BENCH_DEPTH;
-        state->move_filter.size = 0;
-        state->exit_on_mate = true;
+        engine->sd = BENCH_DEPTH;
+        engine->move_filter.size = 0;
+        engine->exit_on_mate = true;
 
         start = get_current_time();
-        (void)search_position(state, false, NULL, NULL);
+        (void)search_position(engine, false, NULL, NULL);
         total += (get_current_time() - start);
         nodes += smp_nodes();
 
@@ -192,7 +192,7 @@ void test_run_benchmark(void)
     printf("Total number of nodes: %"PRIu64"\n", nodes);
     printf("Speed: %.2fkN/s\n", ((double)nodes)/(total/1000.0)/1000);
 
-    engine_destroy_game_state(state);
+    engine_destroy(engine);
 
     hash_tt_destroy_table();
     hash_tt_create_table(tt_size);

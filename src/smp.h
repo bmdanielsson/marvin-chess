@@ -40,9 +40,9 @@ void smp_destroy_workers(void);
 /*
  * Prepare all workers for a new search.
  *
- * @param state The current game state.
+ * @param engine The engine.
  */
-void smp_prepare_workers(struct gamestate *state);
+void smp_prepare_workers(struct engine *engine);
 
 /* Reset all workers */
 void smp_reset_workers(void);

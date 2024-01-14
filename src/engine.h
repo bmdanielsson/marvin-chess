@@ -57,30 +57,30 @@ extern char engine_eval_file[MAX_PATH_LENGTH+1];
 void engine_read_config_file(char *cfgfile);
 
 /*
- * Create a new game state object.
+ * Create a new engine object.
  *
- * @return Returns the new object.
+ * @return Returns the new engine object.
  */
-struct gamestate* engine_create_game_state(void);
+struct engine* engine_create(void);
 
 /*
- * Destroy a game state object.
+ * Destroy an engine object.
  *
- * @param state The object to destroy.
+ * @param engine The object to destroy.
  */
-void engine_destroy_game_state(struct gamestate *state);
+void engine_destroy(struct engine *engine);
 
 /*
  * The main engine loop.
  *
- * @param state The game state object.
+ * @param engine The engine object.
  */
-void engine_loop(struct gamestate *state);
+void engine_loop(struct engine *engine);
 
 /*
  * Read a new command.
  *
- * @return Returns the read command. The returned pointer shoiuld not be freed.
+ * @return Returns the read command. The returned pointer should not be freed.
  */
 char* engine_read_command(void);
 
@@ -127,10 +127,10 @@ bool engine_wait_for_input(struct search_worker *worker);
 /*
  * Send information about the principle variation.
  *
- * @param state The game state.
+ * @param engine The engine.
  * @param pvinfo The pv.
  */
-void engine_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo);
+void engine_send_pv_info(struct engine *engine, struct pvinfo *pvinfo);
 
 /*
  * Send information about score bound during search.

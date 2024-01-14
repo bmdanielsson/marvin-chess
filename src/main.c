@@ -58,7 +58,7 @@ static void print_version(void)
 
 int main(int argc, char *argv[])
 {
-    struct gamestate *state;
+    struct engine *engine;
 
     /* Register a clean up function */
     atexit(cleanup);
@@ -105,18 +105,18 @@ int main(int argc, char *argv[])
         return sfen_generate(argc, argv);
     }
 
-    /* Create game state */
-    state = engine_create_game_state();
-    if (state == NULL) {
+    /* Create engine */
+    engine = engine_create();
+    if (engine == NULL) {
         return 1;
     }
 
     /* Enter the main engine loop */
-    engine_loop(state);
+    engine_loop(engine);
 
     /* Clean up */
     polybook_close();
-    engine_destroy_game_state(state);
+    engine_destroy(engine);
     hash_tt_destroy_table();
     smp_destroy_workers();
     smp_destroy();

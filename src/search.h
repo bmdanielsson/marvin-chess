@@ -48,13 +48,13 @@ void search_init(void);
 /*
  * Search the position..
  *
- * @param state The current game state.
+ * @param engine The engine.
  * @param pondering Flag indicating if a ponder search should be done.
  * @param ponder_move Optional location to store a ponder move at.
  * @param score Optional location to store the score of the best move at.
  * @return Returns the best move in the position.
  */
-uint32_t search_position(struct gamestate *state, bool pondering,
+uint32_t search_position(struct engine *engine, bool pondering,
                          uint32_t *ponder_move, int *score);
 
 #endif

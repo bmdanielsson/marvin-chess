@@ -33,8 +33,8 @@
 #include "history.h"
 #include "nnue.h"
 
-/* Lock for updating the state struct during search */
-static mutex_t state_lock;
+/* Lock for updating the engine struct during search */
+static mutex_t engine_lock;
 
 /* Variables used to signal to workers to stop searching */
 static mutex_t stop_lock;
@@ -46,13 +46,13 @@ static struct search_worker *workers = NULL;
 
 void smp_init(void)
 {
-    mutex_init(&state_lock);
+    mutex_init(&engine_lock);
     mutex_init(&stop_lock);
 }
 
 void smp_destroy(void)
 {
-    mutex_destroy(&state_lock);
+    mutex_destroy(&engine_lock);
     mutex_destroy(&stop_lock);
 }
 
@@ -66,7 +66,7 @@ void smp_create_workers(int nthreads)
     for (k=0;k<number_of_workers;k++) {
         memset(&workers[k], 0, sizeof(struct search_worker));
         hash_nnue_create_table(&workers[k], NNUE_CACHE_SIZE);
-        workers[k].state = NULL;
+        workers[k].engine = NULL;
         workers[k].id = k;
     }
 }
@@ -83,7 +83,7 @@ void smp_destroy_workers(void)
     number_of_workers = 0;
 }
 
-void smp_prepare_workers(struct gamestate *state)
+void smp_prepare_workers(struct engine *engine)
 {
     struct search_worker *worker;
     int                  mpvidx;
@@ -93,8 +93,8 @@ void smp_prepare_workers(struct gamestate *state)
     for (k=0;k<number_of_workers;k++) {
         worker = &workers[k];
 
-        /* Copy data from game state */
-        worker->pos = state->pos;
+        /* Copy data from engine */
+        worker->pos = engine->pos;
 
         /* Clear tables */
         killer_clear_table(worker);
@@ -106,7 +106,7 @@ void smp_prepare_workers(struct gamestate *state)
         worker->tbhits = 0ULL;
 
         /* Clear best move information */
-        for (mpvidx=0;mpvidx<state->multipv;mpvidx++) {
+        for (mpvidx=0;mpvidx<engine->multipv;mpvidx++) {
             worker->mpv_moves[mpvidx] = NOMOVE;
             worker->mpv_lines[mpvidx].score = -INFINITE_SCORE;
             worker->mpv_lines[mpvidx].pv.size = 0;
@@ -115,14 +115,14 @@ void smp_prepare_workers(struct gamestate *state)
         }
 
         /* Clear multipv information */
-        worker->multipv = state->multipv;
+        worker->multipv = engine->multipv;
 
         /* Initialize helper variables */
         worker->resolving_root_fail = false;
 
         /* Setup parent pointers */
-        worker->state = state;
-        worker->pos.state = state;
+        worker->engine = engine;
+        worker->pos.engine = engine;
         worker->pos.worker = worker;
     }
 }
@@ -135,8 +135,8 @@ void smp_reset_workers(void)
     for (k=0;k<number_of_workers;k++) {
         worker = &workers[k];
 
-        worker->state = NULL;
-        worker->pos.state = NULL;
+        worker->engine = NULL;
+        worker->pos.engine = NULL;
         worker->pos.worker = NULL;
     }
 }
@@ -212,15 +212,15 @@ int smp_complete_iteration(struct search_worker *worker)
     int count;
     int k;
 
-    mutex_lock(&state_lock);
+    mutex_lock(&engine_lock);
 
     /*
      * If this is the first time completing this depth then
      * update the completed_depth counter.
      */
-    if ((worker->depth > worker->state->completed_depth) &&
+    if ((worker->depth > worker->engine->completed_depth) &&
         (worker->mpv_lines[0].pv.size >= 1)) {
-        worker->state->completed_depth = worker->depth;
+        worker->engine->completed_depth = worker->depth;
     }
 
     /*
@@ -248,7 +248,7 @@ int smp_complete_iteration(struct search_worker *worker)
         }
     }
 
-    mutex_unlock(&state_lock);
+    mutex_unlock(&engine_lock);
 
     return new_depth;
 }
