@@ -478,7 +478,7 @@ bool pos_make_move(struct position *pos, uint32_t move)
     pos->key = key_update_side(pos->key, pos->stm);
 
     /* Prefetch hash table entries */
-    if (pos->state != NULL) {
+    if (pos->engine != NULL) {
         hash_prefetch(pos->worker);
     }
 
@@ -598,7 +598,7 @@ void pos_make_null_move(struct position *pos)
     /* Update NNUE */
     nnue_make_null_move(pos);
 
-    /* Update the state structure */
+    /* Update the position */
     pos->ep_sq = NO_SQUARE;
     pos->key = key_update_ep_square(pos->key, elem->ep_sq, pos->ep_sq);
     pos->fifty++;
@@ -609,7 +609,7 @@ void pos_make_null_move(struct position *pos)
     pos->key = key_update_side(pos->key, pos->stm);
 
     /* Prefetch hash table entries */
-    if (pos->state != NULL) {
+    if (pos->engine != NULL) {
         hash_prefetch(pos->worker);
     }
 
@@ -631,7 +631,7 @@ void pos_unmake_null_move(struct position *pos)
     pos->fifty = elem->fifty;
     pos->key = elem->key;
 
-    /* Update the state structure */
+    /* Update the position */
     if (pos->stm == WHITE) {
         pos->fullmove--;
     }

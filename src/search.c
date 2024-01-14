@@ -138,8 +138,8 @@ static bool is_filtered_move(struct search_worker *worker, uint32_t move)
 {
     int k;
 
-    for (k=0;k<worker->state->move_filter.size;k++) {
-        if (move == worker->state->move_filter.moves[k]) {
+    for (k=0;k<worker->engine->move_filter.size;k++) {
+        if (move == worker->engine->move_filter.moves[k]) {
             return true;
         }
     }
@@ -211,7 +211,7 @@ static void checkup(struct search_worker *worker)
 
     /* Check if the node limit has been reached */
     if (((tc_get_flags()&TC_NODE_LIMIT) != 0) &&
-        (smp_nodes() >= worker->state->max_nodes)) {
+        (smp_nodes() >= worker->engine->max_nodes)) {
         smp_stop_all();
         longjmp(worker->env, 1);
     }
@@ -222,7 +222,7 @@ static void checkup(struct search_worker *worker)
     }
 
     /* Perform checkup */
-    if (!worker->state->pondering &&
+    if (!worker->engine->pondering &&
         ((tc_get_flags()&TC_TIME_LIMIT) != 0) &&
         !tc_check_time(worker)) {
         smp_stop_all();
@@ -447,7 +447,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
     }
 
     /* Probe tablebases */
-    if (!is_root && worker->state->probe_wdl && egtb_should_probe(pos)) {
+    if (!is_root && worker->engine->probe_wdl && egtb_should_probe(pos)) {
         if (egtb_probe_wdl_tables(pos, &tb_score)) {
             worker->tbhits++;
             if (check_tb_cutoff(tb_score, alpha, beta)) {
@@ -603,7 +603,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
         if (is_root && (worker->multipv > 1) && is_multipv_move(worker, move)) {
             continue;
         }
-        if (is_root && (worker->state->move_filter.size > 0) &&
+        if (is_root && (worker->engine->move_filter.size > 0) &&
             !is_filtered_move(worker, move)) {
             continue;
         }
@@ -796,7 +796,7 @@ static int search(struct search_worker *worker, int depth, int alpha, int beta,
                     worker->mpv_lines[worker->mpvidx].seldepth =
                                                             worker->seldepth;
                     if ((worker->id == 0) && (worker->multipv == 1)) {
-                        engine_send_pv_info(worker->state,
+                        engine_send_pv_info(worker->engine,
                                             &worker->mpv_lines[0]);
                     }
                 }
@@ -937,7 +937,7 @@ static thread_retval_t worker_search_func(void *data)
          * which case there is no point in searching any
          * further.
          */
-        if (worker->state->exit_on_mate && !worker->state->pondering) {
+        if (worker->engine->exit_on_mate && !worker->engine->pondering) {
             if ((score > KNOWN_WIN) || (score < (-KNOWN_WIN))) {
                 smp_stop_all();
                 break;
@@ -945,7 +945,7 @@ static thread_retval_t worker_search_func(void *data)
         }
 
         /* Check if the worker has reached the maximum depth */
-        if (depth > worker->state->sd) {
+        if (depth > worker->engine->sd) {
             smp_stop_all();
             break;
         }
@@ -971,12 +971,12 @@ static thread_retval_t worker_search_func(void *data)
      * command is received so that the bestmove command is not sent too
      * early.
      */
-	while ((worker->id == 0) && worker->state->pondering) {
+	while ((worker->id == 0) && worker->engine->pondering) {
 		if (engine_wait_for_input(worker)) {
 			smp_stop_all();
             break;
 		}
-		if (!worker->state->pondering) {
+		if (!worker->engine->pondering) {
 			smp_stop_all();
 		}
 	}
@@ -996,7 +996,7 @@ void search_init(void)
     }
 }
 
-uint32_t search_position(struct gamestate *state, bool pondering,
+uint32_t search_position(struct engine *engine, bool pondering,
                          uint32_t *ponder_move, int *score)
 {
     int                  k;
@@ -1007,8 +1007,8 @@ uint32_t search_position(struct gamestate *state, bool pondering,
     uint32_t             best_move;
     uint32_t             move;
 
-    assert(state != NULL);
-    assert(valid_position(&state->pos));
+    assert(engine != NULL);
+    assert(valid_position(&engine->pos));
     assert(smp_number_of_workers() > 0);
 
     /* Reset the best move information */
@@ -1028,47 +1028,47 @@ uint32_t search_position(struct gamestate *state, bool pondering,
 
     /* Prepare for search */
     hash_tt_age_table();
-    state->probe_wdl = true;
-    state->root_in_tb = false;
-    state->root_tb_score = 0;
-    state->pondering = pondering;
-    state->pos.height = 0;
-    state->completed_depth = 0;
+    engine->probe_wdl = true;
+    engine->root_in_tb = false;
+    engine->root_tb_score = 0;
+    engine->pondering = pondering;
+    engine->pos.height = 0;
+    engine->completed_depth = 0;
 
     /* Perform a full refresh of the accumulator */
-    nnue_refresh_accumulator(&state->pos);
+    nnue_refresh_accumulator(&engine->pos);
 
     /* Probe tablebases for the root position */
-    if (egtb_should_probe(&state->pos) &&
-        (state->move_filter.size == 0) &&
-        (state->multipv == 1)) {
-        state->root_in_tb = egtb_probe_dtz_tables(&state->pos, &move,
-                                                  &state->root_tb_score);
-        if (state->root_in_tb) {
-            state->move_filter.moves[0] = move;
-            state->move_filter.size = 1;
+    if (egtb_should_probe(&engine->pos) &&
+        (engine->move_filter.size == 0) &&
+        (engine->multipv == 1)) {
+        engine->root_in_tb = egtb_probe_dtz_tables(&engine->pos, &move,
+                                                  &engine->root_tb_score);
+        if (engine->root_in_tb) {
+            engine->move_filter.moves[0] = move;
+            engine->move_filter.size = 1;
         }
-        state->probe_wdl = !state->root_in_tb;
+        engine->probe_wdl = !engine->root_in_tb;
     }
 
     /*
      * Initialize the best move to the first legal root
      * move to make sure a legal move is always returned.
      */
-    gen_legal_moves(&state->pos, &legal);
+    gen_legal_moves(&engine->pos, &legal);
     if (legal.size == 0) {
         return NOMOVE;
     }
-    if (state->move_filter.size == 0) {
+    if (engine->move_filter.size == 0) {
         best_move = legal.moves[0];
     } else {
-        best_move = state->move_filter.moves[0];
+        best_move = engine->move_filter.moves[0];
     }
 
     /* Check if the number of multipv lines have to be reduced */
-    state->multipv = MIN(state->multipv, legal.size);
-    if (state->move_filter.size > 0) {
-        state->multipv = MIN(state->multipv, state->move_filter.size);
+    engine->multipv = MIN(engine->multipv, legal.size);
+    if (engine->move_filter.size > 0) {
+        engine->multipv = MIN(engine->multipv, engine->move_filter.size);
     }
 
     /*
@@ -1076,14 +1076,14 @@ uint32_t search_position(struct gamestate *state, bool pondering,
      * need to do a search. Instead save the time for later.
      */
     if ((legal.size == 1) &&
-        !state->pondering &&
+        !engine->pondering &&
         ((tc_get_flags()&TC_TIME_LIMIT) != 0) &&
         ((tc_get_flags()&(TC_INFINITE_TIME|TC_FIXED_TIME)) == 0)) {
         return best_move;
     }
 
     /* Prepare workers for a new search */
-    smp_prepare_workers(state);
+    smp_prepare_workers(engine);
 
     /* Start helpers */
     for (k=1;k<smp_number_of_workers();k++) {
@@ -1102,7 +1102,7 @@ uint32_t search_position(struct gamestate *state, bool pondering,
     worker = smp_get_worker(0);
     best_pv = &worker->mpv_lines[0];
     send_pv = false;
-    if (state->multipv == 1) {
+    if (engine->multipv == 1) {
         for (k=1;k<smp_number_of_workers();k++) {
             worker = smp_get_worker(k);
             if (worker->mpv_lines[0].pv.size < 1) {
@@ -1122,7 +1122,7 @@ uint32_t search_position(struct gamestate *state, bool pondering,
      * an extra pv line to the GUI.
      */
     if (send_pv) {
-        engine_send_pv_info(state, best_pv);
+        engine_send_pv_info(engine, best_pv);
     }
 
     /* Get the best move and the ponder move */
@@ -1137,7 +1137,7 @@ uint32_t search_position(struct gamestate *state, bool pondering,
     }
 
     /* Reset move filter since it's not needed anymore */
-    state->move_filter.size = 0;
+    engine->move_filter.size = 0;
 
     /* Reset workers */
     smp_reset_workers();

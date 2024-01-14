@@ -77,16 +77,16 @@ static mutex_t tx_lock;
  * Custom command
  * Syntax: display
  */
-static void cmd_display(struct gamestate *state)
+static void cmd_display(struct engine *engine)
 {
-    dbg_print_board(&state->pos);
+    dbg_print_board(&engine->pos);
 }
 
 /*
  * Custom command
  * Syntax: divide <depth>
  */
-static void cmd_divide(char *cmd, struct gamestate *state)
+static void cmd_divide(char *cmd, struct engine *engine)
 {
     int  depth;
     char *iter;
@@ -101,26 +101,26 @@ static void cmd_divide(char *cmd, struct gamestate *state)
         return;
     }
 
-    test_run_divide(&state->pos, depth);
+    test_run_divide(&engine->pos, depth);
 }
 
 /*
  * Custom command
  * Syntax: eval
  */
-static void cmd_eval(struct gamestate *state)
+static void cmd_eval(struct engine *engine)
 {
     int nnue_score;
     int hce_score;
 
-    hce_score = eval_evaluate(&state->pos, true);
+    hce_score = eval_evaluate(&engine->pos, true);
     if (engine_using_nnue && engine_loaded_net) {
-        nnue_score = eval_evaluate(&state->pos, false);
+        nnue_score = eval_evaluate(&engine->pos, false);
         printf("HCE: %d, NNUE: %d\n",
-               state->pos.stm == WHITE?hce_score:-hce_score,
-               state->pos.stm == WHITE?nnue_score:-nnue_score);
+               engine->pos.stm == WHITE?hce_score:-hce_score,
+               engine->pos.stm == WHITE?nnue_score:-nnue_score);
     } else {
-        printf("HCE: %d\n", state->pos.stm == WHITE?hce_score:-hce_score);
+        printf("HCE: %d\n", engine->pos.stm == WHITE?hce_score:-hce_score);
     }
 }
 
@@ -128,7 +128,7 @@ static void cmd_eval(struct gamestate *state)
  * Custom command
  * Syntax: perft <depth>
  */
-static void cmd_perft(char *cmd, struct gamestate *state)
+static void cmd_perft(char *cmd, struct engine *engine)
 {
     int  depth;
     char *iter;
@@ -143,7 +143,7 @@ static void cmd_perft(char *cmd, struct gamestate *state)
         return;
     }
 
-    test_run_perft(&state->pos, depth);
+    test_run_perft(&engine->pos, depth);
 }
 
 /*
@@ -190,30 +190,30 @@ void engine_read_config_file(char *cfgfile)
     fclose(fp);
 }
 
-struct gamestate* engine_create_game_state(void)
+struct engine* engine_create(void)
 {
-    struct gamestate *state;
+    struct engine *engine;
 
-    state = aligned_malloc(64, sizeof(struct gamestate));
-    if (state == NULL) {
+    engine = aligned_malloc(64, sizeof(struct engine));
+    if (engine == NULL) {
         return NULL;
     }
-    memset(state, 0, sizeof(struct gamestate));
-    pos_reset(&state->pos);
-    pos_setup_start_position(&state->pos);
-    state->multipv = 1;
+    memset(engine, 0, sizeof(struct engine));
+    pos_reset(&engine->pos);
+    pos_setup_start_position(&engine->pos);
+    engine->multipv = 1;
 
-    return state;
+    return engine;
 }
 
-void engine_destroy_game_state(struct gamestate *state)
+void engine_destroy(struct engine *engine)
 {
-    assert(state != NULL);
+    assert(engine != NULL);
 
-    aligned_free(state);
+    aligned_free(engine);
 }
 
-void engine_loop(struct gamestate *state)
+void engine_loop(struct engine *engine)
 {
     char *cmd;
     bool stop = false;
@@ -238,13 +238,13 @@ void engine_loop(struct gamestate *state)
         /* Custom commands */
         handled = true;
         if (MATCH(cmd, "display")) {
-            cmd_display(state);
+            cmd_display(engine);
         } else if (MATCH(cmd, "divide")) {
-            cmd_divide(cmd, state);
+            cmd_divide(cmd, engine);
         } else if (MATCH(cmd, "eval")) {
-            cmd_eval(state);
+            cmd_eval(engine);
         } else if (MATCH(cmd, "perft")) {
-            cmd_perft(cmd, state);
+            cmd_perft(cmd, engine);
         } else if (MATCH(cmd, "bench")) {
             cmd_bench();
         } else {
@@ -253,10 +253,10 @@ void engine_loop(struct gamestate *state)
 
         /* Protocol commands */
         if (!handled) {
-            handled = uci_handle_command(state, cmd, &stop);
+            handled = uci_handle_command(engine, cmd, &stop);
         }
         if (!handled) {
-            handled = xboard_handle_command(state, cmd, &stop);
+            handled = xboard_handle_command(engine, cmd, &stop);
         }
         if (!handled) {
             LOG_INFO1("Unknown command: %s\n", cmd);
@@ -348,16 +348,16 @@ bool engine_wait_for_input(struct search_worker *worker)
     return false;
 }
 
-void engine_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
+void engine_send_pv_info(struct engine *engine, struct pvinfo *pvinfo)
 {
     if (engine_protocol == PROTOCOL_UNSPECIFIED) {
         return;
     }
 
     if (engine_protocol == PROTOCOL_UCI) {
-        return uci_send_pv_info(state, pvinfo);
+        return uci_send_pv_info(engine, pvinfo);
     } else if (engine_protocol == PROTOCOL_XBOARD) {
-        return xboard_send_pv_info(state, pvinfo);
+        return xboard_send_pv_info(engine, pvinfo);
     }
 }
 

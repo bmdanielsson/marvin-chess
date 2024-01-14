@@ -435,9 +435,9 @@ struct position {
      */
     int material;
 
-    /* Pointers to the owning worker and the active game state */
+    /* Pointers to the owning worker and the owning engine */
     struct search_worker *worker;
-    struct gamestate *state;
+    struct engine *engine;
 };
 
 /* Per-thread worker instance */
@@ -487,12 +487,12 @@ struct search_worker {
     thread_t thread;
     jmp_buf env;
 
-    /* Pointer to the active game state */
-    struct gamestate *state;
+    /* Pointer to the owning engine */
+    struct engine *engine;
 };
 
-/* Data structure holding the state of an ongoing game */
-struct gamestate {
+/* Data structure representing an engine */
+struct engine {
     /* The current position */
     struct position pos;
     /* Flag indicating if the root position was found in the tablebases */

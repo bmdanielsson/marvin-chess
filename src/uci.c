@@ -46,7 +46,7 @@ static bool own_book_mode = true;
 /* Helper variable used for sorting pv lines */
 static struct pvinfo sorted_mpv_lines[MAX_MULTIPV_LINES];
 
-static void uci_cmd_go(char *cmd, struct gamestate *state)
+static void uci_cmd_go(char *cmd, struct engine *engine)
 {
     char     *iter;
     int      movetime = 0;
@@ -75,9 +75,9 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
     tc_start_clock();
 
     /* Set default search parameters */
-    state->move_filter.size = 0;
-    state->exit_on_mate = true;
-    state->sd = MAX_SEARCH_DEPTH;
+    engine->move_filter.size = 0;
+    engine->exit_on_mate = true;
+    engine->sd = MAX_SEARCH_DEPTH;
 
     /*
      * Extract parameters. If an invalid parameter is
@@ -147,9 +147,9 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
                 return;
             }
             if ((depth >= MAX_SEARCH_DEPTH) || (depth <= 0)) {
-                state->sd = MAX_SEARCH_DEPTH;
+                engine->sd = MAX_SEARCH_DEPTH;
             } else {
-                state->sd = depth;
+                engine->sd = depth;
             }
             iter = strchr(iter, ' ');
             iter = skip_whitespace(iter);
@@ -160,7 +160,7 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             if (sscanf(iter, "nodes %" SCNu64 "", &nodes) != 1) {
                 return;
             }
-            state->max_nodes = nodes;
+            engine->max_nodes = nodes;
             iter = strchr(iter, ' ');
             iter = skip_whitespace(iter);
             iter = strchr(iter, ' ');
@@ -183,12 +183,12 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
             if (temp != NULL) {
                 *temp = '\0';
             }
-            move = pos_str2move(iter, &state->pos);
+            move = pos_str2move(iter, &engine->pos);
             if (move != NOMOVE) {
-                if (pos_make_move(&state->pos, move)) {
-                    pos_unmake_move(&state->pos);
-                    state->move_filter.moves[state->move_filter.size] = move;
-                    state->move_filter.size++;
+                if (pos_make_move(&engine->pos, move)) {
+                    pos_unmake_move(&engine->pos);
+                    engine->move_filter.moves[engine->move_filter.size] = move;
+                    engine->move_filter.size++;
                 }
             }
             if (temp != NULL) {
@@ -203,25 +203,25 @@ static void uci_cmd_go(char *cmd, struct gamestate *state)
         movetime = 0;
         moveinc = 0;
         movestogo = 0;
-        state->exit_on_mate = false;
+        engine->exit_on_mate = false;
         skip_book = true;
     } else if (fixed_time) {
         moveinc = 0;
         movestogo = 0;
     } else {
-        movetime = state->pos.stm == WHITE?wtime:btime;
-        moveinc = state->pos.stm == WHITE?winc:binc;
+        movetime = engine->pos.stm == WHITE?wtime:btime;
+        moveinc = engine->pos.stm == WHITE?winc:binc;
     }
     tc_configure_time_control(movetime, moveinc, movestogo, flags);
 
     /* Try to find a move in the opening book */
     if (own_book_mode && !skip_book) {
-        best_move = polybook_probe(&state->pos);
+        best_move = polybook_probe(&engine->pos);
     }
 
     /* Search the position for a move */
     if (best_move == NOMOVE) {
-        best_move = search_position(state, ponder && ponder_mode, &ponder_move,
+        best_move = search_position(engine, ponder && ponder_mode, &ponder_move,
                                     NULL);
     }
 
@@ -242,7 +242,7 @@ static void uci_cmd_isready(void)
     engine_write_command("readyok");
 }
 
-static void uci_cmd_position(char *cmd, struct gamestate *state)
+static void uci_cmd_position(char *cmd, struct engine *engine)
 {
     char     *iter;
     char     *moves;
@@ -253,7 +253,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
     iter = strchr(cmd, ' ');
     if (iter == NULL) {
         /* Invalid command, set start position and return */
-        pos_setup_start_position(&state->pos);
+        pos_setup_start_position(&engine->pos);
         return;
     }
     iter = skip_whitespace(iter);
@@ -263,7 +263,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
 
     /* Check if the parameter is fen or startpos */
     if (MATCH(iter, "startpos")) {
-        pos_setup_start_position(&state->pos);
+        pos_setup_start_position(&engine->pos);
     } else if (MATCH(iter, "fen")) {
         /* Find beginning of FEN string */
         iter += strlen("fen");
@@ -275,9 +275,9 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
         }
 
         /* Setup the position */
-        if (!pos_setup_from_fen(&state->pos, iter)) {
+        if (!pos_setup_from_fen(&engine->pos, iter)) {
             /* Failed to setup position */
-            pos_setup_start_position(&state->pos);
+            pos_setup_start_position(&engine->pos);
             return;
         }
 
@@ -287,7 +287,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
         }
     } else {
         /* Invalid command, set start position and return */
-        pos_setup_start_position(&state->pos);
+        pos_setup_start_position(&engine->pos);
         return;
     }
 
@@ -304,8 +304,8 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
         /* Play all moves on the internal board */
         while (iter != NULL) {
             movestr = skip_whitespace(iter);
-            move = pos_str2move(movestr, &state->pos);
-            if (!pos_make_move(&state->pos, move)) {
+            move = pos_str2move(movestr, &engine->pos);
+            if (!pos_make_move(&engine->pos, move)) {
                 /* Illegal move */
                 return;
             }
@@ -314,7 +314,7 @@ static void uci_cmd_position(char *cmd, struct gamestate *state)
     }
 }
 
-static void uci_cmd_setoption(char *cmd, struct gamestate *state)
+static void uci_cmd_setoption(char *cmd, struct engine *engine)
 {
     char *iter;
     char *namestr;
@@ -407,7 +407,7 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
                 } else if (value < 1) {
                     value = 1;
                 }
-                state->multipv = value;
+                engine->multipv = value;
             }
         } else if (MATCH(namestr, "UseNNUE")) {
             if (MATCH(valuestr, "false")) {
@@ -468,7 +468,7 @@ static void uci_cmd_ucinewgame(void)
     smp_newgame();
 }
 
-bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop)
+bool uci_handle_command(struct engine *engine, char *cmd, bool *stop)
 {
     assert(cmd != NULL);
     assert(stop != NULL);
@@ -480,16 +480,16 @@ bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop)
     } else if (MATCH(cmd, "go")) {
         /* Both UCI and Xboard protocol has a go command */
         if (engine_protocol == PROTOCOL_UCI) {
-            uci_cmd_go(cmd, state);
+            uci_cmd_go(cmd, engine);
         } else {
             return false;
         }
     } else if (MATCH(cmd, "isready")) {
         uci_cmd_isready();
     } else if (MATCH(cmd, "position")) {
-        uci_cmd_position(cmd, state);
+        uci_cmd_position(cmd, engine);
     } else if (MATCH(cmd, "setoption")) {
-        uci_cmd_setoption(cmd, state);
+        uci_cmd_setoption(cmd, engine);
 	} else if (MATCH(cmd, "stop")) {
 		/* Ignore */
     } else if (MATCH(cmd, "uci") && (strlen(cmd) == 3)) {
@@ -527,16 +527,16 @@ bool uci_check_input(struct search_worker *worker)
         uci_cmd_isready();
     } else if(MATCH(cmd, "ponderhit")) {
         tc_allocate_time();
-        worker->state->pondering = false;
+        worker->engine->pondering = false;
     } else if (MATCH(cmd, "stop")) {
-        worker->state->pondering = false;
+        worker->engine->pondering = false;
         stop = true;
     }
 
     return stop;
 }
 
-void uci_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
+void uci_send_pv_info(struct engine *engine, struct pvinfo *pvinfo)
 {
     char     movestr[MAX_MOVESTR_LENGTH];
     char     buffer[1024];
@@ -551,13 +551,13 @@ void uci_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
     msec = (int)tc_elapsed_time();
     nodes = smp_nodes();
     nps = (msec > 0)?(nodes/msec)*1000:0;
-    tbhits = state->root_in_tb?1:smp_tbhits();
+    tbhits = engine->root_in_tb?1:smp_tbhits();
 
     /* Adjust score in case the root position was found in tablebases */
     score = pvinfo->score;
-    if (state->root_in_tb) {
+    if (engine->root_in_tb) {
         score = ((score > FORCED_MATE) || (score < (-FORCED_MATE)))?
-                                                    score:state->root_tb_score;
+                                                    score:engine->root_tb_score;
     }
 
     /* Build command */
@@ -587,12 +587,12 @@ void uci_send_bound_info(struct search_worker *worker, int score, bool lower)
     msec = (int)tc_elapsed_time();
     nodes = smp_nodes();
     nps = (msec > 0)?(nodes/msec)*1000:0;
-    tbhits = worker->state->root_in_tb?1:smp_tbhits();
+    tbhits = worker->engine->root_in_tb?1:smp_tbhits();
 
     /* Adjust score in case the root position was found in tablebases */
-    if (worker->state->root_in_tb) {
+    if (worker->engine->root_in_tb) {
         score = ((score > FORCED_MATE) || (score < (-FORCED_MATE)))?
-                                            score:worker->state->root_tb_score;
+                                            score:worker->engine->root_tb_score;
     }
 
     /* Build command */
@@ -644,7 +644,7 @@ void uci_send_multipv_info(struct search_worker *worker)
     msec = (int)tc_elapsed_time();
     nodes = smp_nodes();
     nps = (msec > 0)?(nodes/msec)*1000:0;
-    tbhits = worker->state->root_in_tb?1:smp_tbhits();
+    tbhits = worker->engine->root_in_tb?1:smp_tbhits();
     ttusage = hash_tt_usage();
 
     /* Sort pv lines based on score */

@@ -25,12 +25,12 @@
 /*
  * Handle an Xboard command.
  *
- * @param state The game state object.
+ * @param engine The engine.
  * @param cmd The command to handle.
  * @param stop Flag set if the engine should stop after this command.
  * @return Returns true if the command was handled, false otherwise.
  */
-bool xboard_handle_command(struct gamestate *state, char *cmd, bool *stop);
+bool xboard_handle_command(struct engine *engine, char *cmd, bool *stop);
 
 /*
  * Function called during search to check if input has arrived.
@@ -43,9 +43,9 @@ bool xboard_check_input(struct search_worker *worker);
 /*
  * Send information about the principle variation.
  *
- * @param state The game state.
+ * @param engine The engine.
  * @param pvinfo The pv.
  */
-void xboard_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo);
+void xboard_send_pv_info(struct engine *engine, struct pvinfo *pvinfo);
 
 #endif

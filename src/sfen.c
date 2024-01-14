@@ -346,10 +346,10 @@ static void setup_start_position(struct position *pos, float frc_prob)
     pos_setup_start_position(pos);
 }
 
-static int play_game(FILE *fp, struct gamestate *state, int pos_left,
+static int play_game(FILE *fp, struct engine *engine, int pos_left,
                      float frc_prob)
 {
-    struct position    *pos = &state->pos;
+    struct position    *pos = &engine->pos;
     struct packed_sfen batch[MAX_GAME_PLY];
     int                npos = 0;
     uint32_t           move;
@@ -364,8 +364,8 @@ static int play_game(FILE *fp, struct gamestate *state, int pos_left,
     smp_newgame();
 
     /* Setup start position and play some random opening moves */
-    setup_start_position(&state->pos, frc_prob);
-    play_random_moves(&state->pos, RANDOM_PLIES);
+    setup_start_position(&engine->pos, frc_prob);
+    play_random_moves(&engine->pos, RANDOM_PLIES);
     if (pos_get_game_result(pos) != RESULT_UNDETERMINED) {
         return 0;
     }
@@ -373,7 +373,7 @@ static int play_game(FILE *fp, struct gamestate *state, int pos_left,
     /* Play game */
     while (pos_get_game_result(pos) == RESULT_UNDETERMINED) {
         /* Search the position */
-        move = search_position(state, false, NULL, &stm_score);
+        move = search_position(engine, false, NULL, &stm_score);
 
         /* Skip non-quiet moves */
         if (ISTACTICAL(move) ||
@@ -453,9 +453,9 @@ static int play_game(FILE *fp, struct gamestate *state, int pos_left,
 
 static int generate(char *output, int depth, int npositions, double frc_prob)
 {
-    FILE             *outfp = NULL;
-    struct gamestate *state = NULL;
-    int              ngenerated;
+    FILE          *outfp = NULL;
+    struct engine *engine = NULL;
+    int           ngenerated;
 
     /* Open output file */
     outfp = fopen(output, "ab");
@@ -470,16 +470,16 @@ static int generate(char *output, int depth, int npositions, double frc_prob)
     smp_destroy_workers();
     smp_create_workers(1);
     tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
-    state = engine_create_game_state();
-    state->sd = depth;
-    state->move_filter.size = 0;
-    state->exit_on_mate = true;
+    engine = engine_create();
+    engine->sd = depth;
+    engine->move_filter.size = 0;
+    engine->exit_on_mate = true;
 
     /* Play games to generate moves */
     ngenerated = 0;
     while (ngenerated < npositions) {
         /* Play game */
-        ngenerated += play_game(outfp, state, npositions-ngenerated, frc_prob);
+        ngenerated += play_game(outfp, engine, npositions-ngenerated, frc_prob);
         
         /* Clear the transposition table */
         hash_tt_clear_table();
@@ -487,6 +487,9 @@ static int generate(char *output, int depth, int npositions, double frc_prob)
 
     /* Close the output file */
     fclose(outfp);
+
+    /* Destroy the engine*/
+    engine_destroy(engine);
 
     return 0;
 }
@@ -504,7 +507,7 @@ static int rescore(char *input, char *output, int depth, int npositions,
     int                nscored;
     int                batch_size;
     struct packed_sfen batch_data[BATCH_SIZE];
-    struct gamestate   *state = NULL;
+    struct engine      *engine = NULL;
     int                score;
 
     /* Open input and output files */
@@ -556,10 +559,10 @@ static int rescore(char *input, char *output, int depth, int npositions,
     smp_destroy_workers();
     smp_create_workers(1);
     tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
-    state = engine_create_game_state();
-    state->sd = depth;
-    state->move_filter.size = 0;
-    state->exit_on_mate = true;
+    engine = engine_create();
+    engine->sd = depth;
+    engine->move_filter.size = 0;
+    engine->exit_on_mate = true;
 
     /* Rescore positions */
     nscored = 0;
@@ -580,11 +583,11 @@ static int rescore(char *input, char *output, int depth, int npositions,
 
         /* Analyse all positions in the batch */
         for (k=0;k<batch_size;k++) {
-            position_from_sfen(batch_data[k].position, &state->pos);
-            assert(valid_position(&state->pos));
-            assert(state->pos.key == key_generate(&state->pos));
+            position_from_sfen(batch_data[k].position, &engine->pos);
+            assert(valid_position(&engine->pos));
+            assert(engine->pos.key == key_generate(&engine->pos));
             smp_newgame();
-            (void)search_position(state, false, NULL, &score);
+            (void)search_position(engine, false, NULL, &score);
             if ((score > -EVAL_LIMIT) && (score < EVAL_LIMIT)) {
                 /*
                  * The training code doesn't care about the actual move so
@@ -609,8 +612,8 @@ static int rescore(char *input, char *output, int depth, int npositions,
     }
 
 done:
-    if (state != NULL) {
-        engine_destroy_game_state(state);
+    if (engine != NULL) {
+        engine_destroy(engine);
     }
     if (infp) {
         fclose(infp);
