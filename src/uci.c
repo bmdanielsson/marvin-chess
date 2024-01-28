@@ -427,12 +427,10 @@ static void uci_cmd_setoption(char *cmd, struct gamestate *state)
     }
 }
 
-static void uci_cmd_uci(struct gamestate *state)
+static void uci_cmd_uci(void)
 {
     engine_protocol = PROTOCOL_UCI;
     engine_variant = VARIANT_STANDARD;
-
-    state->silent = false;
 
     engine_write_command("id name %s %s", APP_NAME, APP_VERSION);
     engine_write_command("id author %s", APP_AUTHOR);
@@ -494,7 +492,7 @@ bool uci_handle_command(struct gamestate *state, char *cmd, bool *stop)
 	} else if (MATCH(cmd, "stop")) {
 		/* Ignore */
     } else if (MATCH(cmd, "uci") && (strlen(cmd) == 3)) {
-        uci_cmd_uci(state);
+        uci_cmd_uci();
     } else if (MATCH(cmd, "ucinewgame") && (strlen(cmd) == 10)) {
         uci_cmd_ucinewgame();
     } else if (MATCH(cmd, "quit")) {

@@ -350,7 +350,7 @@ bool engine_wait_for_input(struct search_worker *worker)
 
 void engine_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
 {
-    if (state->silent) {
+    if (engine_protocol == PROTOCOL_UNSPECIFIED) {
         return;
     }
 
@@ -363,7 +363,7 @@ void engine_send_pv_info(struct gamestate *state, struct pvinfo *pvinfo)
 
 void engine_send_bound_info(struct search_worker *worker, int score, bool lower)
 {
-    if (worker->state->silent) {
+    if (engine_protocol == PROTOCOL_UNSPECIFIED) {
         return;
     }
 
@@ -375,7 +375,7 @@ void engine_send_bound_info(struct search_worker *worker, int score, bool lower)
 void engine_send_move_info(struct search_worker *worker, int movenumber,
                            uint32_t move)
 {
-    if (worker->state->silent) {
+    if (engine_protocol == PROTOCOL_UNSPECIFIED) {
         return;
     }
 
@@ -386,7 +386,7 @@ void engine_send_move_info(struct search_worker *worker, int movenumber,
 
 void engine_send_multipv_info(struct search_worker *worker)
 {
-    if (worker->state->silent) {
+    if (engine_protocol == PROTOCOL_UNSPECIFIED) {
         return;
     }
 

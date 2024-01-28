@@ -529,8 +529,6 @@ struct gamestate {
     int sd;
     /* The maximum number of nodes the engine should search */
     uint64_t max_nodes;
-    /* Flag used to suppress output during search */
-    bool silent;
     /*
      * Flag indicating if the engine is currently
      * searching in pondering mode.

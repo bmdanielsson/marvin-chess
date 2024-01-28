@@ -198,7 +198,6 @@ static void make_engine_move(struct gamestate *state)
 
     /* Set default search parameters */
     state->exit_on_mate = true;
-    state->silent = false;
     ponder = false;
     pondering_on = NOMOVE;
     flags = 0;
@@ -289,7 +288,6 @@ static void xboard_cmd_analyze(struct gamestate *state)
     while (true) {
         /* Set default search parameters */
         state->sd = MAX_SEARCH_DEPTH;
-        state->silent = false;
         state->exit_on_mate = false;
         engine_clear_pending_command();
         tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
@@ -718,7 +716,6 @@ static void xboard_cmd_xboard(struct gamestate *state)
     post_mode = false;
     game_over = false;
 
-    state->silent = false;
     state->move_filter.size = 0;
 }
 

@@ -176,7 +176,6 @@ void test_run_benchmark(void)
         tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
         smp_newgame();
         state->sd = BENCH_DEPTH;
-        state->silent = true;
         state->move_filter.size = 0;
         state->exit_on_mate = true;
 
