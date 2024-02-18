@@ -94,35 +94,67 @@ static int feature_index(int sq, int piece, int king_sq, int side)
     return sq + piece_index + (NPIECES-2)*NSQUARES*king_sq;
 }
 
-static void update_accumulator(struct position *pos, int side)
+static void accumulator_propagate(struct position *pos, bool update_stm)
+{
+    int16_t *prev_data;
+    int16_t *data;
+    int     side;
+
+    for (side=0;side<NSIDES;side++) {
+        if (update_stm || (side != pos->stm)) {
+            prev_data =
+                    &pos->eval_stack[pos->height-1].accumulator.data[side][0];
+            data = &pos->eval_stack[pos->height].accumulator.data[side][0];
+            simd_copy(prev_data, data, layer_sizes[0]/2);
+        }
+    }
+}
+
+static void accumulator_add(struct position *pos, bool update_stm,
+                            int piece, int sq)
 {
     struct nnue_accumulator *acc;
     int16_t                 *data;
-    int                     k;
-    int                     king_sq;
     uint32_t                index;
     uint32_t                offset;
+    int                     side;
+    int                     king_sq;
 
     acc = &pos->eval_stack[pos->height].accumulator;
-    data = &acc->data[side][0];
-
-    /* Find the location of the firendly king */
-    king_sq = LSB(pos->bb_pieces[side+KING]);
-
-    /* Apply required updates to the accumulator */
-    for (k=0;k<acc->nupdates;k++) {
-        index = feature_index(acc->updates[k].sq,
-                              acc->updates[k].piece, king_sq, side);
-        offset = (layer_sizes[0]/2)*index;
-        if (acc->updates[k].add) {
+    for (side=0;side<NSIDES;side++) {
+        if (update_stm || (side != pos->stm)) {
+            data = &acc->data[side][0];
+            king_sq = LSB(pos->bb_pieces[side+KING]);
+            index = feature_index(sq, piece, king_sq, side);
+            offset = (layer_sizes[0]/2)*index;
             simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
-        } else {
+        }
+    }
+}
+
+static void accumulator_remove(struct position *pos, bool update_stm,
+                               int piece, int sq)
+{
+    struct nnue_accumulator *acc;
+    int16_t                 *data;
+    uint32_t                index;
+    uint32_t                offset;
+    int                     side;
+    int                     king_sq;
+
+    acc = &pos->eval_stack[pos->height].accumulator;
+    for (side=0;side<NSIDES;side++) {
+        if (update_stm || (side != pos->stm)) {
+            data = &acc->data[side][0];
+            king_sq = LSB(pos->bb_pieces[side+KING]);
+            index = feature_index(sq, piece, king_sq, side);
+            offset = (layer_sizes[0]/2)*index;
             simd_sub(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
         }
     }
 }
 
-static void refresh_accumulator(struct position *pos, int side)
+static void accumulator_refresh(struct position *pos, int side)
 {
     int      king_sq;
     int      sq;
@@ -181,8 +213,6 @@ static bool accumulator_refresh_required(struct position *pos, int side)
 
 static void transformer_forward(struct position *pos, struct net_data *data)
 {
-    int16_t  *acc_data;
-    int16_t  *prev_acc_data;
     int      side;
     uint32_t size;
     uint8_t  *dest;
@@ -195,17 +225,7 @@ static void transformer_forward(struct position *pos, struct net_data *data)
     if (!pos->eval_stack[pos->height].accumulator.up2date) {
         for (side=0;side<NSIDES;side++) {
             if (accumulator_refresh_required(pos, side)) {
-                refresh_accumulator(pos, side);
-            } else {
-                /* Copy accumulator data from the previous ply */
-                acc_data =
-                    &pos->eval_stack[pos->height].accumulator.data[side][0];
-                prev_acc_data =
-                    &pos->eval_stack[pos->height-1].accumulator.data[side][0];
-                simd_copy(prev_acc_data, acc_data, layer_sizes[0]/2);
-
-                /* Apply required updates */
-                update_accumulator(pos, side);
+                accumulator_refresh(pos, side);
             }
         }
 
@@ -492,6 +512,7 @@ void nnue_make_move(struct position *pos, uint32_t move)
     int                     promotion = PROMOTION(move);
     int                     capture = pos->pieces[to];
     int                     piece = pos->pieces[from];
+    bool                    update_stm = (piece != (pos->stm+KING));
 
     assert(pos != NULL);
 
@@ -499,68 +520,47 @@ void nnue_make_move(struct position *pos, uint32_t move)
         return;
     }
 
+    /*
+     * If the state of the previous position is not valid
+     * then a full refresh is required.
+     */
     acc = &pos->eval_stack[pos->height].accumulator;
-    acc->up2date = false;
-    acc->nupdates = 0;
+    if ((pos->height == 0) ||
+        !pos->eval_stack[pos->height-1].accumulator.up2date) {
+        acc->up2date = false;
+        return;
+    }
+
     acc->refresh[WHITE] = piece == WHITE_KING;
     acc->refresh[BLACK] = piece == BLACK_KING;
+    acc->up2date = !acc->refresh[WHITE] && !acc->refresh[BLACK];
+
+    /* Copy accumulator data from the previous ply */
+    accumulator_propagate(pos, update_stm);
 
     if (ISKINGSIDECASTLE(move)) {
-        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
-        acc->updates[acc->nupdates].sq = to;
-        acc->updates[acc->nupdates].add = false;
-        acc->nupdates++;
-
-        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
-        acc->updates[acc->nupdates].sq = KINGCASTLE_KINGMOVE(to) - 1;
-        acc->updates[acc->nupdates].add = true;
-        acc->nupdates++;
+        accumulator_remove(pos, false, ROOK + pos->stm, to);
+        accumulator_add(pos, false, ROOK + pos->stm,
+                        KINGCASTLE_KINGMOVE(to) - 1);
     } else if (ISQUEENSIDECASTLE(move)) {
-        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
-        acc->updates[acc->nupdates].sq = to;
-        acc->updates[acc->nupdates].add = false;
-        acc->nupdates++;
-
-        acc->updates[acc->nupdates].piece = ROOK + pos->stm;
-        acc->updates[acc->nupdates].sq = QUEENCASTLE_KINGMOVE(to) + 1;
-        acc->updates[acc->nupdates].add = true;
-        acc->nupdates++;
+        accumulator_remove(pos, false, ROOK + pos->stm, to);
+        accumulator_add(pos, false, ROOK + pos->stm,
+                        QUEENCASTLE_KINGMOVE(to) + 1);
     } else if (ISENPASSANT(move)) {
-        acc->updates[acc->nupdates].piece = piece;
-        acc->updates[acc->nupdates].sq = from;
-        acc->updates[acc->nupdates].add = false;
-        acc->nupdates++;
-
-        acc->updates[acc->nupdates].piece = piece;
-        acc->updates[acc->nupdates].sq = to;
-        acc->updates[acc->nupdates].add = true;
-        acc->nupdates++;
-
-        acc->updates[acc->nupdates].piece = PAWN + FLIP_COLOR(pos->stm);
-        acc->updates[acc->nupdates].sq = (pos->stm == WHITE)?to-8:to+8;
-        acc->updates[acc->nupdates].add = false;
-        acc->nupdates++;
+        accumulator_remove(pos, true, piece, from);
+        accumulator_add(pos, true, piece, to);
+        accumulator_remove(pos, true, PAWN + FLIP_COLOR(pos->stm),
+                           (pos->stm == WHITE)?to-8:to+8);
     } else {
         if (VALUE(piece) != KING) {
-            acc->updates[acc->nupdates].piece = piece;
-            acc->updates[acc->nupdates].sq = from;
-            acc->updates[acc->nupdates].add = false;
-            acc->nupdates++;
+            accumulator_remove(pos, update_stm, piece, from);
         }
-
         if (ISCAPTURE(move)) {
-            acc->updates[acc->nupdates].piece = capture;
-            acc->updates[acc->nupdates].sq = to;
-            acc->updates[acc->nupdates].add = false;
-            acc->nupdates++;
+            accumulator_remove(pos, update_stm, capture, to);
         }
-
         if (VALUE(piece) != KING) {
-            acc->updates[acc->nupdates].piece =
-                                            ISPROMOTION(move)?promotion:piece;
-            acc->updates[acc->nupdates].sq = to;
-            acc->updates[acc->nupdates].add = true;
-            acc->nupdates++;
+            accumulator_add(pos, update_stm, ISPROMOTION(move)?promotion:piece,
+                            to);
         }
     }
 }

@@ -388,16 +388,8 @@ struct nnue_update {
 #define NNUE_NUM_LAYERS 4
 #define NNUE_TRANSFORMER_SIZE 256
 struct nnue_accumulator {
-    /* Accumulator data */
     alignas(64) int16_t data[NSIDES][NNUE_TRANSFORMER_SIZE];
-    /*
-     * Updates that has to be applied to the accumulator to make
-     * it up to date for the current position.
-     */
-    struct nnue_update updates[6];
-    uint8_t nupdates;
     bool refresh[NSIDES];
-    /* Flag indicating if the accumulator data is up to date */
     bool up2date;
 };
 
