@@ -352,11 +352,6 @@ void parallel_memset(void *memory, uint8_t value, size_t size, int nthreads)
     free(task_list);
 }
 
-/*
- * Check this is a 64-bit build.
- *
- * @return Returns true if this is a 64-bit build.
- */
 bool is64bit(void)
 {
 	char *dummy;
@@ -395,14 +390,6 @@ int64_t get_file_size(char *file)
 #endif
 }
 
-/*
- * Set the position in the file in as portable way.
- *
- * @param fp The file pointer.
- * @param offset The offset to use.
- * @param whence The point the offset is calculated from.
- * @return Returns 0 in case of success or -1 in case of error.
- */
 int set_file_position(FILE *fp, int64_t offset, int whence)
 {
     assert(fp != NULL);
