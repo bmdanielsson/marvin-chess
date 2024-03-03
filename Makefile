@@ -1,8 +1,8 @@
 # Default build configuration
 arch = x86-64-modern
 variant = release
-version = 6.2.0
-nnuenet = net-0d21cd7.nnue
+version = 7.0.0-6
+nnuenet = net-99b1529.nnue
 
 # Default options
 sse = no
@@ -209,4 +209,4 @@ marvin : $(OBJECTS)
 	$(CC) $(OBJECTS) $(LDFLAGS) -o $(EXEFILE)
 
 net :
-	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v7/$(nnuenet)
+	wget https://github.com/bmdanielsson/marvin-nets/raw/marvin-lite/v8/$(nnuenet)
