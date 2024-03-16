@@ -103,6 +103,8 @@ int main(int argc, char *argv[])
         return 0;
     } else if ((argc >= 2) && (MATCH(argv[1], "--generate"))) {
         return sfen_generate(argc, argv);
+    } else if ((argc >= 2) && (MATCH(argv[1], "--rescore"))) {
+        return sfen_rescore(argc, argv);
     }
 
     /* Create game state */
