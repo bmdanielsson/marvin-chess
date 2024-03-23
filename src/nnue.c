@@ -43,7 +43,7 @@ INCBIN(nnue_net, NETFILE_NAME);
 #define OUTPUT_SCALE 16.0f
 
 /* Definition of the network architcechure */
-#define NET_VERSION 0x00000008
+#define NET_VERSION 0x00000009
 #define NET_HEADER_SIZE 4
 static int model_layer_sizes[NNUE_NUM_LAYERS] =
                                         {NNUE_TRANSFORMER_SIZE*2, 8, 16, 1};

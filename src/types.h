@@ -379,7 +379,7 @@ struct nnue_cache_item {
 #define NNUE_NUM_INPUT_FEATURES 64*12
 #define NNUE_MAX_ACTIVE_FEATURES 32
 #define NNUE_NUM_LAYERS 4
-#define NNUE_TRANSFORMER_SIZE 256
+#define NNUE_TRANSFORMER_SIZE 384
 struct nnue_accumulator {
     alignas(64) int16_t data[NSIDES][NNUE_TRANSFORMER_SIZE];
 };
