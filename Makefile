@@ -2,7 +2,7 @@
 arch = x86-64-modern
 variant = release
 version = 6.2.0
-nnuenet = net-99b1529.nnue
+nnuenet = net-667d9b0.nnue
 
 # Default options
 sse = no
@@ -209,4 +209,4 @@ marvin : $(OBJECTS)
 	$(CC) $(OBJECTS) $(LDFLAGS) -o $(EXEFILE)
 
 net :
-	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v8/$(nnuenet)
+	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v9/$(nnuenet)
