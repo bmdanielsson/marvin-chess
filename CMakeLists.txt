@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(marvin-chess VERSION 7.0.0 LANGUAGES C)
+project(marvin-chess VERSION 6.2.0 LANGUAGES C)
 
 add_executable(marvin
           src/bitboard.c
@@ -39,8 +39,8 @@ include_directories(import/fathom import/incbin)
 target_link_libraries(marvin m pthread)
 
 add_compile_definitions(APP_ARCH="x86-64-modern")
-add_compile_definitions(APP_VERSION="7.0.0-5")
-add_compile_definitions(NETFILE_NAME="best36.nnue")
+add_compile_definitions(APP_VERSION="6.2.0")
+add_compile_definitions(NETFILE_NAME="net-667d9b0.nnue")
 add_compile_definitions(USE_SSE)
 add_compile_definitions(IS_64BIT)
 add_compile_definitions(USE_POPCNT)
