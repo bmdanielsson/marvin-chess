@@ -15,6 +15,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include <assert.h>
 #include <stdlib.h>
 #include <stdalign.h>
 #ifdef USE_SSE
@@ -42,7 +43,6 @@
 #define MIN_SIZE 1
 #endif
 
-#define WEIGHT_SCALE_BITS 6
 #define MAX_QUANTIZED_ACTIVATION 127.0f
 
 #if defined(USE_AVX2) || defined(USE_SSE)
@@ -63,19 +63,16 @@ static int32_t hsum_8x32(__m256i v)
 }
 #endif
 
-int simd_pad_size(int size)
-{
-    return ((size%MIN_SIZE) == 0)?size:((size/MIN_SIZE)+1)*MIN_SIZE;
-}
-
 void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
                      int noutputs, int32_t *biases, int8_t *weights)
 {
-#if defined(USE_AVX2)
     int k;
     int l;
-    int niterations = ninputs/32;
+    int niterations = ninputs/MIN_SIZE;
 
+    assert((ninputs%MIN_SIZE) == 0);
+
+#if defined(USE_AVX2)
     __m256i c1 = _mm256_set1_epi16(1);
 
     for (k=0;k<noutputs;k++) {
@@ -98,14 +95,7 @@ void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
 
         output[k] = hsum_8x32(vsum) + biases[k];
     }
-    for (;k<MIN_SIZE-(noutputs%MIN_SIZE);k++) {
-        output[k] = 0;
-    }
 #elif defined(USE_SSE)
-    int k;
-    int l;
-    int niterations = ninputs/16;
-
     __m128i c1 = _mm_set1_epi16(1);
 
     for (k=0;k<noutputs;k++) {
@@ -127,14 +117,7 @@ void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
 
         output[k] = hsum_4x32(vsum) + biases[k];
     }
-    for (;k<MIN_SIZE-(noutputs%MIN_SIZE);k++) {
-        output[k] = 0;
-    }
 #elif defined(USE_NEON)
-    int k;
-    int l;
-    int niterations = ninputs/16;
-
     for (k=0;k<noutputs;k++) {
         int8x8_t *pi = (int8x8_t*)input;
         int8x8_t *pw = (int8x8_t*)&weights[k*ninputs];
@@ -151,115 +134,12 @@ void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
 
         output[k] = vaddvq_s32(vsum) + biases[k];
     }
-    for (;k<MIN_SIZE-(noutputs%MIN_SIZE);k++) {
-        output[k] = 0;
-    }
 #else
-    int k;
-    int l;
-
     for (k=0;k<noutputs;k++) {
         output[k] = biases[k];
-        for (l=0;l<ninputs;l++) {
-            output[k] += (input[l]*weights[k*ninputs+l]);
+        for (l=0;l<niterations;l++) {
+            output[k] += (input[l]*weights[k*nterations+l]);
         }
-    }
-#endif
-}
-
-void simd_scale_and_clamp(int32_t *input, uint8_t *output, int nvalues)
-{
-#if defined(USE_AVX2)
-    int k;
-    int niterations = nvalues/32;
-
-    __m256i *pi = (__m256i*)input;
-    __m256i *po = (__m256i*)output;
-
-    __m256i min = _mm256_set1_epi8(0);
-    __m256i idx = _mm256_set_epi32(7, 3, 6, 2, 5, 1, 4, 0);
-
-    for (k=0;k<niterations;k++) {
-        __m256i v1 = _mm256_load_si256(pi++);
-        __m256i v2 = _mm256_load_si256(pi++);
-        __m256i v16_1 = _mm256_packs_epi32(v1, v2);
-        v16_1 = _mm256_srai_epi16(v16_1, WEIGHT_SCALE_BITS);
-
-        v1 = _mm256_loadu_si256(pi++);
-        v2 = _mm256_loadu_si256(pi++);
-        __m256i v16_2 = _mm256_packs_epi32(v1, v2);
-        v16_2 = _mm256_srai_epi16(v16_2, WEIGHT_SCALE_BITS);
-
-        __m256i v8 = _mm256_packs_epi16(v16_1, v16_2);
-        __m256i s = _mm256_permutevar8x32_epi32(v8, idx);
-        s = _mm256_max_epi8(s, min);
-        _mm256_store_si256(po++, s);
-    }
-#elif defined(USE_SSE)
-    int k;
-    int niterations = nvalues/16;
-
-    __m128i *pi = (__m128i*)input;
-    __m128i *po = (__m128i*)output;
-
-    __m128i min = _mm_set1_epi32(0);
-    __m128i max = _mm_set1_epi32((int)MAX_QUANTIZED_ACTIVATION);
-
-    for (k=0;k<niterations;k++) {
-        __m128i v1 = _mm_load_si128(pi++);
-        v1 = _mm_srai_epi32(v1, WEIGHT_SCALE_BITS);
-        v1 = _mm_max_epi32(v1, min);
-        v1 = _mm_min_epi32(v1, max);
-
-        __m128i v2 = _mm_load_si128(pi++);
-        v2 = _mm_srai_epi32(v2, WEIGHT_SCALE_BITS);
-        v2 = _mm_max_epi32(v2, min);
-        v2 = _mm_min_epi32(v2, max);
-
-        __m128i o1 =  _mm_packs_epi32(v1, v2);
-        v1 = _mm_load_si128(pi++);
-        v1 = _mm_srai_epi32(v1, WEIGHT_SCALE_BITS);
-        v1 = _mm_max_epi32(v1, min);
-        v1 = _mm_min_epi32(v1, max);
-
-        v2 = _mm_load_si128(pi++);
-        v2 = _mm_srai_epi32(v2, WEIGHT_SCALE_BITS);
-        v2 = _mm_max_epi32(v2, min);
-        v2 = _mm_min_epi32(v2, max);
-
-        __m128i o2 =  _mm_packs_epi32(v1, v2);
-        __m128i o =  _mm_packs_epi16(o1, o2);
-        _mm_store_si128(po++, o);
-    }
-#elif defined(USE_NEON)
-    int k;
-    int niterations = nvalues/16;
-
-    int32x4_t *pi = (int32x4_t*)input;
-    int8x16_t *po = (int8x16_t*)output;
-
-    int16x8_t min = vmovq_n_s16(0);
-    int16x8_t max = vmovq_n_s16((int16_t)MAX_QUANTIZED_ACTIVATION);
-
-    for (k=0;k<niterations;k++) {
-        int16x8_t lower = vcombine_s16(vshrn_n_s32(*(pi++), WEIGHT_SCALE_BITS),
-                                       vshrn_n_s32(*(pi++), WEIGHT_SCALE_BITS));
-        lower = vminq_s16(lower, max);
-        lower = vmaxq_s16(lower, min);
-
-        int16x8_t upper = vcombine_s16(vshrn_n_s32(*(pi++), WEIGHT_SCALE_BITS),
-                                       vshrn_n_s32(*(pi++), WEIGHT_SCALE_BITS));
-        upper = vminq_s16(upper, max);
-        upper = vmaxq_s16(upper, min);
-
-        *(po++) = vcombine_s8(vmovn_s16(lower), vmovn_s16(upper));
-    }
-#else
-    int k;
-
-    for (k=0;k<nvalues;k++) {
-        output[k] = CLAMP((input[k]>>WEIGHT_SCALE_BITS), 0,
-                          (int)MAX_QUANTIZED_ACTIVATION);
     }
 #endif
 }

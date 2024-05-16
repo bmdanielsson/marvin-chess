@@ -21,14 +21,6 @@
 #include <stdint.h>
 
 /*
- * Calculate a padded size.
- *
- * @param size The actual size.
- * @return Return the size after padding.
- */
-int simd_pad_size(int size);
-
-/*
  * SIMD implementation of a forward pass of a fully connected layer.
  * 
  * @param input The layer input. 
@@ -40,17 +32,6 @@ int simd_pad_size(int size);
  */
 void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
                      int noutputs, int32_t *biases, int8_t *weights);
-
-
-/*
- * SIMD implementation of a scale-and-clamp operation. Values are scaled down
- * and the clamped between 0 and 127.
- *
- * @param input Input values.
- * @param output Output values.
- * @param nvalues The number of values.
- */
-void simd_scale_and_clamp(int32_t *input, uint8_t *output, int nvalues);
 
 /*
  * SIMD implementation of a clamp operation. Values and the clamped between 0

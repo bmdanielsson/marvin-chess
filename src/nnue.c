@@ -43,16 +43,11 @@ INCBIN(nnue_net, NETFILE_NAME);
 #define OUTPUT_SCALE 16.0f
 
 /* Definition of the network architcechure */
-#define NET_VERSION 0x00000009
+#define NET_VERSION 0x0000000A
 #define NET_HEADER_SIZE 4
-static int model_layer_sizes[NNUE_NUM_LAYERS] =
-                                        {NNUE_TRANSFORMER_SIZE*2, 8, 16, 1};
+static int layer_sizes[NNUE_NUM_LAYERS] = {NNUE_INPUT_LAYER_SIZE*2, 1};
 
-/*
- * Struct holding information about a layer in the network. The size
- * may be padded in order to better match SIMD instructions. The model_size
- * field holds the actual, unpadedd, size as defined in the model.
- */
+/* Struct holding information about a layer in the network */
 struct layer {
     union {
         int8_t  *i8;
@@ -66,13 +61,12 @@ struct layer {
 
 /* Struct for holding data during a forward pass */
 struct net_data {
-    alignas(64) int32_t intermediate[NNUE_TRANSFORMER_SIZE*2];
-    alignas(64) uint8_t output[NNUE_TRANSFORMER_SIZE*2];
+    alignas(64) int32_t intermediate[NNUE_INPUT_LAYER_SIZE*2];
+    alignas(64) uint8_t output[NNUE_INPUT_LAYER_SIZE*2];
 };
 
 /* The network */
 static struct layer layers[NNUE_NUM_LAYERS];
-static int layer_sizes[NNUE_NUM_LAYERS];
 
 static int feature_index(int sq, int piece, int side)
 {
@@ -165,7 +159,7 @@ static void accumulator_refresh(struct position *pos, int side)
     }
 }
 
-static void transformer_forward(struct position *pos, struct net_data *data)
+static void input_layer_forward(struct position *pos, struct net_data *data)
 {
     uint32_t size;
     uint8_t  *dest;
@@ -183,26 +177,17 @@ static void transformer_forward(struct position *pos, struct net_data *data)
     simd_clamp(half, dest+size, size);
 }
 
-static void fc_layer_forward(int idx, struct net_data *data, bool output)
+static void output_layer_forward(int idx, struct net_data *data)
 {
     simd_fc_forward(data->output, data->intermediate, layer_sizes[idx-1],
-                    model_layer_sizes[idx], layers[idx].biases.i32,
+                    layer_sizes[idx], layers[idx].biases.i32,
                     layers[idx].weights.i8);
-    if (!output) {
-        simd_scale_and_clamp(data->intermediate, data->output,
-                             layer_sizes[idx]);
-    }
 }
 
 static void network_forward(struct position *pos, struct net_data *data)
 {
-    int k;
-
-    transformer_forward(pos, data);
-    for (k=1;k<NNUE_NUM_LAYERS-1;k++) {
-        fc_layer_forward(k, data, false);
-    }
-    fc_layer_forward(k, data, true);
+    input_layer_forward(pos, data);
+    output_layer_forward(1, data);
 }
 
 static bool parse_header(uint8_t **data)
@@ -218,14 +203,13 @@ static bool parse_header(uint8_t **data)
     return version == NET_VERSION;
 }
 
-static uint8_t* read_transformer(uint8_t *iter, struct layer *layer)
+static uint8_t* read_input_layer(uint8_t *iter, struct layer *layer)
 {
     int k;
     int half;
     int model_half;
 
-    /* Weights and biases are padded with zeroes if necessary */
-    model_half = model_layer_sizes[0]/2;
+    model_half = layer_sizes[0]/2;
     half = layer_sizes[0]/2;
     for (k=0;k<model_half;k++,iter+=2) {
         layer->biases.i16[k] = read_uint16_le(iter);
@@ -243,41 +227,16 @@ static uint8_t* read_transformer(uint8_t *iter, struct layer *layer)
     return iter;
 }
 
-static uint8_t* read_fc_layer(uint8_t *iter, int idx, struct layer *layer)
-{
-    int k;
-    int l;
-
-    /* Weights and biases are padded with zeroes if necessary */
-    for (k=0;k<model_layer_sizes[idx];k++,iter+=4) {
-        layer->biases.i32[k] = read_uint32_le(iter);
-    }
-    for (;k<layer_sizes[idx];k++) {
-        layer->biases.i32[k] = 0;
-    }
-    for (k=0;k<model_layer_sizes[idx];k++) {
-        for (l=0;l<model_layer_sizes[idx-1];l++,iter++) {
-            layer->weights.i8[k*layer_sizes[idx-1]+l] = (int8_t)*iter;
-        }
-        for (;l<layer_sizes[idx-1];l++) {
-            layer->weights.i8[k*layer_sizes[idx-1]+l] = 0;
-        }
-    }
-
-    return iter;
-}
-
 static uint8_t* read_output_layer(uint8_t *iter, int idx, struct layer *layer)
 {
     int k;
     int l;
 
-    /* Note that the size of the output layer is not padded */
-    for (k=0;k<model_layer_sizes[idx];k++,iter+=4) {
+    for (k=0;k<layer_sizes[idx];k++,iter+=4) {
         layer->biases.i32[k] = read_uint32_le(iter);
     }
-    for (k=0;k<model_layer_sizes[idx];k++) {
-        for (l=0;l<model_layer_sizes[idx-1];l++,iter++) {
+    for (k=0;k<layer_sizes[idx];k++) {
+        for (l=0;l<layer_sizes[idx-1];l++,iter++) {
             layer->weights.i8[k*layer_sizes[idx-1]+l] = (int8_t)*iter;
         }
         for (;l<layer_sizes[idx-1];l++) {
@@ -291,18 +250,12 @@ static uint8_t* read_output_layer(uint8_t *iter, int idx, struct layer *layer)
 static bool parse_network(uint8_t **data)
 {
     uint8_t *iter = *data;
-    int   k;
 
-    /* Read biases and weights for the transformer */
-    iter = read_transformer(iter, &layers[0]);
-
-    /* Read biases and weights for each hidden layer */
-    for (k=1;k<NNUE_NUM_LAYERS-1;k++) {
-        iter = read_fc_layer(iter, k, &layers[k]);
-    }
+    /* Read biases and weights for the input layer */
+    iter = read_input_layer(iter, &layers[0]);
 
     /* Read biases and weights for the output layer */
-    iter = read_output_layer(iter, k, &layers[k]);
+    iter = read_output_layer(iter, 1, &layers[1]);
 
     *data = iter;
 
@@ -316,12 +269,12 @@ static uint32_t calculate_net_size(void)
 
     size += NET_HEADER_SIZE;
 
-    size += NNUE_TRANSFORMER_SIZE*sizeof(int16_t);
-    size += NNUE_TRANSFORMER_SIZE*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t);
+    size += NNUE_INPUT_LAYER_SIZE*sizeof(int16_t);
+    size += NNUE_INPUT_LAYER_SIZE*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t);
 
     for (k=1;k<NNUE_NUM_LAYERS;k++) {
-        size += model_layer_sizes[k]*sizeof(int32_t);
-        size += model_layer_sizes[k]*model_layer_sizes[k-1]*sizeof(int8_t);
+        size += layer_sizes[k]*sizeof(int32_t);
+        size += layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t);
     }
 
     return size;
@@ -329,25 +282,14 @@ static uint32_t calculate_net_size(void)
 
 void nnue_init(void)
 {
-    int k;
-
     /* Allocate space for layers */
-    layer_sizes[0] = simd_pad_size(NNUE_TRANSFORMER_SIZE)*2;
     layers[0].weights.i16 = aligned_malloc(64,
                     layer_sizes[0]*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t));
     layers[0].biases.i16 = aligned_malloc(64, layer_sizes[0]*sizeof(int16_t));
-    for (k=1;k<NNUE_NUM_LAYERS-1;k++) {
-        layer_sizes[k] = simd_pad_size(model_layer_sizes[k]);
-        layers[k].weights.i8 = aligned_malloc(64,
-                                layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t));
-        layers[k].biases.i32 = aligned_malloc(64,
-                                layer_sizes[k]*sizeof(int32_t));
-    }
-    layer_sizes[k] = model_layer_sizes[k]; /* Output layer is not padded */
-    layers[k].weights.i8 = aligned_malloc(64,
-                            layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t));
-    layers[k].biases.i32 = aligned_malloc(64,
-                            layer_sizes[k]*sizeof(int32_t));
+    layers[1].weights.i8 = aligned_malloc(64,
+                            layer_sizes[1]*layer_sizes[0]*sizeof(int8_t));
+    layers[1].biases.i32 = aligned_malloc(64,
+                            layer_sizes[1]*sizeof(int32_t));
 }
 
 void nnue_destroy(void)
