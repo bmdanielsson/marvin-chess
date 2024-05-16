@@ -2,7 +2,7 @@
 arch = x86-64-modern
 variant = release
 version = 6.2.0
-nnuenet = net-667d9b0.nnue
+nnuenet = res/eval.nnue
 
 # Default options
 sse = no
@@ -194,7 +194,6 @@ help :
 	@echo ""
 	@echo "Supported targets:"
 	@echo "  marvin: Build the engine (default target)."
-	@echo "  net: Fetch the default NNUE net."
 	@echo "  help: Display this message."
 	@echo "  clean: Remove all intermediate files."
 	@echo ""
@@ -207,6 +206,3 @@ help :
 
 marvin : $(OBJECTS)
 	$(CC) $(OBJECTS) $(LDFLAGS) -o $(EXEFILE)
-
-net :
-	wget https://github.com/bmdanielsson/marvin-nets/raw/main/v9/$(nnuenet)

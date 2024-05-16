@@ -155,7 +155,7 @@ void test_run_benchmark(void)
 
     printf("%s %s (%s)\n", APP_NAME, APP_VERSION, APP_ARCH);
     if (engine_using_nnue) {
-        printf("Using NNUE evaluation with %s\n", engine_eval_file);
+        printf("Using NNUE evaluation\n");
     } else {
         printf("Using classic evaluation\n");
     }

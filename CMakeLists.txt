@@ -40,7 +40,7 @@ target_link_libraries(marvin m pthread)
 
 add_compile_definitions(APP_ARCH="x86-64-modern")
 add_compile_definitions(APP_VERSION="6.2.0")
-add_compile_definitions(NETFILE_NAME="net-667d9b0.nnue")
+add_compile_definitions(NETFILE_NAME="../res/eval.nnue")
 add_compile_definitions(USE_SSE)
 add_compile_definitions(IS_64BIT)
 add_compile_definitions(USE_POPCNT)

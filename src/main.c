@@ -52,7 +52,7 @@ static void print_version(void)
     if (!engine_using_nnue || !engine_loaded_net) {
         printf("Using classic evaluation\n");
     } else {
-        printf("Using NNUE evaluation with %s\n", engine_eval_file);
+        printf("Using NNUE evaluation\n");
     }
 }
 
