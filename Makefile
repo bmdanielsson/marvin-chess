@@ -1,7 +1,7 @@
 # Default build configuration
 arch = x86-64-modern
 variant = release
-version = 6.2.0
+version = 6.3.0
 nnuenet = res/eval.nnue
 
 # Default options
