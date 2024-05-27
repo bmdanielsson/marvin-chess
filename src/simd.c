@@ -138,7 +138,7 @@ void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
     for (k=0;k<noutputs;k++) {
         output[k] = biases[k];
         for (l=0;l<niterations;l++) {
-            output[k] += (input[l]*weights[k*nterations+l]);
+            output[k] += (input[l]*weights[k*niterations+l]);
         }
     }
 #endif
