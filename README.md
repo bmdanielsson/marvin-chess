@@ -31,7 +31,6 @@ Starting from version 5.0.0 Marvin uses a neural network for evaluation. As of v
 The easiest way to build Marvin is to use the included Makefile. The following commands should produce a binary that is compatible with most systems.
 
 ```
-make net
 make
 ```
 
