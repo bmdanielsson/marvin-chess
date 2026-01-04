@@ -370,7 +370,7 @@ static void generate_usage(void)
     printf("\t--output (-o) <file>\n");
     printf("\t--depth (-d) <file>\n");
     printf("\t--npositions (-n) <int>\n");
-    printf("\t--seed (-d) <int>\n");
+    printf("\t--seed (-s) <int>\n");
     printf("\t--frc-prob (-f) <float>\n");
     printf("\t--help (-h) <int>\n");
 }
