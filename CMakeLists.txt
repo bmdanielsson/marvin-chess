@@ -21,7 +21,7 @@ add_executable(marvin
           src/position.c
           src/search.c
           src/see.c
-          src/sfen.c
+          src/selfplay.c
           src/simd.c
           src/smp.c
           src/test.c

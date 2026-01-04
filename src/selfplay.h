@@ -15,16 +15,16 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef SFEN_H
-#define SFEN_H
+#ifndef SELFPLAY_H
+#define SELFPLAY_H
 
 /*
- * Generate a sfen file in bin format.
+ * Run selfplay games to generate training positions.
  *
  * @param argc The number of command line arguments.
  * @param argv The command line arguments.
  * @return Return 0 on success or a positive value in case of error.
  */
-int sfen_generate(int argc, char *argv[]);
+int selfplay_run(int argc, char *argv[]);
 
 #endif

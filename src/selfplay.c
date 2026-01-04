@@ -21,7 +21,7 @@
 #include <assert.h>
 #include <inttypes.h>
 
-#include "sfen.h" 
+#include "selfplay.h"
 #include "position.h"
 #include "bitboard.h"
 #include "key.h"
@@ -320,7 +320,7 @@ static int play_game(FILE *fp, struct engine *engine, int pos_left,
     return npos;
 }
 
-static int generate(char *output, int depth, int npositions, double frc_prob)
+static int play_games(char *output, int depth, int npositions, double frc_prob)
 {
     FILE          *outfp = NULL;
     struct engine *engine = NULL;
@@ -363,9 +363,9 @@ static int generate(char *output, int depth, int npositions, double frc_prob)
     return 0;
 }
 
-static void generate_usage(void)
+static void selfplay_usage(void)
 {
-    printf("marvin --generate <options>\n");
+    printf("marvin --selfplay <options>\n");
     printf("Options:\n");
     printf("\t--output (-o) <file>\n");
     printf("\t--depth (-d) <file>\n");
@@ -375,7 +375,7 @@ static void generate_usage(void)
     printf("\t--help (-h) <int>\n");
 }
 
-int sfen_generate(int argc, char *argv[])
+int selfplay_run(int argc, char *argv[])
 {
     int     iter;
     char    *output_file = NULL;
@@ -412,11 +412,11 @@ int sfen_generate(int argc, char *argv[])
             iter++;
             frc_prob = atof(argv[iter]);
         } else if (MATCH(argv[iter], "-h") || MATCH(argv[iter], "--help")) {
-            generate_usage();
+            selfplay_usage();
             return 0;
         } else {
             printf("Error: unknown argument, %s\n", argv[iter]);
-            generate_usage();
+            selfplay_usage();
             return 1;
         }
 
@@ -428,12 +428,12 @@ int sfen_generate(int argc, char *argv[])
         (depth <= 0) || (depth >= MAX_SEARCH_DEPTH) ||
         (npositions <= 0) || (frc_prob < 0.0) || (frc_prob >= 1.0)) {
         printf("Error: invalid options\n");
-        generate_usage();
+        selfplay_usage();
         return 1;
     }
 
     /* Initialize random number generator */
     srand(seed);
 
-    return generate(output_file, depth, npositions, frc_prob);
+    return play_games(output_file, depth, npositions, frc_prob);
 }
