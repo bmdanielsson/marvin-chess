@@ -61,7 +61,7 @@ static struct {
     uint8_t code;       /* Code for the piece */
     uint8_t nbits;      /* The number of bits in the code */
     uint8_t piece_type; /* The type of piece */
-} huffman_table[] = {
+} sfen_huffman_table[] = {
     {0b0000, 1, NO_PIECE}, /* No piece */
     {0b0001, 4, PAWN},     /* Pawn */
     {0b0011, 4, KNIGHT},   /* Knight */
@@ -70,45 +70,65 @@ static struct {
     {0b1001, 4, QUEEN},    /* Queen */
 };
 
-static uint8_t encode_bit(uint8_t *data, uint8_t cursor, uint8_t value)
+enum output_format {
+    SFEN
+};
+
+struct position_data {
+    uint8_t  board[NSQUARES];
+    uint8_t  black_king_sq;
+    uint8_t  white_king_sq;
+    uint8_t  ep_sq;
+    int      castle;
+    int      fifty;
+    int      fullmove;
+    uint8_t  stm;
+    uint32_t move;
+    int16_t  stm_score;
+    uint16_t ply;
+    int8_t   stm_result;
+};
+
+static uint8_t sfen_encode_bit(uint8_t *buf, uint8_t cursor, uint8_t value)
 {
     if (value != 0) {
-        data[cursor/8] |= (1 << (cursor&0x7));
+        buf[cursor/8] |= (1 << (cursor&0x7));
     }
 
     return cursor + 1;
 }
 
-static uint8_t encode_bits(uint8_t *data, uint8_t cursor, uint8_t value,
-                           uint8_t nbits)
+static uint8_t sfen_encode_bits(uint8_t *buf, uint8_t cursor, uint8_t value,
+                                uint8_t nbits)
 {
     uint8_t k;
 
     for (k=0;k<nbits;k++) {
-        cursor = encode_bit(data, cursor, value&(1 << k));
+        cursor = sfen_encode_bit(buf, cursor, value&(1 << k));
     }
 
     return cursor;
 }
 
-static uint8_t encode_piece(uint8_t *data, uint8_t cursor, int piece)
+static uint8_t sfen_encode_piece(uint8_t *buf, uint8_t cursor, int piece)
 {
     int value = VALUE(piece);
     int color = COLOR(piece);
 
     if (piece == NO_PIECE) {
-        cursor = encode_bits(data, cursor, huffman_table[0].code,
-                             huffman_table[0].nbits);
+        cursor = sfen_encode_bits(buf, cursor, sfen_huffman_table[0].code,
+                                  sfen_huffman_table[0].nbits);
     } else {
-        cursor = encode_bits(data, cursor, huffman_table[value/2+1].code,
-                             huffman_table[value/2+1].nbits);
-        cursor = encode_bit(data, cursor, color);
+        cursor = sfen_encode_bits(buf, cursor,
+                                  sfen_huffman_table[value/2+1].code,
+                                  sfen_huffman_table[value/2+1].nbits);
+        cursor = sfen_encode_bit(buf, cursor, color);
     }
 
     return cursor;
 }
 
-static void encode_position(struct position *pos, uint8_t *data)
+static void sfen_encode_position(struct position_data *data, uint8_t *buf)
 {
     uint8_t cursor = 0;
     int     file;
@@ -116,52 +136,52 @@ static void encode_position(struct position *pos, uint8_t *data)
     int     piece;
 
     /* Encode side to move */
-    cursor = encode_bit(data, cursor, pos->stm);
+    cursor = sfen_encode_bit(buf, cursor, data->stm);
 
     /* Encode king positions */
-    cursor = encode_bits(data, cursor, LSB(pos->bb_pieces[WHITE_KING]), 6);
-    cursor = encode_bits(data, cursor, LSB(pos->bb_pieces[BLACK_KING]), 6);
+    cursor = sfen_encode_bits(buf, cursor, data->white_king_sq, 6);
+    cursor = sfen_encode_bits(buf, cursor, data->black_king_sq, 6);
 
     /* Encode piece positions */
     for (rank=RANK_8;rank>=RANK_1;rank--) {
         for (file=FILE_A;file<=FILE_H;file++) {
-            piece = pos->pieces[SQUARE(file, rank)];
+            piece = data->board[SQUARE(file, rank)];
             if ((piece == WHITE_KING) || (piece == BLACK_KING)) {
                 continue;
             }
-            cursor = encode_piece(data, cursor, piece);
+            cursor = sfen_encode_piece(buf, cursor, piece);
         }
     }
 
     /* Encode castling availability */
-    cursor = encode_bit(data, cursor, (pos->castle&WHITE_KINGSIDE) != 0);
-    cursor = encode_bit(data, cursor, (pos->castle&WHITE_QUEENSIDE) != 0);
-    cursor = encode_bit(data, cursor, (pos->castle&BLACK_KINGSIDE) != 0);
-    cursor = encode_bit(data, cursor, (pos->castle&BLACK_QUEENSIDE) != 0);
+    cursor = sfen_encode_bit(buf, cursor, (data->castle&WHITE_KINGSIDE) != 0);
+    cursor = sfen_encode_bit(buf, cursor, (data->castle&WHITE_QUEENSIDE) != 0);
+    cursor = sfen_encode_bit(buf, cursor, (data->castle&BLACK_KINGSIDE) != 0);
+    cursor = sfen_encode_bit(buf, cursor, (data->castle&BLACK_QUEENSIDE) != 0);
 
     /* Encode en-passant square */
-    if  (pos->ep_sq == NO_SQUARE) {
-        cursor = encode_bit(data, cursor, 0);
+    if  (data->ep_sq == NO_SQUARE) {
+        cursor = sfen_encode_bit(buf, cursor, 0);
     } else {
-        cursor = encode_bit(data, cursor, 1);
-        cursor = encode_bits(data, cursor, pos->ep_sq, 6);
+        cursor = sfen_encode_bit(buf, cursor, 1);
+        cursor = sfen_encode_bits(buf, cursor, data->ep_sq, 6);
     }
 
     /*
      * Encode fifty-move counter. To keep compatibility with Stockfish
      * only 6 bits are stored now. The last bit is stored at the end.
      */
-    cursor = encode_bits(data, cursor, pos->fifty, 6);
+    cursor = sfen_encode_bits(buf, cursor, data->fifty, 6);
 
     /* Encode move counter */
-    cursor = encode_bits(data, cursor, pos->fullmove, 8);
-    cursor = encode_bits(data, cursor, pos->fullmove >> 8, 8);
+    cursor = sfen_encode_bits(buf, cursor, data->fullmove, 8);
+    cursor = sfen_encode_bits(buf, cursor, data->fullmove >> 8, 8);
 
     /* Encode upper bit of the fifty-move counter */
-    cursor = encode_bit(data, cursor, (pos->fifty >> 6) & 1);
+    cursor = sfen_encode_bit(buf, cursor, (data->fifty >> 6) & 1);
 }
 
-static uint16_t encode_move(uint32_t move)
+static uint16_t sfen_encode_move(uint32_t move)
 {
     uint16_t data = 0;
     int      to = TO(move);
@@ -179,6 +199,57 @@ static uint16_t encode_move(uint32_t move)
     }
 
     return data;
+}
+
+
+static void write_sfen_data(FILE *fp, struct position_data *data)
+{
+    struct packed_sfen sfen;
+
+    memset(&sfen, 0, sizeof(struct packed_sfen));
+    sfen_encode_position(data, sfen.position);
+    sfen.stm_score = data->stm_score;
+    sfen.move = sfen_encode_move(data->move);
+    sfen.ply = data->ply;
+    sfen.stm_result = data->stm_result;
+    sfen.padding = 0xFF;
+
+    fwrite(&sfen, SFEN_BIN_SIZE, 1, fp);
+}
+
+static void write_position_data(FILE *fp, struct position_data *batch, int npos,
+                                enum output_format format)
+{
+    int k;
+
+    for (k=0;k<npos;k++) {
+        switch (format) {
+        case SFEN:
+            write_sfen_data(fp, &batch[k]);
+            break;
+        default:
+            assert(false);
+        }
+    }
+
+    fflush(fp);
+}
+
+static void fill_position_data(struct position *pos, struct position_data *data,
+                               uint32_t move, int stm_score)
+{
+    memcpy(data->board, pos->pieces, NSQUARES);
+    data->white_king_sq = LSB(pos->bb_pieces[WHITE_KING]);
+    data->black_king_sq = LSB(pos->bb_pieces[BLACK_KING]);
+    data->ep_sq = pos->ep_sq;
+    data->castle = pos->castle;
+    data->fifty = pos->fifty;
+    data->fullmove = pos->fullmove;
+    data->stm = pos->stm;
+    data->move = move;
+    data->stm_score = stm_score;
+    data->ply = pos->ply;
+    data->stm_result = (pos->stm == WHITE)?1:-1;
 }
 
 static void play_random_moves(struct position *pos, int nmoves)
@@ -216,20 +287,20 @@ static void setup_start_position(struct position *pos, float frc_prob)
 }
 
 static int play_game(FILE *fp, struct engine *engine, int pos_left,
-                     float frc_prob)
+                     float frc_prob, enum output_format format)
 {
-    struct position    *pos = &engine->pos;
-    struct packed_sfen batch[MAX_GAME_PLY];
-    int                npos = 0;
-    uint32_t           move;
-    int                stm_score;
-    int                white_score;
-    int                white_result = 0;
-    int                draw_count = 0;
-    int                k;
+    struct position      *pos = &engine->pos;
+    struct position_data batch[MAX_GAME_PLY];
+    int                  npos = 0;
+    uint32_t             move;
+    int                  stm_score;
+    int                  white_score;
+    int                  white_result = 0;
+    int                  draw_count = 0;
+    int                  k;
 
     /* Prepare for a new game */
-    memset(batch, 0, sizeof(struct packed_sfen)*MAX_GAME_PLY);
+    memset(batch, 0, sizeof(struct position_data)*MAX_GAME_PLY);
     smp_newgame();
 
     /* Setup start position and play some random opening moves */
@@ -260,16 +331,10 @@ static int play_game(FILE *fp, struct engine *engine, int pos_left,
         }
 
         /*
-         * Encode the position and the result of the search. The game
+         * Store position data and the result of the search. The game
          * result is filled in later.
          */
-        encode_position(pos, batch[npos].position);
-        batch[npos].stm_score = stm_score;
-        batch[npos].move = encode_move(move);
-        batch[npos].ply = pos->ply;
-        batch[npos].stm_result = (pos->stm == WHITE)?1:-1;
-        batch[npos].padding = 0xFF;
-        npos++;
+        fill_position_data(pos, &batch[npos++], move, stm_score);
 
         /* Check ply limit */
         if (pos->ply >= MAX_GAME_PLY) {
@@ -310,17 +375,17 @@ static int play_game(FILE *fp, struct engine *engine, int pos_left,
         batch[k].stm_result *= white_result;
     }
 
-    /* Write sfen positions to file */
+    /* Write positions to file */
     if (npos > pos_left) {
         npos = pos_left;
     }
-    fwrite(batch, SFEN_BIN_SIZE, npos, fp);
-    fflush(fp);
+    write_position_data(fp, batch, npos, format);
 
     return npos;
 }
 
-static int play_games(char *output, int depth, int npositions, double frc_prob)
+static int play_games(char *output, int depth, int npositions, double frc_prob,
+                      enum output_format format)
 {
     FILE          *outfp = NULL;
     struct engine *engine = NULL;
@@ -348,7 +413,8 @@ static int play_games(char *output, int depth, int npositions, double frc_prob)
     ngenerated = 0;
     while (ngenerated < npositions) {
         /* Play game */
-        ngenerated += play_game(outfp, engine, npositions-ngenerated, frc_prob);
+        ngenerated += play_game(outfp, engine, npositions-ngenerated, frc_prob,
+                                format);
         
         /* Clear the transposition table */
         hash_tt_clear_table();
@@ -372,17 +438,19 @@ static void selfplay_usage(void)
     printf("\t--npositions (-n) <int>\n");
     printf("\t--seed (-s) <int>\n");
     printf("\t--frc-prob (-f) <float>\n");
+    printf("\t--format (-r) [sfen]\n");
     printf("\t--help (-h) <int>\n");
 }
 
 int selfplay_run(int argc, char *argv[])
 {
-    int     iter;
-    char    *output_file = NULL;
-    int     depth = 8;
-    int64_t npositions = -1;
-    int     seed = time(NULL);
-    double  frc_prob = 0.0;
+    int                iter;
+    char               *output_file = NULL;
+    int                depth = 8;
+    int64_t            npositions = -1;
+    int                seed = time(NULL);
+    double             frc_prob = 0.0;
+    enum output_format format = SFEN;
 
     /* Parse command line options */
     iter = 2;
@@ -411,6 +479,17 @@ int selfplay_run(int argc, char *argv[])
                    ((iter+1) < argc)) {
             iter++;
             frc_prob = atof(argv[iter]);
+        } else if ((MATCH(argv[iter], "-r") ||
+                    MATCH(argv[iter], "--format")) &&
+                   ((iter+1) < argc)) {
+            iter++;
+            if (MATCH(argv[iter], "sfen")) {
+                format = SFEN;
+            } else {
+                printf("Error: unknown output format, %s\n", argv[iter]);
+                selfplay_usage();
+                return 1;
+            }
         } else if (MATCH(argv[iter], "-h") || MATCH(argv[iter], "--help")) {
             selfplay_usage();
             return 0;
@@ -435,5 +514,5 @@ int selfplay_run(int argc, char *argv[])
     /* Initialize random number generator */
     srand(seed);
 
-    return play_games(output_file, depth, npositions, frc_prob);
+    return play_games(output_file, depth, npositions, frc_prob, format);
 }
