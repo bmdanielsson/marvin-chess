@@ -27,13 +27,4 @@
  */
 int sfen_generate(int argc, char *argv[]);
 
-/*
- * Rescore a sfen file in bin format.
- *
- * @param argc The number of command line arguments.
- * @param argv The command line arguments.
- * @return Return 0 on success or a positive value in case of error.
- */
-int sfen_rescore(int argc, char *argv[]);
-
 #endif

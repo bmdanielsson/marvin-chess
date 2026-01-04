@@ -79,14 +79,6 @@ static uint8_t encode_bit(uint8_t *data, uint8_t cursor, uint8_t value)
     return cursor + 1;
 }
 
-static int read_bit(uint8_t *data, int *cursor)
-{
-    int b = (data[*cursor/8] >> (*cursor&7))&1;
-    (*cursor)++;
-
-    return b;
-}
-
 static uint8_t encode_bits(uint8_t *data, uint8_t cursor, uint8_t value,
                            uint8_t nbits)
 {
@@ -97,18 +89,6 @@ static uint8_t encode_bits(uint8_t *data, uint8_t cursor, uint8_t value,
     }
 
     return cursor;
-}
-
-static int read_bits(uint8_t *data, int *cursor, int nbits)
-{
-    int k;
-    int result = 0;
-
-    for (k=0;k<nbits;k++) {
-        result |= read_bit(data, cursor)?(1 << k):0;
-    }
-
-    return result;
 }
 
 static uint8_t encode_piece(uint8_t *data, uint8_t cursor, int piece)
@@ -126,36 +106,6 @@ static uint8_t encode_piece(uint8_t *data, uint8_t cursor, int piece)
     }
 
     return cursor;
-}
-
-static int read_piece(uint8_t *data, int *cursor)
-{
-    int  color = WHITE;
-    int  code = 0;
-    int  nbits = 0;
-    bool found = false;
-    int  k;
-
-    while (!found) {
-        code |= read_bit(data, cursor) << nbits;
-        nbits++;
-
-        for (k=0;k<6;k++) {
-            if ((huffman_table[k].code == code) &&
-                (huffman_table[k].nbits == nbits)) {
-                found = true;
-                break;
-            }
-        }
-    }
-
-    if (huffman_table[k].piece_type == NO_PIECE) {
-        return NO_PIECE;
-    }
-
-    color = read_bit(data, cursor);
-
-    return color + huffman_table[k].piece_type;
 }
 
 static void encode_position(struct position *pos, uint8_t *data)
@@ -209,87 +159,6 @@ static void encode_position(struct position *pos, uint8_t *data)
 
     /* Encode upper bit of the fifty-move counter */
     cursor = encode_bit(data, cursor, (pos->fifty >> 6) & 1);
-}
-
-static void add_piece(struct position *pos, int piece, int sq)
-{
-    pos->pieces[sq] = piece;
-    SETBIT(pos->bb_pieces[piece], sq);
-    SETBIT(pos->bb_sides[COLOR(piece)], sq);
-    SETBIT(pos->bb_all, sq);
-    pos->key = key_set_piece(pos->key, piece, sq);
-}
-
-static void position_from_sfen(uint8_t *data, struct position *pos)
-{
-    int cursor = 0;
-    int sq;
-    int rank;
-    int file;
-    int piece;
-    int fifty;
-    int fullmove;
-
-    /* Initialize position */
-    pos_reset(pos);
-
-    /* The side to move */
-    pos->stm = read_bit(data, &cursor);
-    pos->key = key_set_side(pos->key, pos->stm);
-
-    /* King positions */
-    sq = read_bits(data, &cursor, 6);
-    add_piece(pos, WHITE_KING, sq);
-    sq = read_bits(data, &cursor, 6);
-    add_piece(pos, BLACK_KING, sq);
-
-    /* Piece positions */
-    for (rank=RANK_8;rank>=RANK_1;rank--) {
-        for (file=FILE_A;file<=FILE_H;file++) {
-            sq = SQUARE(file, rank);
-            if (pos->pieces[sq] != NO_PIECE) {
-                continue;
-            }
-
-            piece = read_piece(data, &cursor);
-            if (piece != NO_PIECE) {
-                add_piece(pos, piece, sq);
-            }
-        }
-    }
-
-    /* Castling */
-    if (read_bit(data, &cursor) == 1) {
-        pos->castle |= WHITE_KINGSIDE;
-    }
-    if (read_bit(data, &cursor) == 1) {
-        pos->castle |= WHITE_QUEENSIDE;
-    }
-    if (read_bit(data, &cursor) == 1) {
-        pos->castle |= BLACK_KINGSIDE;
-    }
-    if (read_bit(data, &cursor) == 1) {
-        pos->castle |= BLACK_QUEENSIDE;
-    }
-    pos->key = key_set_castling(pos->key, pos->castle);
-
-    /* En-passant square */
-    if (read_bit(data, &cursor) == 1) {
-        pos->ep_sq = read_bits(data, &cursor, 6);
-        pos->key = key_set_ep_square(pos->key, pos->ep_sq);
-    }
-
-    /* 50-move counter, lower 6 bits */
-    fifty = read_bits(data, &cursor, 6);
-
-    /* Fullmove counter */
-    fullmove = read_bits(data, &cursor, 8);
-    fullmove |= (read_bits(data, &cursor, 8) << 8);
-    pos->fullmove = fullmove;
-
-    /* 50-move counter, upper 1 bit */
-    fifty |= (read_bit(data, &cursor) << 6);
-    pos->fifty = fifty;
 }
 
 static uint16_t encode_move(uint32_t move)
@@ -494,137 +363,6 @@ static int generate(char *output, int depth, int npositions, double frc_prob)
     return 0;
 }
 
-static int rescore(char *input, char *output, int depth, int npositions,
-                   int64_t offset)
-{
-    int                k;
-    int                count;
-    int                ret = 0;
-    FILE               *infp = NULL;
-    FILE               *outfp = NULL;
-    uint64_t           size;
-    uint32_t           nentries;
-    int                nscored;
-    int                batch_size;
-    struct packed_sfen batch_data[BATCH_SIZE];
-    struct engine      *engine = NULL;
-    int                score;
-
-    /* Open input and output files */
-    infp = fopen(input, "rb");
-    if (infp == NULL) {
-        printf("Error: failed to open input file, %s\n", input);
-        ret = 1;
-        goto done;
-    }
-    outfp = fopen(output, "ab");
-    if (outfp == NULL) {
-        printf("Error: failed to open output file, %s\n", output);
-        ret = 1;
-        goto done;
-    }
-
-    /* Get the number of entries in the input file */
-    size = get_file_size(input);
-    if ((size%SFEN_BIN_SIZE) != 0ULL) {
-        printf("Error: invalid input size %"PRIu64"\n", size);
-        ret = 1;
-        goto done;
-    }
-    nentries = size/SFEN_BIN_SIZE;
-    if (npositions < 0) {
-        npositions = nentries;
-    }
-    if ((uint32_t)offset >= nentries) {
-        printf("Error: invalid offset %d %d\n", (int)offset, nentries);
-        ret = 1;
-        goto done;
-    }
-    if (((uint32_t)npositions+(uint32_t)offset) > nentries) {
-        printf("Error: invalid number of positions\n");
-        ret = 1;
-        goto done;
-    }
-
-    /* Seek to the correct position in the input file */
-    if (set_file_position(infp, offset*SFEN_BIN_SIZE, SEEK_SET) < 0) {
-        printf("Error: seek failed\n");
-        ret = 1;
-        goto done;
-    }
-
-    /* Setup engine */
-    hash_tt_destroy_table();
-    hash_tt_create_table(DEFAULT_MAIN_HASH_SIZE);
-    smp_destroy_workers();
-    smp_create_workers(1);
-    tc_configure_time_control(0, 0, 0, TC_INFINITE_TIME);
-    engine = engine_create();
-    engine->sd = depth;
-    engine->move_filter.size = 0;
-    engine->exit_on_mate = true;
-
-    /* Rescore positions */
-    nscored = 0;
-    batch_size = BATCH_SIZE;
-    while (nscored < npositions) {
-        /* Read batch */
-        if ((nscored+BATCH_SIZE) <= npositions) {
-           batch_size = BATCH_SIZE;
-        } else {
-           batch_size = npositions - nscored;
-        }
-        count = (int)fread(batch_data, SFEN_BIN_SIZE, batch_size, infp);
-        if (count != batch_size) {
-            printf("Error: failed to read data\n");
-            ret = 1;
-            goto done;
-        }
-
-        /* Analyse all positions in the batch */
-        for (k=0;k<batch_size;k++) {
-            position_from_sfen(batch_data[k].position, &engine->pos);
-            assert(valid_position(&engine->pos));
-            assert(engine->pos.key == key_generate(&engine->pos));
-            smp_newgame();
-            (void)search_position(engine, false, NULL, &score);
-            if ((score > -EVAL_LIMIT) && (score < EVAL_LIMIT)) {
-                /*
-                 * The training code doesn't care about the actual move so
-                 * don't bother updating it.
-                 */
-                batch_data[k].stm_score = (int16_t)score;
-            }
-        }
-
-        /* Write the batch to the output file */
-        count = (int)fwrite(batch_data, SFEN_BIN_SIZE, batch_size, outfp);
-        if (count != batch_size) {
-            printf("Error: failed to write data\n");
-            ret = 1;
-            goto done;
-        }
-        nscored += batch_size;
-        fflush(outfp);
-
-        /* Clear the transposition table */
-        hash_tt_clear_table();
-    }
-
-done:
-    if (engine != NULL) {
-        engine_destroy(engine);
-    }
-    if (infp) {
-        fclose(infp);
-    }
-    if (outfp) {
-        fclose(outfp);
-    }
-
-    return ret;
-}
-
 static void generate_usage(void)
 {
     printf("marvin --generate <options>\n");
@@ -634,18 +372,6 @@ static void generate_usage(void)
     printf("\t--npositions (-n) <int>\n");
     printf("\t--seed (-d) <int>\n");
     printf("\t--frc-prob (-f) <float>\n");
-    printf("\t--help (-h) <int>\n");
-}
-
-static void rescore_usage(void)
-{
-    printf("marvin --rescore <options>\n");
-    printf("Options:\n");
-    printf("\t--input (-i) <file>\n");
-    printf("\t--output (-o) <file>\n");
-    printf("\t--depth (-d) <file>\n");
-    printf("\t--npositions (-n) <int>\n");
-    printf("\t--offset (-f) <int>\n");
     printf("\t--help (-h) <int>\n");
 }
 
@@ -710,65 +436,4 @@ int sfen_generate(int argc, char *argv[])
     srand(seed);
 
     return generate(output_file, depth, npositions, frc_prob);
-}
-
-int sfen_rescore(int argc, char *argv[])
-{
-    int      iter;
-    char     *input_file = NULL;
-    char     *output_file = NULL;
-    int      depth = 8;
-    int      offset = 0;
-    int64_t  npositions = -1;
-
-    /* Parse command line options */
-    iter = 2;
-    while (iter < argc) {
-        if ((MATCH(argv[iter], "-i") || MATCH(argv[iter], "--input")) &&
-            ((iter+1) < argc)) {
-            iter++;
-            input_file = argv[iter];
-        } else if ((MATCH(argv[iter], "-o") ||
-                    MATCH(argv[iter], "--output")) &&
-                   ((iter+1) < argc)) {
-            iter++;
-            output_file = argv[iter];
-        } else if ((MATCH(argv[iter], "-d") ||
-                    MATCH(argv[iter], "--depth")) &&
-                   ((iter+1) < argc)) {
-            iter++;
-            depth = atoi(argv[iter]);
-        } else if ((MATCH(argv[iter], "-n") ||
-                    MATCH(argv[iter], "--npositions")) &&
-                   ((iter+1) < argc)) {
-            iter++;
-            npositions = atoi(argv[iter]);
-        } else if ((MATCH(argv[iter], "-f") ||
-                    MATCH(argv[iter], "--offset")) &&
-                   ((iter+1) < argc)) {
-            iter++;
-            offset = atoi(argv[iter]);
-        } else if (MATCH(argv[iter], "-h") || MATCH(argv[iter], "--help")) {
-            rescore_usage();
-            return 0;
-        } else {
-            printf("Error: unknown argument, %s\n", argv[iter]);
-            rescore_usage();
-            return 1;
-        }
-
-        iter++;
-    }
-
-    /* Validate options */
-    if (!input_file || !output_file ||
-        (depth <= 0) || (depth >= MAX_SEARCH_DEPTH) ||
-        (offset < 0) ||
-        (npositions == 0)) {
-        printf("Error: invalid options\n");
-        rescore_usage();
-        return 1;
-    }
-
-    return rescore(input_file, output_file, depth, npositions, offset);
 }
