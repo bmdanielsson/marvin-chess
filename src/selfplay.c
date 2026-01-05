@@ -70,12 +70,21 @@ static struct {
     {0b1001, 4, QUEEN},    /* Queen */
 };
 
-enum output_format {
-    SFEN
+/* Table mapping Marvin piece definitions to bullet piece definitions */
+static uint8_t bullet_piece_map[NPIECES] = {
+    0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13
 };
 
+/* Supported output formats */
+enum output_format {
+    SFEN,
+    BULLET
+};
+
+/* Format independent data for a position */
 struct position_data {
     uint8_t  board[NSQUARES];
+    uint64_t occ;
     uint8_t  black_king_sq;
     uint8_t  white_king_sq;
     uint8_t  ep_sq;
@@ -201,7 +210,6 @@ static uint16_t sfen_encode_move(uint32_t move)
     return data;
 }
 
-
 static void write_sfen_data(FILE *fp, struct position_data *data)
 {
     struct packed_sfen sfen;
@@ -217,6 +225,61 @@ static void write_sfen_data(FILE *fp, struct position_data *data)
     fwrite(&sfen, SFEN_BIN_SIZE, 1, fp);
 }
 
+static void write_bullet_data(FILE *fp, struct position_data *data)
+{
+    uint64_t occ = data->occ;
+    uint64_t rel_occ = 0ULL;
+    uint64_t bb;
+    uint8_t  rel_board[NSQUARES];
+    int      sq;
+    int      piece;
+    uint8_t  king_sq;
+    uint8_t  opp_king_sq;
+    uint8_t  position[16] = {0};
+    int      index;
+    uint8_t  padding[3] = {0, 0, 0};
+    int8_t   stm_result = data->stm_result + 1;
+
+    /* Make the board side-to-move relative */
+    while (occ != 0ULL) {
+        sq = POPBIT(&occ);
+        piece = bullet_piece_map[data->board[sq]];
+
+        if (data->stm == BLACK) {
+            sq ^= 56;
+            piece ^= 8;
+        }
+
+        if (piece == 5) {
+            king_sq = sq;
+        } else if (piece == 13) {
+            opp_king_sq = sq^56;
+        }
+
+        rel_board[sq] = piece;
+        SETBIT(rel_occ, sq);
+    }
+
+    /* Encode the position */
+    index = 0;
+    bb = rel_occ;
+    while (bb != 0ULL) {
+        sq = POPBIT(&bb);
+        piece = rel_board[sq];
+        position[index/2] |= (piece << (4*(index & 1)));
+        index++;
+    }
+
+    /* Write data */
+    fwrite(&rel_occ, 8, 1, fp);
+    fwrite(position, 1, 16, fp);
+    fwrite(&data->stm_score, 2, 1, fp);
+    fwrite(&stm_result, 1, 1, fp);
+    fwrite(&king_sq, 1, 1, fp);
+    fwrite(&opp_king_sq, 1, 1, fp);
+    fwrite(&padding, 3, 1, fp);
+}
+
 static void write_position_data(FILE *fp, struct position_data *batch, int npos,
                                 enum output_format format)
 {
@@ -226,6 +289,9 @@ static void write_position_data(FILE *fp, struct position_data *batch, int npos,
         switch (format) {
         case SFEN:
             write_sfen_data(fp, &batch[k]);
+            break;
+        case BULLET:
+            write_bullet_data(fp, &batch[k]);
             break;
         default:
             assert(false);
@@ -239,6 +305,7 @@ static void fill_position_data(struct position *pos, struct position_data *data,
                                uint32_t move, int stm_score)
 {
     memcpy(data->board, pos->pieces, NSQUARES);
+    data->occ = pos->bb_all;
     data->white_king_sq = LSB(pos->bb_pieces[WHITE_KING]);
     data->black_king_sq = LSB(pos->bb_pieces[BLACK_KING]);
     data->ep_sq = pos->ep_sq;
@@ -438,7 +505,7 @@ static void selfplay_usage(void)
     printf("\t--npositions (-n) <int>\n");
     printf("\t--seed (-s) <int>\n");
     printf("\t--frc-prob (-f) <float>\n");
-    printf("\t--format (-r) [sfen]\n");
+    printf("\t--format (-r) [sfen|bullet]\n");
     printf("\t--help (-h) <int>\n");
 }
 
@@ -485,6 +552,8 @@ int selfplay_run(int argc, char *argv[])
             iter++;
             if (MATCH(argv[iter], "sfen")) {
                 format = SFEN;
+            } else if (MATCH(argv[iter], "bullet")) {
+                format = BULLET;
             } else {
                 printf("Error: unknown output format, %s\n", argv[iter]);
                 selfplay_usage();
