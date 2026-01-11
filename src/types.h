@@ -375,13 +375,18 @@ struct nnue_cache_item {
     int score;
 };
 
-/* Accumulator for NNUE input features for a position */
+/* NNUE parameters */
 #define NNUE_NUM_INPUT_FEATURES 64*12
-#define NNUE_MAX_ACTIVE_FEATURES 32
 #define NNUE_NUM_LAYERS 2
-#define NNUE_INPUT_LAYER_SIZE 1024
+#define NNUE_HIDDEN_LAYER_SIZE 512
+#define NNUE_OUTPUT_LAYER_SIZE 1
+#define NNUE_SCALE 400
+#define NNUE_QUANT_QA 255
+#define NNUE_QUANT_QB 64
+
+/* Accumulator for NNUE input features for a position */
 struct nnue_accumulator {
-    alignas(64) int16_t data[NSIDES][NNUE_INPUT_LAYER_SIZE];
+    alignas(64) int16_t data[NSIDES][NNUE_HIDDEN_LAYER_SIZE];
 };
 
 /* Item in the evaluation stack */

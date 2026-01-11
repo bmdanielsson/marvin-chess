@@ -39,50 +39,52 @@
 #include "incbin.h"
 INCBIN(nnue_net, NETFILE_NAME);
 
-/* NNUE quantization parameters */
-#define OUTPUT_SCALE 16.0f
-
 /* Definition of the network architcechure */
-#define NET_VERSION 0x0000000A
-#define NET_HEADER_SIZE 4
-static int layer_sizes[NNUE_NUM_LAYERS] = {NNUE_INPUT_LAYER_SIZE*2, 1};
+static int layer_sizes[NNUE_NUM_LAYERS] = {NNUE_HIDDEN_LAYER_SIZE*2,
+                                           NNUE_OUTPUT_LAYER_SIZE};
 
 /* Struct holding information about a layer in the network */
 struct layer {
-    union {
-        int8_t  *i8;
-        int16_t *i16;
-    }                   weights;
-    union {
-        int32_t *i32;
-        int16_t *i16;
-    }                   biases;
+    int16_t *weights;
+    int16_t *biases;
 };
 
-/* Struct for holding data during a forward pass */
-struct net_data {
-    alignas(64) int32_t intermediate[NNUE_INPUT_LAYER_SIZE*2];
-    alignas(64) uint8_t output[NNUE_INPUT_LAYER_SIZE*2];
+/* Struct holding network layers */
+struct net {
+    struct layer hidden;
+    struct layer output;
 };
 
 /* The network */
-static struct layer layers[NNUE_NUM_LAYERS];
+static struct net net;
+
+/*
+ * Table mapping Marvin piece definitions to Bullet piece definitions. Piece
+ * values for black are flipped to be used when calculating feature indexes.
+ */
+static uint8_t bullet_piece_map[NSIDES][NPIECES] = {
+    {0, 6, 1, 7, 2, 8, 3, 9, 4, 10, 5, 11},
+    {6, 0, 7, 1, 8, 2, 9, 3, 10, 4, 11, 5}
+};
 
 static int feature_index(int sq, int piece, int side)
 {
     int piece_index;
+    int bullet_piece;
+
+    /*
+     * Convert to Bullet piece representation. The lookup will also take
+     * care of swapping indexing when it is black to move.
+     */
+    bullet_piece = bullet_piece_map[side][piece];
 
     /*
      * For black the board should be flipped so squares must be
-     * updated accordingly. Additionally the piece index is
-     * side-to-move relative so for black the indexing order has
-     * to be swapped.
+     * updated accordingly.
      */
+    piece_index = bullet_piece*NSQUARES;
     if (side == BLACK) {
         sq = MIRROR(sq);
-        piece_index = FLIP_COLOR(piece)*NSQUARES;
-    } else {
-        piece_index = piece*NSQUARES;
     }
 
     return sq + piece_index;
@@ -97,7 +99,7 @@ static void accumulator_propagate(struct position *pos)
     for (side=0;side<NSIDES;side++) {
         prev_data = &pos->eval_stack[pos->height-1].accumulator.data[side][0];
         data = &pos->eval_stack[pos->height].accumulator.data[side][0];
-        simd_copy(prev_data, data, layer_sizes[0]/2);
+        simd_copy(prev_data, data);
     }
 }
 
@@ -114,7 +116,7 @@ static void accumulator_add(struct position *pos, int piece, int sq)
         data = &acc->data[side][0];
         index = feature_index(sq, piece, side);
         offset = (layer_sizes[0]/2)*index;
-        simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
+        simd_add(&net.hidden.weights[offset], data);
     }
 }
 
@@ -131,7 +133,7 @@ static void accumulator_remove(struct position *pos, int piece, int sq)
         data = &acc->data[side][0];
         index = feature_index(sq, piece, side);
         offset = (layer_sizes[0]/2)*index;
-        simd_sub(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
+        simd_sub(&net.hidden.weights[offset], data);
     }
 }
 
@@ -147,7 +149,7 @@ static void accumulator_refresh(struct position *pos, int side)
     data = &pos->eval_stack[pos->height].accumulator.data[side][0];
 
     /* Add biases */
-    simd_copy(layers[0].biases.i16, data, layer_sizes[0]/2);
+    simd_copy(net.hidden.biases, data);
 
     /* Update the accumulator based on each piece */
     bb = pos->bb_all;
@@ -155,73 +157,32 @@ static void accumulator_refresh(struct position *pos, int side)
         sq = POPBIT(&bb);
         index = feature_index(sq, pos->pieces[sq], side);
         offset = (layer_sizes[0]/2)*index;
-        simd_add(&layers[0].weights.i16[offset], data, layer_sizes[0]/2);
+        simd_add(&net.hidden.weights[offset], data);
     }
 }
 
-static void input_layer_forward(struct position *pos, struct net_data *data)
+static int32_t forward_half(struct position *pos, int side, int16_t *weights)
 {
-    uint32_t size;
-    uint8_t  *dest;
-    int16_t  *half;
+    int16_t *inputs;
 
-    /*
-     * Combine the two halves to form the inputs to the network. The
-     * values are clamped to be in the range [0, 127].
-     */
-    size = layer_sizes[0]/2;
-    dest = &data->output[0];
-    half = pos->eval_stack[pos->height].accumulator.data[pos->stm];
-    simd_clamp(half, dest, size);
-    half = pos->eval_stack[pos->height].accumulator.data[FLIP_COLOR(pos->stm)];
-    simd_clamp(half, dest+size, size);
+    inputs = pos->eval_stack[pos->height].accumulator.data[side];
+    return simd_fully_connected(inputs, weights);
 }
 
-static void output_layer_forward(int idx, struct net_data *data)
-{
-    simd_fc_forward(data->output, data->intermediate, layer_sizes[idx-1],
-                    layer_sizes[idx], layers[idx].biases.i32,
-                    layers[idx].weights.i8);
-}
-
-static void network_forward(struct position *pos, struct net_data *data)
-{
-    input_layer_forward(pos, data);
-    output_layer_forward(1, data);
-}
-
-static bool parse_header(uint8_t **data)
-{
-    uint8_t  *iter = *data;
-    uint32_t version;
-
-    version = read_uint32_le(iter);
-    iter += 4;
-
-    *data = iter;
-
-    return version == NET_VERSION;
-}
-
-static uint8_t* read_input_layer(uint8_t *iter, struct layer *layer)
+static uint8_t* read_hidden_layer(uint8_t *iter, struct layer *layer)
 {
     int k;
+    int l;
     int half;
-    int model_half;
 
-    model_half = layer_sizes[0]/2;
     half = layer_sizes[0]/2;
-    for (k=0;k<model_half;k++,iter+=2) {
-        layer->biases.i16[k] = read_uint16_le(iter);
+    for (k=0;k<NNUE_NUM_INPUT_FEATURES;k++) {
+        for (l=0;l<half;l++,iter+=2) {
+            layer->weights[k*half+l] = read_uint16_le(iter);
+        }
     }
-    for (;k<half;k++) {
-        layer->biases.i16[k] = 0;
-    }
-    for (k=0;k<model_half*NNUE_NUM_INPUT_FEATURES;k++,iter+=2) {
-        layer->weights.i16[k] = read_uint16_le(iter);
-    }
-    for (;k<half*NNUE_NUM_INPUT_FEATURES;k++) {
-        layer->weights.i16[k] = 0;
+    for (k=0;k<half;k++,iter+=2) {
+        layer->biases[k] = read_uint16_le(iter);
     }
 
     return iter;
@@ -232,16 +193,13 @@ static uint8_t* read_output_layer(uint8_t *iter, int idx, struct layer *layer)
     int k;
     int l;
 
-    for (k=0;k<layer_sizes[idx];k++,iter+=4) {
-        layer->biases.i32[k] = read_uint32_le(iter);
+    for (k=0;k<layer_sizes[idx-1];k++) {
+        for (l=0;l<layer_sizes[idx];l++,iter+=2) {
+            layer->weights[k*layer_sizes[idx]+l] = read_uint16_le(iter);
+        }
     }
-    for (k=0;k<layer_sizes[idx];k++) {
-        for (l=0;l<layer_sizes[idx-1];l++,iter++) {
-            layer->weights.i8[k*layer_sizes[idx-1]+l] = (int8_t)*iter;
-        }
-        for (;l<layer_sizes[idx-1];l++) {
-            layer->weights.i8[k*layer_sizes[idx-1]+l] = 0;
-        }
+    for (k=0;k<layer_sizes[idx];k++,iter+=2) {
+        layer->biases[k] = read_uint16_le(iter);
     }
 
     return iter;
@@ -252,10 +210,10 @@ static bool parse_network(uint8_t **data)
     uint8_t *iter = *data;
 
     /* Read biases and weights for the input layer */
-    iter = read_input_layer(iter, &layers[0]);
+    iter = read_hidden_layer(iter, &net.hidden);
 
     /* Read biases and weights for the output layer */
-    iter = read_output_layer(iter, 1, &layers[1]);
+    iter = read_output_layer(iter, 1, &net.output);
 
     *data = iter;
 
@@ -265,16 +223,20 @@ static bool parse_network(uint8_t **data)
 static uint32_t calculate_net_size(void)
 {
     uint32_t size = 0;
-    int      k;
+    int      rem;
 
-    size += NET_HEADER_SIZE;
+    /* Hidden layer */
+    size += NNUE_HIDDEN_LAYER_SIZE*sizeof(int16_t);
+    size += NNUE_HIDDEN_LAYER_SIZE*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t);
 
-    size += NNUE_INPUT_LAYER_SIZE*sizeof(int16_t);
-    size += NNUE_INPUT_LAYER_SIZE*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t);
+    /* Output layer */
+    size += layer_sizes[1]*sizeof(int16_t);
+    size += layer_sizes[1]*layer_sizes[0]*sizeof(int16_t);
 
-    for (k=1;k<NNUE_NUM_LAYERS;k++) {
-        size += layer_sizes[k]*sizeof(int32_t);
-        size += layer_sizes[k]*layer_sizes[k-1]*sizeof(int8_t);
+    /* Files are padded so that the size if a multiple of 64 */
+    rem = size%64;
+    if (rem > 0) {
+        size += (64 - rem);
     }
 
     return size;
@@ -283,25 +245,21 @@ static uint32_t calculate_net_size(void)
 void nnue_init(void)
 {
     /* Allocate space for layers */
-    layers[0].weights.i16 = aligned_malloc(64,
+    net.hidden.weights = aligned_malloc(64,
                     layer_sizes[0]*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t));
-    layers[0].biases.i16 = aligned_malloc(64, layer_sizes[0]*sizeof(int16_t));
-    layers[1].weights.i8 = aligned_malloc(64,
-                            layer_sizes[1]*layer_sizes[0]*sizeof(int8_t));
-    layers[1].biases.i32 = aligned_malloc(64,
-                            layer_sizes[1]*sizeof(int32_t));
+    net.hidden.biases = aligned_malloc(64, layer_sizes[0]*sizeof(int16_t));
+    net.output.weights = aligned_malloc(64,
+                            layer_sizes[1]*layer_sizes[0]*sizeof(int16_t));
+    net.output.biases = aligned_malloc(64,
+                            layer_sizes[1]*sizeof(int16_t));
 }
 
 void nnue_destroy(void)
 {
-    int k;
-
-    aligned_free(layers[0].weights.i16);
-    aligned_free(layers[0].biases.i16);
-    for (k=1;k<NNUE_NUM_LAYERS;k++) {
-        aligned_free(layers[k].weights.i8);
-        aligned_free(layers[k].biases.i32);
-    }
+    aligned_free(net.hidden.weights);
+    aligned_free(net.hidden.biases);
+    aligned_free(net.output.weights);
+    aligned_free(net.output.biases);
 }
 
 void nnue_refresh_accumulator(struct position *pos)
@@ -350,14 +308,8 @@ bool nnue_load_net(char *path)
         }
     }
 
-    /* Parse network header */
-    iter = data;
-    if (!parse_header(&iter)) {
-        ret = false;
-        goto exit;
-    }
-
     /* Parse network */
+    iter = data;
     if (!parse_network(&iter)) {
         ret = false;
         goto exit;
@@ -375,20 +327,26 @@ exit:
 
 int16_t nnue_evaluate(struct position *pos)
 {
-    int             score;
-    struct net_data data;
-    
-    if ((pos->worker != NULL) && hash_nnue_lookup(pos->worker, &score)) {
-        return score;
-    }
+    int32_t output = 0;
 
-    network_forward(pos, &data);
-    score = data.intermediate[0]/OUTPUT_SCALE;
-    if (pos->worker != NULL) {
-        hash_nnue_store(pos->worker, score);
-    }
+    /* Summarize the two accumulators */
+    output += forward_half(pos, pos->stm, &net.output.weights[0]);
+    output += forward_half(pos, FLIP_COLOR(pos->stm),
+                           &net.output.weights[NNUE_HIDDEN_LAYER_SIZE]);
 
-    return score;
+    /* Account for screlu */
+    output /= NNUE_QUANT_QA;
+
+    /* Add bias */
+    output += net.output.biases[0];
+
+    /* Apply scale factor */
+    output *= NNUE_SCALE;
+
+    /* Dequantize */
+    output /= (NNUE_QUANT_QA*NNUE_QUANT_QB);
+
+    return output;
 }
 
 void nnue_make_move(struct position *pos, uint32_t move)

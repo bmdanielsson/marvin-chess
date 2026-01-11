@@ -21,53 +21,37 @@
 #include <stdint.h>
 
 /*
- * SIMD implementation of a forward pass of a fully connected layer.
+ * SIMD implementation of a fully connected layer with one output and a
+ * SCReLU activation function.
  * 
- * @param input The layer input. 
- * @param output The layer output. 
- * @param ninputs The number of inputs. 
- * @param noutputs The number of outputs.
- * @param biases Layer biases.
+ * @param inputs The layer input.
  * @param weights Layer weights.
+ * @return Returns the output.
  */
-void simd_fc_forward(uint8_t *input, int32_t *output, int ninputs,
-                     int noutputs, int32_t *biases, int8_t *weights);
-
-/*
- * SIMD implementation of a clamp operation. Values and the clamped between 0
- * and 127.
- *
- * @param input Input values.
- * @param output Output values.
- * @param nvalues The number of values.
- */
-void simd_clamp(int16_t *input, uint8_t *output, int nvalues);
+int32_t simd_fully_connected(int16_t *inputs, int16_t *weights);
 
 /*
  * SIMD implementation of a copy operation.
  *
- * @param input Input values.
- * @param output Output values.
- * @param nvalues The number of values.
+ * @param inputs Input values.
+ * @param outputs Output values.
  */
-void simd_copy(int16_t *input, int16_t *output, int nvalues);
+void simd_copy(int16_t *inputs, int16_t *outputs);
 
 /*
  * SIMD implementation of an add operation.
  *
- * @param input Input values.
- * @param output Output values.
- * @param nvalues The number of values.
+ * @param inputs Input values.
+ * @param outputs Output values.
  */
-void simd_add(int16_t *input, int16_t *output, int nvalues);
+void simd_add(int16_t *inputs, int16_t *outputs);
 
 /*
  * SIMD implementation of a sub operation.
  *
- * @param input Input values.
- * @param output Output values.
- * @param nvalues The number of values.
+ * @param inputs Input values.
+ * @param outputs Output values.
  */
-void simd_sub(int16_t *input, int16_t *output, int nvalues);
+void simd_sub(int16_t *inputs, int16_t *output);
 
 #endif
