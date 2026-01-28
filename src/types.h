@@ -366,15 +366,6 @@ struct tt_bucket {
     uint8_t pad[16];
 };
 
-/*
- * An item in the NNUE cache. The size should be a power-of-2
- * for best performance.
- */
-struct nnue_cache_item {
-    uint64_t key;
-    int score;
-};
-
 /* NNUE parameters */
 #define NNUE_NUM_INPUT_FEATURES 64*12
 #define NNUE_NUM_LAYERS 2
@@ -477,10 +468,6 @@ struct search_worker {
     int seldepth;
     /* The number of tablebase hits */
     uint64_t tbhits;
-
-    /* Cache for NNUE evaluations */
-    struct nnue_cache_item *nnue_cache;
-    int nnue_cache_size;
 
     /* PV information */
     int multipv;

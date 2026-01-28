@@ -74,15 +74,6 @@ static void allocate_tt(int size)
     assert(transposition_table != NULL);
 }
 
-static void allocate_nnue_cache(struct search_worker *worker, int size)
-{
-    worker->nnue_cache_size = largest_power_of_2(size,
-                                                sizeof(struct nnue_cache_item));
-    worker->nnue_cache = aligned_malloc(CACHE_LINE_SIZE,
-                        worker->nnue_cache_size*sizeof(struct nnue_cache_item));
-    assert(worker->nnue_cache != NULL);
-}
-
 int hash_tt_max_size(void)
 {
 	return is64bit()?MAX_MAIN_HASH_SIZE_64BIT:MAX_MAIN_HASH_SIZE_32BIT;
@@ -289,89 +280,9 @@ int hash_tt_usage(void)
     return nused/TT_BUCKET_SIZE;
 }
 
-void hash_nnue_create_table(struct search_worker *worker, int size)
-{
-    assert(size >= 0);
-
-    hash_nnue_destroy_table(worker);
-
-    allocate_nnue_cache(worker, size);
-    hash_nnue_clear_table(worker);
-}
-
-void hash_nnue_destroy_table(struct search_worker *worker)
-{
-    aligned_free(worker->nnue_cache);
-    worker->nnue_cache = NULL;
-    worker->nnue_cache_size = 0;
-}
-
-void hash_nnue_clear_table(struct search_worker *worker)
-{
-    assert(worker != NULL);
-    assert(worker->nnue_cache != NULL);
-
-    memset(worker->nnue_cache, 0,
-           worker->nnue_cache_size*sizeof(struct nnue_cache_item));
-}
-
-void hash_nnue_store(struct search_worker *worker, int score)
-{
-    struct position *pos;
-    uint32_t        idx;
-
-    assert(valid_position(&worker->pos));
-
-    pos = &worker->pos;
-
-    if (worker->nnue_cache == NULL) {
-        return;
-    }
-
-    /* Find the correct position in the table */
-    idx = (uint32_t)(pos->key&(worker->nnue_cache_size-1));
-
-    /*
-     * Insert the item in the table. An always-replace strategy
-     * is used in case the position is already taken.
-     */
-    worker->nnue_cache[idx].score = score;
-    worker->nnue_cache[idx].key = pos->key;
-}
-
-bool hash_nnue_lookup(struct search_worker *worker, int *score)
-{
-    struct position *pos;
-    uint32_t        idx;
-    bool            found;
-
-    assert(valid_position(&worker->pos));
-    assert(score != NULL);
-
-    pos = &worker->pos;
-
-    if (worker->nnue_cache == NULL) {
-        return false;
-    }
-
-    /*
-     * Find the correct position in the table and check
-     * if it contains an item for this position.
-     */
-    found = false;
-    idx = (uint32_t)(pos->key&(worker->nnue_cache_size-1));
-    if (worker->nnue_cache[idx].key == pos->key) {
-        found = true;
-        *score = worker->nnue_cache[idx].score;
-    }
-
-    return found;
-}
-
 void hash_prefetch(struct search_worker *worker)
 {
     (void)worker;
 
     PREFETCH_ADDRESS(&transposition_table[worker->pos.key&(tt_size-1)]);
-    PREFETCH_ADDRESS(&worker->nnue_cache[worker->pos.key&(worker->nnue_cache_size-1)]);
 }

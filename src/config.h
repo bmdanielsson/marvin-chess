@@ -39,9 +39,6 @@
 #define MIN_MOVE_OVERHEAD 0
 #define MAX_MOVE_OVERHEAD 2000
 
-/* The size to use for the NNUE cache (in MB) */
-#define NNUE_CACHE_SIZE 2
-
 /* The maximum number of supported worker threads */
 #define MAX_WORKERS 512
 
