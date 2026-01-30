@@ -92,14 +92,14 @@ static int feature_index(int sq, int piece, int side)
 
 static void accumulator_propagate(struct position *pos)
 {
-    int16_t                 *prev_data;
-    int16_t                 *data;
-    int                     side;
+    int16_t *prev_data;
+    int16_t *data;
+    int     side;
 
     for (side=0;side<NSIDES;side++) {
         prev_data = &pos->eval_stack[pos->height-1].accumulator.data[side][0];
         data = &pos->eval_stack[pos->height].accumulator.data[side][0];
-        simd_copy(prev_data, data);
+        memcpy(data, prev_data, sizeof(int16_t)*NNUE_HIDDEN_LAYER_SIZE);
     }
 }
 
@@ -149,7 +149,7 @@ static void accumulator_refresh(struct position *pos, int side)
     data = &pos->eval_stack[pos->height].accumulator.data[side][0];
 
     /* Add biases */
-    simd_copy(net.hidden.biases, data);
+    memcpy(data, net.hidden.biases, sizeof(int16_t)*NNUE_HIDDEN_LAYER_SIZE);
 
     /* Update the accumulator based on each piece */
     bb = pos->bb_all;

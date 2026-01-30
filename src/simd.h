@@ -31,14 +31,6 @@
 int32_t simd_fully_connected(int16_t *inputs, int16_t *weights);
 
 /*
- * SIMD implementation of a copy operation.
- *
- * @param inputs Input values.
- * @param outputs Output values.
- */
-void simd_copy(int16_t *inputs, int16_t *outputs);
-
-/*
  * SIMD implementation of an add operation.
  *
  * @param inputs Input values.

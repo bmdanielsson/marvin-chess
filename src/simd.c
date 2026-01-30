@@ -78,19 +78,6 @@ int32_t simd_fully_connected(int16_t *inputs, int16_t *weights)
     return hsum_8x32(vsum);
 }
 
-void simd_copy(int16_t *inputs, int16_t *outputs)
-{
-    int k;
-    int niterations = NNUE_HIDDEN_LAYER_SIZE/NUM_REGS;
-
-    __m256i *pi = (__m256i*)inputs;
-    __m256i *po = (__m256i*)outputs;
-
-    for (k=0;k<niterations;k++,pi++) {
-        po[k] = _mm256_load_si256(pi);
-    }
-}
-
 void simd_add(int16_t *inputs, int16_t *outputs)
 {
     int k;
@@ -155,19 +142,6 @@ int32_t simd_fully_connected(int16_t *inputs, int16_t *weights)
     return hsum_4x32(vsum);
 }
 
-void simd_copy(int16_t *inputs, int16_t *outputs)
-{
-    int k;
-    int niterations = NNUE_HIDDEN_LAYER_SIZE/NUM_REGS;
-
-    __m128i *pi = (__m128i*)inputs;
-    __m128i *po = (__m128i*)outputs;
-
-    for (k=0;k<niterations;k++,pi++) {
-        po[k] = _mm_load_si128(pi);
-    }
-}
-
 void simd_add(int16_t *inputs, int16_t *outputs)
 {
     int k;
@@ -214,15 +188,6 @@ int32_t simd_fully_connected(int16_t *inputs, int16_t *weights)
     }
 
     return output;
-}
-
-void simd_copy(int16_t *inputs, int16_t *outputs)
-{
-    int k;
-
-    for (k=0;k<NNUE_HIDDEN_LAYER_SIZE;k++) {
-        outputs[k] = inputs[k];
-    }
 }
 
 void simd_add(int16_t *inputs, int16_t *outputs)
