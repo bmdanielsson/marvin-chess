@@ -39,10 +39,6 @@
 #include "incbin.h"
 INCBIN(nnue_net, NETFILE_NAME);
 
-/* Definition of the network architcechure */
-static int layer_sizes[NNUE_NUM_LAYERS] = {NNUE_HIDDEN_LAYER_SIZE*2,
-                                           NNUE_OUTPUT_LAYER_SIZE};
-
 /* Struct holding information about a layer in the network */
 struct layer {
     int16_t *weights;
@@ -110,8 +106,8 @@ static void accumulator_move(struct position *pos, uint32_t move)
 
     /* Perform operation for both perspectives */
     for (side=0;side<NSIDES;side++) {
-        sub_off = feature_index(from, sub_piece, side)*(layer_sizes[0]/2);
-        add_off = feature_index(to, add_piece, side)*(layer_sizes[0]/2);
+        sub_off = feature_index(from, sub_piece, side)*NNUE_HIDDEN_LAYER_SIZE;
+        add_off = feature_index(to, add_piece, side)*NNUE_HIDDEN_LAYER_SIZE;
 
         simd_add_sub(&src->data[side][0], &dest->data[side][0],
                      &net.hidden.weights[add_off],
@@ -142,9 +138,9 @@ static void accumulator_capture(struct position *pos, uint32_t move)
 
     /* Perform operation for both perspectives */
     for (side=0;side<NSIDES;side++) {
-        sub_off1 = feature_index(from, sub_piece1, side)*(layer_sizes[0]/2);
-        sub_off2 = feature_index(to, sub_piece2, side)*(layer_sizes[0]/2);
-        add_off = feature_index(to, add_piece, side)*(layer_sizes[0]/2);
+        sub_off1 = feature_index(from, sub_piece1, side)*NNUE_HIDDEN_LAYER_SIZE;
+        sub_off2 = feature_index(to, sub_piece2, side)*NNUE_HIDDEN_LAYER_SIZE;
+        add_off = feature_index(to, add_piece, side)*NNUE_HIDDEN_LAYER_SIZE;
 
         simd_add_sub2(&src->data[side][0], &dest->data[side][0],
                       &net.hidden.weights[add_off],
@@ -178,9 +174,10 @@ static void accumulator_en_passant(struct position *pos, uint32_t move)
 
     /* Perform operation for both perspectives */
     for (side=0;side<NSIDES;side++) {
-        sub_off1 = feature_index(from, sub_piece1, side)*(layer_sizes[0]/2);
-        sub_off2 = feature_index(sub_sq2, sub_piece2, side)*(layer_sizes[0]/2);
-        add_off = feature_index(to, add_piece, side)*(layer_sizes[0]/2);
+        sub_off1 = feature_index(from, sub_piece1, side)*NNUE_HIDDEN_LAYER_SIZE;
+        sub_off2 = feature_index(sub_sq2, sub_piece2, side)*
+                                                        NNUE_HIDDEN_LAYER_SIZE;
+        add_off = feature_index(to, add_piece, side)*NNUE_HIDDEN_LAYER_SIZE;
 
         simd_add_sub2(&src->data[side][0], &dest->data[side][0],
                       &net.hidden.weights[add_off],
@@ -208,10 +205,10 @@ static void accumulator_castling(struct position *pos, int king_from,
 
     /* Perform operation for both perspectives */
     for (side=0;side<NSIDES;side++) {
-        sub_off1 = feature_index(king_from, king, side)*(layer_sizes[0]/2);
-        sub_off2 = feature_index(rook_from, rook, side)*(layer_sizes[0]/2);
-        add_off1 = feature_index(king_to, king, side)*(layer_sizes[0]/2);
-        add_off2 = feature_index(rook_to, rook, side)*(layer_sizes[0]/2);
+        sub_off1 = feature_index(king_from, king, side)*NNUE_HIDDEN_LAYER_SIZE;
+        sub_off2 = feature_index(rook_from, rook, side)*NNUE_HIDDEN_LAYER_SIZE;
+        add_off1 = feature_index(king_to, king, side)*NNUE_HIDDEN_LAYER_SIZE;
+        add_off2 = feature_index(rook_to, rook, side)*NNUE_HIDDEN_LAYER_SIZE;
 
         simd_add2_sub2(&src->data[side][0], &dest->data[side][0],
                       &net.hidden.weights[add_off1],
@@ -253,7 +250,7 @@ static void accumulator_refresh(struct position *pos, int side)
     while (bb != 0ULL) {
         sq = POPBIT(&bb);
         index = feature_index(sq, pos->pieces[sq], side);
-        offset = (layer_sizes[0]/2)*index;
+        offset = NNUE_HIDDEN_LAYER_SIZE*index;
         simd_add(&net.hidden.weights[offset], data);
     }
 }
@@ -272,7 +269,7 @@ static uint8_t* read_hidden_layer(uint8_t *iter, struct layer *layer)
     int l;
     int half;
 
-    half = layer_sizes[0]/2;
+    half = NNUE_HIDDEN_LAYER_SIZE;
     for (k=0;k<NNUE_NUM_INPUT_FEATURES;k++) {
         for (l=0;l<half;l++,iter+=2) {
             layer->weights[k*half+l] = read_uint16_le(iter);
@@ -285,19 +282,15 @@ static uint8_t* read_hidden_layer(uint8_t *iter, struct layer *layer)
     return iter;
 }
 
-static uint8_t* read_output_layer(uint8_t *iter, int idx, struct layer *layer)
+static uint8_t* read_output_layer(uint8_t *iter, struct layer *layer)
 {
     int k;
-    int l;
 
-    for (k=0;k<layer_sizes[idx-1];k++) {
-        for (l=0;l<layer_sizes[idx];l++,iter+=2) {
-            layer->weights[k*layer_sizes[idx]+l] = read_uint16_le(iter);
-        }
+    for (k=0;k<NNUE_HIDDEN_LAYER_SIZE*2;k++,iter+=2) {
+        layer->weights[k] = read_uint16_le(iter);
     }
-    for (k=0;k<layer_sizes[idx];k++,iter+=2) {
-        layer->biases[k] = read_uint16_le(iter);
-    }
+    layer->biases[0] = read_uint16_le(iter);
+    iter += 2;
 
     return iter;
 }
@@ -306,11 +299,11 @@ static bool parse_network(uint8_t **data)
 {
     uint8_t *iter = *data;
 
-    /* Read biases and weights for the input layer */
+    /* Read biases and weights for the hidden layer */
     iter = read_hidden_layer(iter, &net.hidden);
 
     /* Read biases and weights for the output layer */
-    iter = read_output_layer(iter, 1, &net.output);
+    iter = read_output_layer(iter, &net.output);
 
     *data = iter;
 
@@ -327,8 +320,8 @@ static uint32_t calculate_net_size(void)
     size += NNUE_HIDDEN_LAYER_SIZE*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t);
 
     /* Output layer */
-    size += layer_sizes[1]*sizeof(int16_t);
-    size += layer_sizes[1]*layer_sizes[0]*sizeof(int16_t);
+    size += sizeof(int16_t);
+    size += NNUE_HIDDEN_LAYER_SIZE*2*sizeof(int16_t);
 
     /* Files are padded so that the size if a multiple of 64 */
     rem = size%64;
@@ -343,12 +336,12 @@ void nnue_init(void)
 {
     /* Allocate space for layers */
     net.hidden.weights = aligned_malloc(64,
-                    layer_sizes[0]*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t));
-    net.hidden.biases = aligned_malloc(64, layer_sizes[0]*sizeof(int16_t));
+            NNUE_HIDDEN_LAYER_SIZE*2*NNUE_NUM_INPUT_FEATURES*sizeof(int16_t));
+    net.hidden.biases = aligned_malloc(64,
+                                    NNUE_HIDDEN_LAYER_SIZE*2*sizeof(int16_t));
     net.output.weights = aligned_malloc(64,
-                            layer_sizes[1]*layer_sizes[0]*sizeof(int16_t));
-    net.output.biases = aligned_malloc(64,
-                            layer_sizes[1]*sizeof(int16_t));
+                                    NNUE_HIDDEN_LAYER_SIZE*2*sizeof(int16_t));
+    net.output.biases = aligned_malloc(64, sizeof(int16_t));
 }
 
 void nnue_destroy(void)
