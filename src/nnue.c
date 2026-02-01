@@ -90,7 +90,138 @@ static int feature_index(int sq, int piece, int side)
     return sq + piece_index;
 }
 
-static void accumulator_propagate(struct position *pos)
+static void accumulator_move(struct position *pos, uint32_t move)
+{
+    struct nnue_accumulator *src;
+    struct nnue_accumulator *dest;
+    int                     from = FROM(move);
+    int                     to = TO(move);
+    int                     side;
+    int                     sub_piece;
+    int                     add_piece;
+    int                     add_off;
+    int                     sub_off;
+
+    /* Prepare operation parameters */
+    sub_piece = pos->pieces[from];
+    add_piece = ISPROMOTION(move)?PROMOTION(move):sub_piece;
+    src = &pos->eval_stack[pos->height-1].accumulator;
+    dest = &pos->eval_stack[pos->height].accumulator;
+
+    /* Perform operation for both perspectives */
+    for (side=0;side<NSIDES;side++) {
+        sub_off = feature_index(from, sub_piece, side)*(layer_sizes[0]/2);
+        add_off = feature_index(to, add_piece, side)*(layer_sizes[0]/2);
+
+        simd_add_sub(&src->data[side][0], &dest->data[side][0],
+                     &net.hidden.weights[add_off],
+                     &net.hidden.weights[sub_off]);
+    }
+}
+
+static void accumulator_capture(struct position *pos, uint32_t move)
+{
+    struct nnue_accumulator *src;
+    struct nnue_accumulator *dest;
+    int                     from = FROM(move);
+    int                     to = TO(move);
+    int                     side;
+    int                     sub_piece1;
+    int                     sub_piece2;
+    int                     add_piece;
+    int                     add_off;
+    int                     sub_off1;
+    int                     sub_off2;
+
+    /* Prepare operation parameters */
+    sub_piece1 = pos->pieces[from];
+    sub_piece2 = pos->pieces[to];
+    add_piece = ISPROMOTION(move)?PROMOTION(move):sub_piece1;
+    src = &pos->eval_stack[pos->height-1].accumulator;
+    dest = &pos->eval_stack[pos->height].accumulator;
+
+    /* Perform operation for both perspectives */
+    for (side=0;side<NSIDES;side++) {
+        sub_off1 = feature_index(from, sub_piece1, side)*(layer_sizes[0]/2);
+        sub_off2 = feature_index(to, sub_piece2, side)*(layer_sizes[0]/2);
+        add_off = feature_index(to, add_piece, side)*(layer_sizes[0]/2);
+
+        simd_add_sub2(&src->data[side][0], &dest->data[side][0],
+                      &net.hidden.weights[add_off],
+                      &net.hidden.weights[sub_off1],
+                      &net.hidden.weights[sub_off2]);
+    }
+}
+
+static void accumulator_en_passant(struct position *pos, uint32_t move)
+{
+    struct nnue_accumulator *src;
+    struct nnue_accumulator *dest;
+    int                     from = FROM(move);
+    int                     to = TO(move);
+    int                     side;
+    int                     sub_piece1;
+    int                     sub_piece2;
+    int                     add_piece;
+    int                     sub_sq2;
+    int                     add_off;
+    int                     sub_off1;
+    int                     sub_off2;
+
+    /* Prepare operation parameters */
+    sub_piece1 = PAWN + pos->stm;
+    sub_piece2 = PAWN + FLIP_COLOR(pos->stm);
+    add_piece = sub_piece1;
+    sub_sq2 = (pos->stm == WHITE)?to-8:to+8;
+    src = &pos->eval_stack[pos->height-1].accumulator;
+    dest = &pos->eval_stack[pos->height].accumulator;
+
+    /* Perform operation for both perspectives */
+    for (side=0;side<NSIDES;side++) {
+        sub_off1 = feature_index(from, sub_piece1, side)*(layer_sizes[0]/2);
+        sub_off2 = feature_index(sub_sq2, sub_piece2, side)*(layer_sizes[0]/2);
+        add_off = feature_index(to, add_piece, side)*(layer_sizes[0]/2);
+
+        simd_add_sub2(&src->data[side][0], &dest->data[side][0],
+                      &net.hidden.weights[add_off],
+                      &net.hidden.weights[sub_off1],
+                      &net.hidden.weights[sub_off2]);
+    }
+}
+
+static void accumulator_castling(struct position *pos, int king_from,
+                                 int king_to,int rook_from, int rook_to)
+{
+    struct nnue_accumulator *src;
+    struct nnue_accumulator *dest;
+    int                     side;
+    int                     rook = ROOK + pos->stm;
+    int                     king = KING + pos->stm;
+    int                     add_off1;
+    int                     add_off2;
+    int                     sub_off1;
+    int                     sub_off2;
+
+    /* Prepare operation parameters */
+    src = &pos->eval_stack[pos->height-1].accumulator;
+    dest = &pos->eval_stack[pos->height].accumulator;
+
+    /* Perform operation for both perspectives */
+    for (side=0;side<NSIDES;side++) {
+        sub_off1 = feature_index(king_from, king, side)*(layer_sizes[0]/2);
+        sub_off2 = feature_index(rook_from, rook, side)*(layer_sizes[0]/2);
+        add_off1 = feature_index(king_to, king, side)*(layer_sizes[0]/2);
+        add_off2 = feature_index(rook_to, rook, side)*(layer_sizes[0]/2);
+
+        simd_add2_sub2(&src->data[side][0], &dest->data[side][0],
+                      &net.hidden.weights[add_off1],
+                      &net.hidden.weights[add_off2],
+                      &net.hidden.weights[sub_off1],
+                      &net.hidden.weights[sub_off2]);
+    }
+}
+
+static void accumulator_copy(struct position *pos)
 {
     int16_t *prev_data;
     int16_t *data;
@@ -100,40 +231,6 @@ static void accumulator_propagate(struct position *pos)
         prev_data = &pos->eval_stack[pos->height-1].accumulator.data[side][0];
         data = &pos->eval_stack[pos->height].accumulator.data[side][0];
         memcpy(data, prev_data, sizeof(int16_t)*NNUE_HIDDEN_LAYER_SIZE);
-    }
-}
-
-static void accumulator_add(struct position *pos, int piece, int sq)
-{
-    struct nnue_accumulator *acc;
-    int16_t                 *data;
-    uint32_t                index;
-    uint32_t                offset;
-    int                     side;
-
-    acc = &pos->eval_stack[pos->height].accumulator;
-    for (side=0;side<NSIDES;side++) {
-        data = &acc->data[side][0];
-        index = feature_index(sq, piece, side);
-        offset = (layer_sizes[0]/2)*index;
-        simd_add(&net.hidden.weights[offset], data);
-    }
-}
-
-static void accumulator_remove(struct position *pos, int piece, int sq)
-{
-    struct nnue_accumulator *acc;
-    int16_t                 *data;
-    uint32_t                index;
-    uint32_t                offset;
-    int                     side;
-
-    acc = &pos->eval_stack[pos->height].accumulator;
-    for (side=0;side<NSIDES;side++) {
-        data = &acc->data[side][0];
-        index = feature_index(sq, piece, side);
-        offset = (layer_sizes[0]/2)*index;
-        simd_sub(&net.hidden.weights[offset], data);
     }
 }
 
@@ -353,9 +450,6 @@ void nnue_make_move(struct position *pos, uint32_t move)
 {
     int from = FROM(move);
     int to = TO(move);
-    int promotion = PROMOTION(move);
-    int capture = pos->pieces[to];
-    int piece = pos->pieces[from];
 
     assert(pos->height > 0);
 
@@ -364,31 +458,19 @@ void nnue_make_move(struct position *pos, uint32_t move)
         return;
     }
 
-    /* Copy accumulator data from the previous ply */
-    accumulator_propagate(pos);
-
     /* Update accumulator */
     if (ISKINGSIDECASTLE(move)) {
-        accumulator_remove(pos, KING + pos->stm, from);
-        accumulator_add(pos, KING + pos->stm, KINGCASTLE_KINGMOVE(to));
-        accumulator_remove(pos, ROOK + pos->stm, to);
-        accumulator_add(pos, ROOK + pos->stm, KINGCASTLE_KINGMOVE(to) - 1);
+        accumulator_castling(pos, from, KINGCASTLE_KINGMOVE(to), to,
+                             KINGCASTLE_KINGMOVE(to) - 1);
     } else if (ISQUEENSIDECASTLE(move)) {
-        accumulator_remove(pos, KING + pos->stm, from);
-        accumulator_add(pos, KING + pos->stm, QUEENCASTLE_KINGMOVE(to));
-        accumulator_remove(pos, ROOK + pos->stm, to);
-        accumulator_add(pos, ROOK + pos->stm, QUEENCASTLE_KINGMOVE(to) + 1);
+        accumulator_castling(pos, from, QUEENCASTLE_KINGMOVE(to), to,
+                             QUEENCASTLE_KINGMOVE(to) + 1);
     } else if (ISENPASSANT(move)) {
-        accumulator_remove(pos, piece, from);
-        accumulator_add(pos, piece, to);
-        accumulator_remove(pos, PAWN + FLIP_COLOR(pos->stm),
-                           (pos->stm == WHITE)?to-8:to+8);
+        accumulator_en_passant(pos, move);
+    } else if (ISCAPTURE(move)) {
+        accumulator_capture(pos, move);
     } else {
-        accumulator_remove(pos, piece, from);
-        if (ISCAPTURE(move)) {
-            accumulator_remove(pos, capture, to);
-        }
-        accumulator_add(pos, ISPROMOTION(move)?promotion:piece, to);
+        accumulator_move(pos, move);
     }
 }
 
@@ -396,5 +478,5 @@ void nnue_make_null_move(struct position *pos)
 {
     assert(pos != NULL);
 
-    accumulator_propagate(pos);
+    accumulator_copy(pos);
 }

@@ -46,4 +46,39 @@ void simd_add(int16_t *inputs, int16_t *outputs);
  */
 void simd_sub(int16_t *inputs, int16_t *output);
 
+/*
+ * SIMD implementation of a fused add + sub operation.
+ *
+ * @param input The input.
+ * @param output The output.
+ * @param add The add weights.
+ * @output sub The sub weights.
+ */
+void simd_add_sub(int16_t* input, int16_t *output, int16_t *add, int16_t *sub);
+
+/*
+ * SIMD implementation of a fused add + sub + sub operation.
+ *
+ * @param input The input.
+ * @param output The output.
+ * @param add The add weights.
+ * @output sub1 The first sub weights.
+ * @output sub2 The second sub weights.
+ */
+void simd_add_sub2(int16_t* input, int16_t *output, int16_t *add, int16_t *sub1,
+                   int16_t *sub2);
+
+/*
+ * SIMD implementation of a fused add + add + sub + sub operation.
+ *
+ * @param input The input.
+ * @param output The output.
+ * @param add1 The first add weights.
+ * @param add2 The second add weights.
+ * @output sub1 The first sub weights.
+ * @output sub2 The second sub weights.
+ */
+void simd_add2_sub2(int16_t* input, int16_t *output, int16_t *add1,
+                    int16_t *add2, int16_t *sub1, int16_t *sub2);
+
 #endif

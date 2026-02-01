@@ -104,6 +104,62 @@ void simd_sub(int16_t *inputs, int16_t *outputs)
     }
 }
 
+void simd_add_sub(int16_t* input, int16_t *output, int16_t *add, int16_t *sub)
+{
+    int k;
+    int niterations = NNUE_HIDDEN_LAYER_SIZE/NUM_REGS;
+
+    __m256i *pi = (__m256i*)input;
+    __m256i *po = (__m256i*)output;
+    __m256i *padd = (__m256i*)add;
+    __m256i *psub = (__m256i*)sub;
+
+    for (k=0;k<niterations;k++) {
+        __m256i v = _mm256_add_epi16(pi[k], padd[k]);
+        po[k] = _mm256_sub_epi16(v, psub[k]);
+    }
+}
+
+void simd_add_sub2(int16_t* input, int16_t *output, int16_t *add, int16_t *sub1,
+                   int16_t *sub2)
+{
+    int k;
+    int niterations = NNUE_HIDDEN_LAYER_SIZE/NUM_REGS;
+
+    __m256i *pi = (__m256i*)input;
+    __m256i *po = (__m256i*)output;
+    __m256i *padd = (__m256i*)add;
+    __m256i *psub1 = (__m256i*)sub1;
+    __m256i *psub2 = (__m256i*)sub2;
+
+    for (k=0;k<niterations;k++) {
+        __m256i v = _mm256_add_epi16(pi[k], padd[k]);
+        __m256i v2 = _mm256_sub_epi16(v, psub1[k]);
+        po[k] = _mm256_sub_epi16(v2, psub2[k]);
+    }
+}
+
+void simd_add2_sub2(int16_t* input, int16_t *output, int16_t *add1,
+                    int16_t *add2, int16_t *sub1, int16_t *sub2)
+{
+    int k;
+    int niterations = NNUE_HIDDEN_LAYER_SIZE/NUM_REGS;
+
+    __m256i *pi = (__m256i*)input;
+    __m256i *po = (__m256i*)output;
+    __m256i *padd1 = (__m256i*)add1;
+    __m256i *padd2 = (__m256i*)add2;
+    __m256i *psub1 = (__m256i*)sub1;
+    __m256i *psub2 = (__m256i*)sub2;
+
+    for (k=0;k<niterations;k++) {
+        __m256i v = _mm256_add_epi16(pi[k], padd1[k]);
+        __m256i v2 = _mm256_add_epi16(v, padd2[k]);
+        __m256i v3 = _mm256_sub_epi16(v2, psub1[k]);
+        po[k] = _mm256_sub_epi16(v3, psub2[k]);
+    }
+}
+
 #elif defined(USE_SSE)
 
 static int32_t hsum_4x32(__m128i v)
@@ -168,6 +224,62 @@ void simd_sub(int16_t *inputs, int16_t *outputs)
     }
 }
 
+void simd_add_sub(int16_t* input, int16_t *output, int16_t *add, int16_t *sub)
+{
+    int k;
+    int niterations = NNUE_HIDDEN_LAYER_SIZE/NUM_REGS;
+
+    __m128i *pi = (__m128i*)input;
+    __m128i *po = (__m128i*)output;
+    __m128i *padd = (__m128i*)add;
+    __m128i *psub = (__m128i*)sub;
+
+    for (k=0;k<niterations;k++) {
+        __m128i v = _mm_add_epi16(pi[k], padd[k]);
+        po[k] = _mm_sub_epi16(v, psub[k]);
+    }
+}
+
+void simd_add_sub2(int16_t* input, int16_t *output, int16_t *add, int16_t *sub1,
+                   int16_t *sub2)
+{
+    int k;
+    int niterations = NNUE_HIDDEN_LAYER_SIZE/NUM_REGS;
+
+    __m128i *pi = (__m128i*)input;
+    __m128i *po = (__m128i*)output;
+    __m128i *padd = (__m128i*)add;
+    __m128i *psub1 = (__m128i*)sub1;
+    __m128i *psub2 = (__m128i*)sub2;
+
+    for (k=0;k<niterations;k++) {
+        __m128i v = _mm_add_epi16(pi[k], padd[k]);
+        __m128i v2 = _mm_sub_epi16(v, psub1[k]);
+        po[k] = _mm_sub_epi16(v2, psub2[k]);
+    }
+}
+
+void simd_add2_sub2(int16_t* input, int16_t *output, int16_t *add1,
+                    int16_t *add2, int16_t *sub1, int16_t *sub2)
+{
+    int k;
+    int niterations = NNUE_HIDDEN_LAYER_SIZE/NUM_REGS;
+
+    __m128i *pi = (__m128i*)input;
+    __m128i *po = (__m128i*)output;
+    __m128i *padd1 = (__m128i*)add1;
+    __m128i *padd2 = (__m128i*)add2;
+    __m128i *psub1 = (__m128i*)sub1;
+    __m128i *psub2 = (__m128i*)sub2;
+
+    for (k=0;k<niterations;k++) {
+        __m128i v = _mm_add_epi16(pi[k], padd1[k]);
+        __m128i v2 = _mm_add_epi16(v, padd2[k]);
+        __m128i v3 = _mm_sub_epi16(v2, psub1[k]);
+        po[k] = _mm_sub_epi16(v3, psub2[k]);
+    }
+}
+
 #else
 
 static int32_t screlu(int16_t input)
@@ -205,6 +317,36 @@ void simd_sub(int16_t *inputs, int16_t *outputs)
 
     for (k=0;k<NNUE_HIDDEN_LAYER_SIZE;k++) {
         outputs[k] -= inputs[k];
+    }
+}
+
+static void simd_add_sub(int16_t* input, int16_t *output, int16_t *add,
+                         int16_t *sub)
+{
+    int k;
+
+    for (k=0;k<NNUE_HIDDEN_LAYER_SIZE;k++) {
+        output[k] = input[k] + add[k] - sub[k];
+    }
+}
+
+static void simd_add_sub2(int16_t* input, int16_t *output, int16_t *add,
+                          int16_t *sub1, int16_t *sub2)
+{
+    int k;
+
+    for (k=0;k<NNUE_HIDDEN_LAYER_SIZE;k++) {
+        output[k] = input[k] + add[k] - sub1[k] - sub2[k];
+    }
+}
+
+void simd_add2_sub2(int16_t* input, int16_t *output, int16_t *add1,
+                    int16_t *add2, int16_t *sub1, int16_t *sub2)
+{
+    int k;
+
+    for (k=0;k<NNUE_HIDDEN_LAYER_SIZE;k++) {
+        output[k] = input[k] + add1[k] + add2[k] - sub1[k] - sub2[k];
     }
 }
 #endif
